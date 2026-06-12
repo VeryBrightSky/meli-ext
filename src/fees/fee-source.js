@@ -66,6 +66,8 @@ globalThis.MST_FEE_SOURCE = (() => {
     freeShippingThresholdMXN: table.freeShippingThresholdMXN,
     getQuote,
     getFixedCost: fixedCostFor,
+    // Prices where the fixed charge steps (sweet-spot candidates).
+    getFixedCostThresholds: () => table.fixedCost.tiers.map((t) => t.maxPriceExclusive),
     listCategoryGroups,
     matchCategory
   });

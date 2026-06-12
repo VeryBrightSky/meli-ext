@@ -233,6 +233,57 @@ test("exact unreachable margin: 16% rate + 85% margin -> null (UI shows 'Margen 
   assert.equal(p, null);
 });
 
+test("sweet spot: $280 @ 10% → raise to $299, net up exactly $54.10", () => {
+  // net(280) = 252 − 37 = 215; net(299) = 269.10 − 0 = 269.10
+  const spot = CALC.findSweetSpot({
+    priceMXN: 280,
+    ratePct: 10,
+    fixedCostFn: SOURCE.getFixedCost,
+    thresholds: SOURCE.getFixedCostThresholds()
+  });
+  assert.deepEqual(spot, { targetPriceMXN: 299, netGainMXN: 54.1 });
+});
+
+test("sweet spot: worst-case 16% rate at $280 still gains $52.96", () => {
+  // (299−280)·0.84 + 37 = 15.96 + 37 = 52.96
+  const spot = CALC.findSweetSpot({
+    priceMXN: 280,
+    ratePct: 16,
+    fixedCostFn: SOURCE.getFixedCost,
+    thresholds: SOURCE.getFixedCostThresholds()
+  });
+  assert.deepEqual(spot, { targetPriceMXN: 299, netGainMXN: 52.96 });
+});
+
+test("sweet spot: tier INCREASES never nudge ($95→$99 loses, $145→$150 loses)", () => {
+  const args = { ratePct: 10, fixedCostFn: SOURCE.getFixedCost, thresholds: SOURCE.getFixedCostThresholds() };
+  // net(95)=60.50 vs net(99)=59.10 → −1.40, and $150/$299 outside +20%
+  assert.equal(CALC.findSweetSpot({ ...args, priceMXN: 95 }), null);
+  // net(145)=100.50 vs net(150)=98.00 → −2.50
+  assert.equal(CALC.findSweetSpot({ ...args, priceMXN: 145 }), null);
+});
+
+test("sweet spot: no threshold nearby → null ($310 and $827)", () => {
+  const args = { ratePct: 10, fixedCostFn: SOURCE.getFixedCost, thresholds: SOURCE.getFixedCostThresholds() };
+  assert.equal(CALC.findSweetSpot({ ...args, priceMXN: 310 }), null);
+  assert.equal(CALC.findSweetSpot({ ...args, priceMXN: 827 }), null);
+});
+
+test("sweet spot: $260 still reaches $299 within +20% window", () => {
+  // net(260)=234−37=197; net(299)=269.10 → gain 72.10; limit 312 ≥ 299
+  const spot = CALC.findSweetSpot({
+    priceMXN: 260,
+    ratePct: 10,
+    fixedCostFn: SOURCE.getFixedCost,
+    thresholds: SOURCE.getFixedCostThresholds()
+  });
+  assert.deepEqual(spot, { targetPriceMXN: 299, netGainMXN: 72.1 });
+});
+
+test("fixed-cost thresholds come from the table", () => {
+  assert.deepEqual(SOURCE.getFixedCostThresholds(), [99, 150, 299]);
+});
+
 test("getFixedCost exposed on the fee source", () => {
   assert.equal(SOURCE.getFixedCost(50), 25);
   assert.equal(SOURCE.getFixedCost(299), 0);

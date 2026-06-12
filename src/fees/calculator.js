@@ -100,5 +100,31 @@ globalThis.MST_CALC = (() => {
     return round2(price);
   }
 
-  return Object.freeze({ computeBreakdown, solveTargetPrice, round2, parseMoney });
+  // Sweet-spot detector: fees are discontinuous (fixed-charge tiers at
+  // $99/$150, charge disappears at $299), so a small price INCREASE can raise
+  // the net payout. Scan thresholds within `maxIncreaseRatio` above the
+  // current price and return the one with the best positive net gain.
+  // Shipping/cost are constant across the comparison and cancel out.
+  function findSweetSpot({ priceMXN, ratePct, fixedCostFn, thresholds, maxIncreaseRatio = 0.2 }) {
+    if (!(priceMXN > 0)) return null;
+    const net = (p) => p * (1 - ratePct / 100) - fixedCostFn(p);
+    const limit = priceMXN * (1 + maxIncreaseRatio);
+    let best = null;
+    for (const t of thresholds) {
+      if (t <= priceMXN || t > limit) continue;
+      const gain = round2(net(t) - net(priceMXN));
+      if (gain > 0 && (best === null || gain > best.netGainMXN)) {
+        best = { targetPriceMXN: t, netGainMXN: gain };
+      }
+    }
+    return best;
+  }
+
+  return Object.freeze({
+    computeBreakdown,
+    solveTargetPrice,
+    findSweetSpot,
+    round2,
+    parseMoney
+  });
 })();

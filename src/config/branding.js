@@ -9,7 +9,7 @@ globalThis.EXT_BRAND = Object.freeze({
   name: "Netio",
   // Name used in manifest.json. "(dev)" suffix is stripped by the release build.
   manifestName: "Netio (dev)",
-  version: "1.0.0",
+  version: "1.1.0",
   description:
     "Calculadora de comisiones, ganancias y precios para vendedores de Mercado Libre México.",
   // Path relative to the extension root; resolve with chrome.runtime.getURL().

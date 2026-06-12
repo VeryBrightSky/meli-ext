@@ -17,13 +17,15 @@ globalThis.MST_CARD = (() => {
   // the DOM node (persistence watcher rebuilds from this).
   const state = {
     priceMXN: 0,
+    pagePriceMXN: 0, // the price actually on the page; priceMXN is what-if
     itemId: null,
     listingTypeId: "classic",
     categoryGroupId: null,
     categoryAutoDetected: false,
     shippingCostMXN: 0,
     productCostMXN: 0,
-    targetMarginPct: 0
+    targetMarginPct: 0,
+    compareOpen: false
   };
 
   // Live references into the current card DOM, repopulated on each build().
@@ -174,6 +176,75 @@ globalThis.MST_CARD = (() => {
     if (!refs.card) return;
     const { quote, b } = computeCurrent();
 
+    // What-if price: reset link only when diverging from the page price.
+    refs.resetPrice.style.display =
+      state.priceMXN !== state.pagePriceMXN ? "" : "none";
+    refs.shipLabel.textContent =
+      state.priceMXN >= SOURCE.freeShippingThresholdMXN
+        ? T("rowShippingFree")
+        : T("rowShipping");
+
+    // Sweet spot (worst-case rate so the promised gain is conservative).
+    const spot = CALC.findSweetSpot({
+      priceMXN: state.priceMXN,
+      ratePct: quote.pctMax,
+      fixedCostFn: SOURCE.getFixedCost,
+      thresholds: SOURCE.getFixedCostThresholds()
+    });
+    refs.sweetspot.style.display = spot ? "" : "none";
+    if (spot) {
+      refs.sweetspot.textContent = T("sweetSpot", [
+        fmtMoney(spot.targetPriceMXN),
+        fmtMoney(spot.netGainMXN)
+      ]);
+      refs.sweetspot.dataset.target = String(spot.targetPriceMXN);
+    } else {
+      delete refs.sweetspot.dataset.target;
+    }
+
+    // Clásica vs Premium comparison.
+    refs.compareBtn.setAttribute("aria-pressed", String(state.compareOpen));
+    refs.compareBtn.classList.toggle(
+      `${PREFIX}-compare-toggle--active`,
+      state.compareOpen
+    );
+    refs.compareBox.style.display = state.compareOpen ? "" : "none";
+    if (state.compareOpen) {
+      const inputs = {
+        priceMXN: state.priceMXN,
+        shippingCostMXN: state.shippingCostMXN,
+        productCostMXN: 0
+      };
+      const c = CALC.computeBreakdown(
+        SOURCE.getQuote({
+          priceMXN: state.priceMXN,
+          listingTypeId: "classic",
+          categoryGroupId: state.categoryGroupId
+        }),
+        inputs
+      );
+      const p = CALC.computeBreakdown(
+        SOURCE.getQuote({
+          priceMXN: state.priceMXN,
+          listingTypeId: "premium",
+          categoryGroupId: state.categoryGroupId
+        }),
+        inputs
+      );
+      patchRow(refs.compareClassic, null, fmtRange(c.netMinMXN, c.netMaxMXN), flash);
+      patchRow(refs.comparePremium, null, fmtRange(p.netMinMXN, p.netMaxMXN), flash);
+      // Interval difference: [cMin − pMax, cMax − pMin] — the true bounds.
+      patchRow(
+        refs.compareDiff,
+        null,
+        fmtRange(
+          CALC.round2(c.netMinMXN - p.netMaxMXN),
+          CALC.round2(c.netMaxMXN - p.netMinMXN)
+        ),
+        flash
+      );
+    }
+
     patchRow(
       refs.commission,
       T("rowCommission", [fmtPctRange(b.pctMin, b.pctMax)]),
@@ -276,9 +347,28 @@ globalThis.MST_CARD = (() => {
     header.appendChild(badge);
     body.appendChild(header);
 
-    const priceRow = buildRow(T("rowPrice"));
-    priceRow.value.textContent = fmtMoney(state.priceMXN);
-    body.appendChild(priceRow.root);
+    // What-if price: editable, pre-filled from the page; reset link restores.
+    const priceRow = el("div", `${PREFIX}-row`);
+    priceRow.appendChild(el("span", `${PREFIX}-row__label`, T("rowPrice")));
+    const priceWrap = el("span", `${PREFIX}-pricewrap`);
+    refs.resetPrice = el("button", `${PREFIX}-reset`, T("resetPrice"));
+    refs.resetPrice.type = "button";
+    refs.resetPrice.addEventListener("click", () => {
+      state.priceMXN = state.pagePriceMXN;
+      refs.priceInput.syncFromState();
+      update();
+    });
+    refs.priceInput = moneyInput(
+      () => state.priceMXN,
+      (v) => {
+        if (v > 0) state.priceMXN = v; // ignore empty/zero — price can't be 0
+        update();
+      }
+    );
+    refs.priceInput.setAttribute("aria-label", T("rowPrice"));
+    priceWrap.append(refs.resetPrice, refs.priceInput);
+    priceRow.appendChild(priceWrap);
+    body.appendChild(priceRow);
 
     // Listing type toggle.
     const typeRow = el("div", `${PREFIX}-row`);
@@ -298,7 +388,26 @@ globalThis.MST_CARD = (() => {
       toggle.appendChild(btn);
     }
     typeRow.appendChild(toggle);
+    // Clásica vs Premium side-by-side comparison.
+    refs.compareBtn = el("button", `${PREFIX}-compare-toggle`, T("btnCompare"));
+    refs.compareBtn.type = "button";
+    refs.compareBtn.addEventListener("click", () => {
+      state.compareOpen = !state.compareOpen;
+      update(false);
+    });
+    typeRow.appendChild(refs.compareBtn);
     body.appendChild(typeRow);
+
+    refs.compareBox = el("div", `${PREFIX}-compare`);
+    refs.compareClassic = buildRow(T("typeClassic"));
+    refs.comparePremium = buildRow(T("typePremium"));
+    refs.compareDiff = buildRow(T("compareDiff"));
+    refs.compareBox.append(
+      refs.compareClassic.root,
+      refs.comparePremium.root,
+      refs.compareDiff.root
+    );
+    body.appendChild(refs.compareBox);
 
     // Category picker.
     const catRow = el("div", `${PREFIX}-row`);
@@ -343,13 +452,10 @@ globalThis.MST_CARD = (() => {
     refs.effective = buildRow(T("rowEffectiveRate"));
     body.appendChild(refs.effective.root);
 
-    // Shipping input.
+    // Shipping input. Label is price-dependent (what-if can cross $299).
     const shipRow = el("div", `${PREFIX}-row`);
-    const shipLabel =
-      state.priceMXN >= SOURCE.freeShippingThresholdMXN
-        ? T("rowShippingFree")
-        : T("rowShipping");
-    shipRow.appendChild(el("span", `${PREFIX}-row__label`, shipLabel));
+    refs.shipLabel = el("span", `${PREFIX}-row__label`, T("rowShipping"));
+    shipRow.appendChild(refs.shipLabel);
     refs.shippingInput = moneyInput(
       () => state.shippingCostMXN,
       (v) => {
@@ -364,6 +470,19 @@ globalThis.MST_CARD = (() => {
 
     refs.net = buildRow(T("rowNet"), "total");
     body.appendChild(refs.net.root);
+
+    // Sweet-spot nudge: clicking applies the suggested what-if price.
+    refs.sweetspot = el("button", `${PREFIX}-sweetspot`, "");
+    refs.sweetspot.type = "button";
+    refs.sweetspot.addEventListener("click", () => {
+      const target = Number(refs.sweetspot.dataset.target);
+      if (target > 0) {
+        state.priceMXN = target;
+        refs.priceInput.syncFromState();
+        update();
+      }
+    });
+    body.appendChild(refs.sweetspot);
 
     // Product cost input → profit margin.
     const costRow = el("div", `${PREFIX}-row`);
@@ -505,6 +624,7 @@ globalThis.MST_CARD = (() => {
     }
 
     state.priceMXN = pageData.price.value;
+    state.pagePriceMXN = pageData.price.value;
     state.itemId = pageData.itemId;
     state.listingTypeId = pageData.listingTypeGuess;
     // Structured data first (language-stable), visible breadcrumb fallback.
@@ -519,8 +639,10 @@ globalThis.MST_CARD = (() => {
 
     refs.card = card;
     buildCalculator(body);
+    refs.priceInput.syncFromState(); // pre-fill with the page price
     update(false);
     restoreInputs().then(() => {
+      refs.priceInput.syncFromState();
       refs.shippingInput.syncFromState();
       refs.costInput.syncFromState();
       refs.marginInput.syncFromState();

@@ -162,6 +162,101 @@ globalThis.MST_QUICKVIEW = (() => {
     return strip;
   }
 
+  // --- CSV export -----------------------------------------------------------
+
+  function csvEscape(value) {
+    const s = String(value ?? "");
+    return /[",\n;]/.test(s) ? `"${s.replaceAll('"', '""')}"` : s;
+  }
+
+  function buildCsv() {
+    const header = [
+      T("csvHeaderTitle"),
+      T("rowPrice"),
+      T("stripListingType"),
+      T("stripCategory"),
+      T("stripFreeShipping"),
+      T("csvCommissionMin"),
+      T("csvCommissionMax"),
+      T("csvNetMin"),
+      T("csvNetMax")
+    ];
+    const groupLabel =
+      SOURCE.listCategoryGroups().find((g) => g.id === pageCategoryGroupId)?.label ?? "";
+    const lines = [header.map(csvEscape).join(",")];
+
+    const { items } = findItems();
+    for (const item of items) {
+      if (!item.querySelector(`.${STRIP_CLASS}`)) continue; // export what's shown
+      const data = extractItemData(item);
+      if (!data.priceMXN) continue;
+      const quote = SOURCE.getQuote({
+        priceMXN: data.priceMXN,
+        listingTypeId: data.listingTypeGuess,
+        categoryGroupId: pageCategoryGroupId
+      });
+      const b = CALC.computeBreakdown(quote, {
+        priceMXN: data.priceMXN,
+        shippingCostMXN: 0,
+        productCostMXN: 0
+      });
+      const title =
+        item.querySelector("h2, .poly-component__title")?.textContent.trim() ?? "";
+      lines.push(
+        [
+          title,
+          b.priceMXN.toFixed(2),
+          data.listingTypeGuess === "premium" ? T("typePremium") : T("typeClassic"),
+          groupLabel,
+          data.freeShipping ? T("yes") : T("no"),
+          b.commissionMinMXN.toFixed(2),
+          b.commissionMaxMXN.toFixed(2),
+          b.netMinMXN.toFixed(2),
+          b.netMaxMXN.toFixed(2)
+        ]
+          .map(csvEscape)
+          .join(",")
+      );
+    }
+    return "﻿" + lines.join("\r\n"); // BOM so Excel opens UTF-8 correctly
+  }
+
+  function downloadCsv() {
+    const blob = new Blob([buildCsv()], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${BRAND.name.toLowerCase()}-resultados.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  // Inject (or refresh) the export bar above the results list. Idempotent.
+  function ensureExportBar(firstItem, stripCount) {
+    const ID = `${PREFIX}-export`;
+    let bar = document.getElementById(ID);
+    if (!bar) {
+      const list = firstItem.closest("ol, ul") ?? firstItem.parentElement;
+      if (!list || !list.parentElement) return;
+      bar = el("div", `${PREFIX}-export`);
+      bar.id = ID;
+      const logo = document.createElement("img");
+      logo.src = chrome.runtime.getURL(BRAND.logoPath);
+      logo.alt = BRAND.name;
+      logo.width = 12;
+      logo.height = 12;
+      const btn = el("button", `${PREFIX}-export__btn`, "");
+      btn.type = "button";
+      btn.addEventListener("click", downloadCsv);
+      bar.append(logo, btn, el("span", `${PREFIX}-export__brand`, BRAND.name));
+      list.parentElement.insertBefore(bar, list);
+    }
+    bar.querySelector(`.${PREFIX}-export__btn`).textContent =
+      `${T("btnExportCsv")} (${stripCount})`;
+  }
+
   // --- Scan & observe -----------------------------------------------------------
 
   function scan() {
@@ -187,6 +282,8 @@ globalThis.MST_QUICKVIEW = (() => {
           `+${injected} strip(s) injected, ${skippedNoPrice} skipped (no price)`
       );
     }
+    const stripCount = items.filter((i) => i.querySelector(`.${STRIP_CLASS}`)).length;
+    if (stripCount > 0) ensureExportBar(items[0], stripCount);
     return { injected, total: items.length, selector };
   }
 

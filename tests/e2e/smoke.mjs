@@ -5,7 +5,7 @@
 //   npm run test:e2e
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { createServer } from "node:https";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -82,7 +82,10 @@ const rowValue = (label) => `
 
 async function typeInto(page, index, text) {
   const inputs = await page.$$(".mst-card input");
-  await inputs[index].click({ clickCount: 3 });
+  await inputs[index].focus();
+  // Triple-click select-all is unreliable in headless; select programmatically
+  // so typing replaces any pre-filled value (e.g. the what-if price).
+  await inputs[index].evaluate((el) => el.select());
   await inputs[index].type(text, { delay: 20 });
   await page.keyboard.press("Enter"); // confirm = blur = flush debounce
   await new Promise((r) => setTimeout(r, 300));
@@ -103,8 +106,9 @@ try {
   assert.ok(cardBox && cardBox.width > 0 && cardBox.height > 0, "card has no on-screen box");
   pass("card injects and is visible");
 
-  assert.equal(await page.evaluate(rowValue("Precio de venta")), "$827.00");
-  pass("price read $827.00 (not the crossed-out $1,199)");
+  const priceValue = await page.$eval(".mst-card input", (i) => i.value);
+  assert.equal(priceValue, "827.00");
+  pass("price input pre-filled 827.00 (not the crossed-out $1,199)");
 
   // structured-data category: breadcrumb is English, so tech (10%) proves
   // the embedded-state path worked
@@ -115,12 +119,12 @@ try {
   assert.equal(await page.evaluate(rowValue("Recibirás aprox.")), "$827.00".replace("827.00", "744.30"));
   pass("net payout $744.30");
 
-  await typeInto(page, 0, "50"); // shipping
-  await typeInto(page, 1, "400"); // product cost
+  await typeInto(page, 1, "50"); // shipping (input 0 is the what-if price)
+  await typeInto(page, 2, "400"); // product cost
   assert.equal(await page.evaluate(rowValue("Precio mínimo")), "$500.00");
   pass("cost 400 + shipping 50 → breakeven $500.00");
 
-  await typeInto(page, 2, "20"); // target margin
+  await typeInto(page, 3, "20"); // target margin
   assert.equal(await page.evaluate(rowValue("Precio objetivo")), "$642.86");
   pass("margin 20% → target price $642.86");
 
@@ -137,6 +141,54 @@ try {
     assert.ok(clip.includes(expected), `clipboard missing "${expected}"\n--- got:\n${clip}`);
   }
   pass("copy summary writes expected text to clipboard");
+
+  // --- v1.1: what-if price + sweet spot ------------------------------------
+  const spotVisibleAt827 = await page.$eval(
+    ".mst-sweetspot",
+    (e) => e.style.display !== "none"
+  );
+  assert.equal(spotVisibleAt827, false, "sweet spot should be hidden at $827");
+
+  await typeInto(page, 0, "280"); // what-if price near the $299 threshold
+  assert.equal(await page.evaluate(rowValue("Comisión")), "−$28.00");
+  assert.equal(await page.evaluate(rowValue("Cargo fijo")), "−$37.00");
+  assert.equal(await page.evaluate(rowValue("Recibirás aprox.")), "$165.00");
+  pass("what-if price 280 recalculates live (commission −$28.00, fijo −$37.00, net $165.00)");
+
+  const spotText = await page.$eval(".mst-sweetspot", (e) => e.textContent);
+  assert.ok(spotText.includes("$299.00"), `sweet spot missing $299.00: ${spotText}`);
+  assert.ok(spotText.includes("$54.10"), `sweet spot missing $54.10: ${spotText}`);
+  pass("sweet spot nudges $299.00 with exact net gain $54.10");
+
+  await page.click(".mst-sweetspot");
+  await new Promise((r) => setTimeout(r, 300));
+  assert.equal(await page.$eval(".mst-card input", (i) => i.value), "299.00");
+  assert.equal(await page.evaluate(rowValue("Recibirás aprox.")), "$219.10");
+  pass("clicking the nudge applies $299 (net $219.10)");
+
+  await page.click(".mst-reset");
+  await new Promise((r) => setTimeout(r, 300));
+  assert.equal(await page.$eval(".mst-card input", (i) => i.value), "827.00");
+  assert.equal(await page.evaluate(rowValue("Recibirás aprox.")), "$694.30");
+  assert.equal(
+    await page.$eval(".mst-sweetspot", (e) => e.style.display !== "none"),
+    false
+  );
+  pass("reset restores page price $827 and hides the nudge");
+
+  // --- v1.1: Clásica vs Premium compare -------------------------------------
+  await page.click(".mst-compare-toggle");
+  await new Promise((r) => setTimeout(r, 200));
+  const compare = await page.evaluate(() => {
+    const box = document.querySelector(".mst-compare");
+    const vals = [...box.querySelectorAll(".mst-row__value")].map((v) => v.textContent);
+    return { visible: box.style.display !== "none", vals };
+  });
+  assert.equal(compare.visible, true);
+  assert.equal(compare.vals[0], "$694.30"); // Clásica 10%, shipping 50
+  assert.equal(compare.vals[1], "$657.08 – $673.62"); // Premium 12.5–14.5%
+  assert.equal(compare.vals[2], "$20.68 – $37.22"); // MSI cost interval
+  pass("compare shows Clásica $694.30 vs Premium $657.08–$673.62, MSI cost $20.68–$37.22");
 
   // --- search page ----------------------------------------------------------
   console.log("\nSEARCH FIXTURE");
@@ -170,6 +222,43 @@ try {
   const firstBar = await search.$eval(".mst-strip__bar b", (b) => b.textContent);
   assert.equal(firstBar, "$744.30");
   pass("collapsed bar shows net $744.30 (skipped crossed-out $999)");
+
+  // --- v1.1: CSV export -------------------------------------------------------
+  const exportLabel = await search.$eval(".mst-export__btn", (b) => b.textContent);
+  assert.equal(exportLabel, "Exportar CSV (3)");
+  pass("export bar present with count (3)");
+
+  // Content scripts live in an isolated world — hooking URL.createObjectURL
+  // from the main world can't see the call. Capture the real download instead.
+  const dlDir = mkdtempSync(join(tmpdir(), "meli-e2e-dl-"));
+  const cdp = await search.createCDPSession();
+  await cdp.send("Browser.setDownloadBehavior", {
+    behavior: "allow",
+    downloadPath: dlDir
+  });
+  await search.click(".mst-export__btn");
+  let csvFile = null;
+  for (let i = 0; i < 50 && !csvFile; i++) {
+    await new Promise((r) => setTimeout(r, 100));
+    csvFile = readdirSync(dlDir).find((f) => f.endsWith(".csv"));
+  }
+  assert.ok(csvFile, "no CSV file downloaded within 5s");
+  assert.equal(csvFile, "netio-resultados.csv");
+  const csv = readFileSync(join(dlDir, csvFile), "utf8");
+  rmSync(dlDir, { recursive: true, force: true });
+  const lines = csv.replace(/^﻿/, "").split("\r\n");
+  assert.equal(lines.length, 4, `expected header + 3 rows, got ${lines.length}`);
+  assert.ok(lines[0].startsWith("Título,"), `bad header: ${lines[0]}`);
+  assert.ok(
+    lines[1].includes("827.00") && lines[1].includes("Clásica") && lines[1].includes("Sí"),
+    `row1 wrong: ${lines[1]}`
+  );
+  assert.ok(
+    lines[2].includes("120.00") && lines[2].includes("Premium"),
+    `row2 wrong: ${lines[2]}`
+  );
+  assert.ok(lines[1].includes("Tecnología y electrónica"), `category missing: ${lines[1]}`);
+  pass("CSV export: header + 3 rows with prices, types, category, free-shipping");
 
   console.log(`\nE2E: ${passed.length}/${passed.length} checks passed`);
 } finally {

@@ -104,6 +104,110 @@
   color: #f23d4f;
 }
 
+/* What-if price */
+.mst-pricewrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mst-reset {
+  font-family: inherit;
+  font-size: 12px;
+  border: none;
+  background: none;
+  color: #3483fa;
+  cursor: pointer;
+  padding: 0;
+}
+
+.mst-reset:hover {
+  text-decoration: underline;
+}
+
+/* Sweet-spot nudge */
+.mst-sweetspot {
+  font-family: inherit;
+  font-size: 12px;
+  text-align: left;
+  line-height: 1.4;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 6px;
+  background: #fff3cd;
+  color: rgba(0, 0, 0, 0.8);
+  cursor: pointer;
+}
+
+.mst-sweetspot:hover {
+  background: #ffecb3;
+}
+
+/* Clásica vs Premium comparison */
+.mst-compare-toggle {
+  font-family: inherit;
+  font-size: 12px;
+  margin-left: 8px;
+  padding: 4px 8px;
+  border: 1px solid rgba(0, 0, 0, 0.17);
+  border-radius: 6px;
+  background: #fff;
+  color: rgba(0, 0, 0, 0.7);
+  cursor: pointer;
+}
+
+.mst-compare-toggle--active {
+  border-color: #3483fa;
+  color: #3483fa;
+}
+
+.mst-compare {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.03);
+}
+
+/* CSV export bar (search pages) */
+.mst-export {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: inherit;
+  background: #fff;
+  border-radius: 6px;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.12);
+  padding: 8px 12px;
+  margin: 8px 0;
+}
+
+.mst-export img {
+  display: block;
+  border-radius: 2px;
+}
+
+.mst-export__btn {
+  font-family: inherit;
+  font-size: 13px;
+  border: none;
+  background: none;
+  color: #3483fa;
+  cursor: pointer;
+  padding: 0;
+}
+
+.mst-export__btn:hover {
+  text-decoration: underline;
+}
+
+.mst-export__brand {
+  margin-left: auto;
+  font-size: 11px;
+  color: rgba(0, 0, 0, 0.4);
+}
+
 .mst-copy {
   font-family: inherit;
   font-size: 13px;
