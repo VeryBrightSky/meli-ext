@@ -198,6 +198,41 @@ test("effective rate combines commission and fixed charge as % of price", () => 
   assert.equal(b3.effectiveRateMaxPct, 16);
 });
 
+test("exact display numbers: breakeven $500.00, target $642.86 (10% classic, cost 400, ship 50)", () => {
+  const args = { costMXN: 400, shippingMXN: 50, ratePct: 10, fixedCostFn: SOURCE.getFixedCost };
+  const breakeven = CALC.solveTargetPrice({ ...args, marginPct: 0 });
+  assert.equal(breakeven, 500);
+  assert.equal(UI.fmtMoney(breakeven), "$500.00");
+  const target = CALC.solveTargetPrice({ ...args, marginPct: 20 });
+  assert.equal(target, 642.86);
+  assert.equal(UI.fmtMoney(target), "$642.86");
+});
+
+test("exact tier-crossing: solution migrates $25 tier -> $30 tier", () => {
+  // cost 70 @ 10%: naive 77.78 (+$25 tier) -> 105.56 crosses into the $30
+  // tier -> converges at (70+30)/0.9 = 111.11
+  const p = CALC.solveTargetPrice({
+    costMXN: 70,
+    shippingMXN: 0,
+    marginPct: 0,
+    ratePct: 10,
+    fixedCostFn: SOURCE.getFixedCost
+  });
+  assert.equal(p, 111.11);
+  assert.equal(UI.fmtMoney(p), "$111.11");
+});
+
+test("exact unreachable margin: 16% rate + 85% margin -> null (UI shows 'Margen inalcanzable')", () => {
+  const p = CALC.solveTargetPrice({
+    costMXN: 100,
+    shippingMXN: 0,
+    marginPct: 85,
+    ratePct: 16,
+    fixedCostFn: SOURCE.getFixedCost
+  });
+  assert.equal(p, null);
+});
+
 test("getFixedCost exposed on the fee source", () => {
   assert.equal(SOURCE.getFixedCost(50), 25);
   assert.equal(SOURCE.getFixedCost(299), 0);

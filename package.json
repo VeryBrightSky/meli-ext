@@ -9,6 +9,10 @@
     "build:release": "node scripts/build.mjs --release",
     "icons": "python3 scripts/gen-icons.py",
     "check": "node --check src/config/branding.js && node --check src/content/content.js && node --check src/content/card.js && node --check src/content/page-data.js && node --check src/content/format.js && node --check src/content/quickview.js && node --check src/fees/fee-table.js && node --check src/fees/calculator.js && node --check src/fees/fee-source.js && node --check src/background/service-worker.js && node --check src/options/options.js && node -e \"JSON.parse(require('fs').readFileSync('manifest.json'))\" && echo OK",
-    "test": "npm run check && node --test \"tests/**/*.test.mjs\""
+    "test": "npm run check && node --test \"tests/**/*.test.mjs\"",
+    "test:e2e": "node tests/e2e/smoke.mjs"
+  },
+  "devDependencies": {
+    "puppeteer": "^25.1.0"
   }
 }
