@@ -30,6 +30,7 @@ rmSync(dist, { recursive: true, force: true });
 mkdirSync(dist);
 cpSync(manifestPath, join(dist, "manifest.json"));
 cpSync(join(root, "src"), join(dist, "src"), { recursive: true });
+cpSync(join(root, "_locales"), join(dist, "_locales"), { recursive: true });
 console.log("dist/ ready (load unpacked from repo root or dist/)");
 
 if (release) {
@@ -39,8 +40,14 @@ if (release) {
     execFileSync("zip", ["-r", zipPath, "."], { cwd: dist });
     console.log(`packed ${zipPath}`);
   } catch {
-    console.error("`zip` not found — install it or zip dist/ manually for CWS upload.");
-    process.exitCode = 1;
+    try {
+      // zip CLI missing — Python stdlib fallback.
+      execFileSync("python3", ["-m", "zipfile", "-c", zipPath, "."], { cwd: dist });
+      console.log(`packed ${zipPath} (python zipfile)`);
+    } catch {
+      console.error("neither `zip` nor python3 available — zip dist/ manually for CWS upload.");
+      process.exitCode = 1;
+    }
   }
 }
 

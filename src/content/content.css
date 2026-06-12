@@ -11,6 +11,7 @@
   margin: 16px 0;
   color: rgba(0, 0, 0, 0.9);
   box-sizing: border-box;
+  width: 100%;
 }
 
 .mst-card__body {
@@ -191,6 +192,8 @@
   color: rgba(0, 0, 0, 0.55);
   cursor: pointer;
   text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
 }
 
 .mst-strip__bar b {
@@ -220,16 +223,30 @@
   padding: 2px 0 8px;
 }
 
+/* display:flex above outspecifies the UA's [hidden] rule — restate it, or
+   the panel loads expanded. */
+.mst-strip__panel[hidden] {
+  display: none;
+}
+
 .mst-strip__row {
   display: flex;
+  align-items: baseline;
   justify-content: space-between;
   gap: 8px;
   font-size: 12px;
   line-height: 1.3;
 }
 
+/* Narrow result cards: labels truncate with ellipsis instead of stacking
+   word-by-word; values never wrap mid-range. */
 .mst-strip__label {
   color: rgba(0, 0, 0, 0.55);
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .mst-strip__value {
@@ -237,6 +254,7 @@
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   text-align: right;
+  flex: 0 0 auto;
 }
 
 .mst-strip__brand {

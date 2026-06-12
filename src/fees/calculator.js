@@ -71,5 +71,28 @@ globalThis.MST_CALC = (() => {
     return breakdown;
   }
 
-  return Object.freeze({ computeBreakdown, round2, parseMoney });
+  // Reverse calculator: the listing price P that yields profit = marginPct·P
+  // after commission (ratePct·P), the price-dependent fixed charge, and
+  // shipping:  P·(1 − rate − margin) = cost + shipping + fixed(P)
+  // fixed(P) is a step function of P, so iterate to a fixed point (the tiers
+  // are few and monotonic; cap the loop defensively). marginPct = 0 gives the
+  // break-even price. Returns null when the margin is unreachable.
+  function solveTargetPrice({ costMXN, shippingMXN, marginPct, ratePct, fixedCostFn }) {
+    const denom = 1 - ratePct / 100 - marginPct / 100;
+    if (denom <= 0.001) return null;
+    const base = costMXN + (shippingMXN > 0 ? shippingMXN : 0);
+    if (base <= 0) return null;
+
+    let fixed = 0;
+    let price = base / denom;
+    for (let i = 0; i < 6; i++) {
+      const nextFixed = fixedCostFn(price);
+      if (nextFixed === fixed && i > 0) break;
+      fixed = nextFixed;
+      price = (base + fixed) / denom;
+    }
+    return round2(price);
+  }
+
+  return Object.freeze({ computeBreakdown, solveTargetPrice, round2, parseMoney });
 })();

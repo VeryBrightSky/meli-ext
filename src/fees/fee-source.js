@@ -65,6 +65,7 @@ globalThis.MST_FEE_SOURCE = (() => {
     meta: table.meta,
     freeShippingThresholdMXN: table.freeShippingThresholdMXN,
     getQuote,
+    getFixedCost: fixedCostFor,
     listCategoryGroups,
     matchCategory
   });

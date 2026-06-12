@@ -11,6 +11,7 @@ globalThis.MST_CARD = (() => {
   const SOURCE = globalThis.MST_FEE_SOURCE;
   const CALC = globalThis.MST_CALC;
   const UI = globalThis.MST_UI;
+  const T = globalThis.MST_I18N.t;
 
   // Mutable card state — survives re-injection because the module outlives
   // the DOM node (persistence watcher rebuilds from this).
@@ -21,7 +22,8 @@ globalThis.MST_CARD = (() => {
     categoryGroupId: null,
     categoryAutoDetected: false,
     shippingCostMXN: 0,
-    productCostMXN: 0
+    productCostMXN: 0,
+    targetMarginPct: 0
   };
 
   // Live references into the current card DOM, repopulated on each build().
@@ -112,7 +114,10 @@ globalThis.MST_CARD = (() => {
   }
 
   function persistInputs() {
-    const record = { shippingCostMXN: state.shippingCostMXN };
+    const record = {
+      shippingCostMXN: state.shippingCostMXN,
+      targetMarginPct: state.targetMarginPct
+    };
     chrome.storage.local.set({ [`${PREFIX}:defaults`]: record });
     if (state.itemId) {
       chrome.storage.local.set({
@@ -124,10 +129,21 @@ globalThis.MST_CARD = (() => {
   async function restoreInputs() {
     const keys = [`${PREFIX}:defaults`];
     if (state.itemId) keys.push(`${PREFIX}:cost:${state.itemId}`);
-    const stored = await chrome.storage.local.get(keys);
-    // Sanitize: storage may hold junk from previous buggy sessions.
-    state.shippingCostMXN = CALC.parseMoney(stored[`${PREFIX}:defaults`]?.shippingCostMXN ?? 0);
+    const [stored, settings] = await Promise.all([
+      chrome.storage.local.get(keys),
+      chrome.storage.sync.get({ defaultShippingMXN: 0, defaultListingType: "auto" })
+    ]);
+    const defaults = stored[`${PREFIX}:defaults`];
+    // Sanitize: storage may hold junk from previous buggy sessions. Card-level
+    // saved values win over the options-page default.
+    state.shippingCostMXN = CALC.parseMoney(
+      defaults?.shippingCostMXN ?? settings.defaultShippingMXN ?? 0
+    );
+    state.targetMarginPct = CALC.parseMoney(defaults?.targetMarginPct ?? 0);
     state.productCostMXN = CALC.parseMoney(stored[`${PREFIX}:cost:${state.itemId}`] ?? 0);
+    if (settings.defaultListingType !== "auto") {
+      state.listingTypeId = settings.defaultListingType === "premium" ? "premium" : "classic";
+    }
   }
 
   // --- Update (no DOM rebuilding) ---------------------------------------------
@@ -147,7 +163,7 @@ globalThis.MST_CARD = (() => {
 
     patchRow(
       refs.commission,
-      `Comisión (${fmtPctRange(b.pctMin, b.pctMax)})`,
+      T("rowCommission", [fmtPctRange(b.pctMin, b.pctMax)]),
       fmtCharge(b.commissionMinMXN, b.commissionMaxMXN),
       flash
     );
@@ -171,18 +187,53 @@ globalThis.MST_CARD = (() => {
       refs.profit.root.classList.toggle(`${PREFIX}-row--loss`, b.profitMaxMXN < 0);
     }
 
+    // Breakeven + target price (reverse calculator). Range rates produce a
+    // price range; the WORST case (pctMax) is the safe number to act on.
+    const hasCost = state.productCostMXN > 0;
+    const solve = (ratePct, marginPct) =>
+      CALC.solveTargetPrice({
+        costMXN: state.productCostMXN,
+        shippingMXN: state.shippingCostMXN,
+        marginPct,
+        ratePct,
+        fixedCostFn: SOURCE.getFixedCost
+      });
+
+    refs.breakeven.root.style.display = hasCost ? "" : "none";
+    if (hasCost) {
+      const lo = solve(quote.pctMin, 0);
+      const hi = solve(quote.pctMax, 0);
+      patchRow(refs.breakeven, null, lo !== null && hi !== null ? fmtRange(lo, hi) : "—", flash);
+    }
+
+    refs.targetMarginRow.style.display = hasCost ? "" : "none";
+    const hasTarget = hasCost && state.targetMarginPct > 0;
+    refs.target.root.style.display = hasTarget ? "" : "none";
+    if (hasTarget) {
+      const lo = solve(quote.pctMin, state.targetMarginPct);
+      const hi = solve(quote.pctMax, state.targetMarginPct);
+      patchRow(
+        refs.target,
+        null,
+        lo !== null && hi !== null ? fmtRange(lo, hi) : T("targetUnreachable"),
+        flash
+      );
+    }
+
     // Category hint + toggle button states.
     if (!state.categoryGroupId) {
-      refs.hint.textContent = `Sin categoría, la comisión oficial va de ${fmtPctRange(quote.pctMin, quote.pctMax)}.`;
+      refs.hint.textContent = T("hintNoCategory", [fmtPctRange(quote.pctMin, quote.pctMax)]);
       refs.hint.style.display = "";
     } else if (state.categoryAutoDetected) {
-      refs.hint.textContent = "Detectada de la página — corrígela si no coincide.";
+      refs.hint.textContent = T("hintDetected");
       refs.hint.style.display = "";
     } else {
       refs.hint.style.display = "none";
     }
     for (const [id, btn] of Object.entries(refs.toggleButtons)) {
-      btn.classList.toggle(`${PREFIX}-toggle__btn--active`, state.listingTypeId === id);
+      const active = state.listingTypeId === id;
+      btn.classList.toggle(`${PREFIX}-toggle__btn--active`, active);
+      btn.setAttribute("aria-pressed", String(active));
     }
   }
 
@@ -198,28 +249,25 @@ globalThis.MST_CARD = (() => {
 
   function buildCalculator(body) {
     const header = el("div", `${PREFIX}-header`);
-    header.appendChild(el("h2", `${PREFIX}-title`, "Calculadora del vendedor"));
-    const badge = el("span", `${PREFIX}-badge`, "Estimado");
-    badge.setAttribute(
-      "title",
-      `Estimación basada en las tarifas publicadas por Mercado Libre ` +
-        `(consultadas el ${SOURCE.meta.retrievedAt}). El porcentaje exacto ` +
-        `depende de tu categoría y cuenta. No incluye retenciones fiscales ` +
-        `(ISR/IVA) ni el costo real de Mercado Envíos.`
-    );
+    header.appendChild(el("h2", `${PREFIX}-title`, T("cardTitle")));
+    const badge = el("span", `${PREFIX}-badge`, T("badgeEstimate"));
+    badge.setAttribute("title", T("badgeTooltip", [SOURCE.meta.retrievedAt]));
+    badge.tabIndex = 0;
     header.appendChild(badge);
     body.appendChild(header);
 
-    const priceRow = buildRow("Precio de venta");
+    const priceRow = buildRow(T("rowPrice"));
     priceRow.value.textContent = fmtMoney(state.priceMXN);
     body.appendChild(priceRow.root);
 
     // Listing type toggle.
     const typeRow = el("div", `${PREFIX}-row`);
-    typeRow.appendChild(el("span", `${PREFIX}-row__label`, "Publicación"));
+    typeRow.appendChild(el("span", `${PREFIX}-row__label`, T("rowListingType")));
     const toggle = el("div", `${PREFIX}-toggle`);
+    toggle.setAttribute("role", "group");
+    toggle.setAttribute("aria-label", T("rowListingType"));
     refs.toggleButtons = {};
-    for (const [id, label] of [["classic", "Clásica"], ["premium", "Premium"]]) {
+    for (const [id, label] of [["classic", T("typeClassic")], ["premium", T("typePremium")]]) {
       const btn = el("button", `${PREFIX}-toggle__btn`, label);
       btn.type = "button";
       btn.addEventListener("click", () => {
@@ -234,10 +282,11 @@ globalThis.MST_CARD = (() => {
 
     // Category picker.
     const catRow = el("div", `${PREFIX}-row`);
-    catRow.appendChild(el("span", `${PREFIX}-row__label`, "Categoría"));
+    catRow.appendChild(el("span", `${PREFIX}-row__label`, T("rowCategory")));
     const select = document.createElement("select");
     select.className = `${PREFIX}-select`;
-    const placeholder = new Option("Selecciona categoría…", "");
+    select.setAttribute("aria-label", T("rowCategory"));
+    const placeholder = new Option(T("categoryPlaceholder"), "");
     placeholder.disabled = true;
     select.appendChild(placeholder);
     for (const group of SOURCE.listCategoryGroups()) {
@@ -255,18 +304,18 @@ globalThis.MST_CARD = (() => {
     refs.hint = el("div", `${PREFIX}-hint`, "");
     body.appendChild(refs.hint);
 
-    refs.commission = buildRow("Comisión");
+    refs.commission = buildRow(T("rowCommission", [""]));
     body.appendChild(refs.commission.root);
 
-    refs.fixed = buildRow("Cargo fijo (precio < $299)");
+    refs.fixed = buildRow(T("rowFixedCost"));
     body.appendChild(refs.fixed.root);
 
     // Shipping input.
     const shipRow = el("div", `${PREFIX}-row`);
     const shipLabel =
       state.priceMXN >= SOURCE.freeShippingThresholdMXN
-        ? "Tu costo de envío (envío gratis ≥ $299)"
-        : "Tu costo de envío";
+        ? T("rowShippingFree")
+        : T("rowShipping");
     shipRow.appendChild(el("span", `${PREFIX}-row__label`, shipLabel));
     refs.shippingInput = moneyInput(
       () => state.shippingCostMXN,
@@ -276,15 +325,16 @@ globalThis.MST_CARD = (() => {
         update();
       }
     );
+    refs.shippingInput.setAttribute("aria-label", T("inputShippingAria"));
     shipRow.appendChild(refs.shippingInput);
     body.appendChild(shipRow);
 
-    refs.net = buildRow("Recibirás aprox.", "total");
+    refs.net = buildRow(T("rowNet"), "total");
     body.appendChild(refs.net.root);
 
     // Product cost input → profit margin.
     const costRow = el("div", `${PREFIX}-row`);
-    costRow.appendChild(el("span", `${PREFIX}-row__label`, "Costo de tu producto"));
+    costRow.appendChild(el("span", `${PREFIX}-row__label`, T("rowProductCost")));
     refs.costInput = moneyInput(
       () => state.productCostMXN,
       (v) => {
@@ -293,11 +343,35 @@ globalThis.MST_CARD = (() => {
         update();
       }
     );
+    refs.costInput.setAttribute("aria-label", T("inputProductCostAria"));
     costRow.appendChild(refs.costInput);
     body.appendChild(costRow);
 
-    refs.profit = buildRow("Ganancia", "profit");
+    refs.profit = buildRow(T("rowProfit"), "profit");
     body.appendChild(refs.profit.root);
+
+    // Breakeven (auto when cost is set).
+    refs.breakeven = buildRow(T("rowBreakeven"));
+    body.appendChild(refs.breakeven.root);
+
+    // Reverse calculator: target margin % → required listing price.
+    const marginRow = el("div", `${PREFIX}-row`);
+    marginRow.appendChild(el("span", `${PREFIX}-row__label`, T("rowTargetMargin")));
+    refs.marginInput = moneyInput(
+      () => state.targetMarginPct,
+      (v) => {
+        state.targetMarginPct = Math.min(v, 99);
+        persistInputs();
+        update();
+      }
+    );
+    refs.marginInput.setAttribute("aria-label", T("inputMarginAria"));
+    marginRow.appendChild(refs.marginInput);
+    refs.targetMarginRow = marginRow;
+    body.appendChild(marginRow);
+
+    refs.target = buildRow(T("rowTargetPrice"), "total");
+    body.appendChild(refs.target.root);
   }
 
   // Builds the card element. With pageData it renders the live calculator;
@@ -316,7 +390,7 @@ globalThis.MST_CARD = (() => {
     logo.height = 12;
     footer.append(
       logo,
-      el("span", null, `${BRAND.name} · tarifas al ${SOURCE.meta.retrievedAt}`)
+      el("span", null, T("footerRates", [BRAND.name, SOURCE.meta.retrievedAt]))
     );
     card.appendChild(footer);
 
@@ -340,6 +414,7 @@ globalThis.MST_CARD = (() => {
     restoreInputs().then(() => {
       refs.shippingInput.syncFromState();
       refs.costInput.syncFromState();
+      refs.marginInput.syncFromState();
       update(false);
     });
     return card;

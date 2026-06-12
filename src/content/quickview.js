@@ -11,6 +11,7 @@ globalThis.MST_QUICKVIEW = (() => {
   const SOURCE = globalThis.MST_FEE_SOURCE;
   const CALC = globalThis.MST_CALC;
   const UI = globalThis.MST_UI;
+  const T = globalThis.MST_I18N.t;
   const TAG = `[${BRAND.name}]`;
   const STRIP_CLASS = `${PREFIX}-strip`;
 
@@ -109,7 +110,7 @@ globalThis.MST_QUICKVIEW = (() => {
     logo.width = 10;
     logo.height = 10;
     bar.appendChild(logo);
-    bar.appendChild(el("span", null, "Neto aprox."));
+    bar.appendChild(el("span", null, T("stripNet")));
     bar.appendChild(el("b", null, UI.fmtRange(b.netMinMXN, b.netMaxMXN)));
     const chevron = el("span", `${PREFIX}-strip__chevron`, "▾");
     bar.appendChild(chevron);
@@ -120,32 +121,35 @@ globalThis.MST_QUICKVIEW = (() => {
 
     panel.appendChild(
       panelRow(
-        "Publicación (estimada)",
-        data.listingTypeGuess === "premium" ? "Premium" : "Clásica"
+        T("stripListingType"),
+        data.listingTypeGuess === "premium" ? T("typePremium") : T("typeClassic")
       )
     );
     panel.appendChild(
       panelRow(
-        "Categoría",
-        quote.categoryGroup ? quote.categoryGroup.label : `Desconocida (${UI.fmtPctRange(quote.pctMin, quote.pctMax)})`
+        T("stripCategory"),
+        quote.categoryGroup
+          ? quote.categoryGroup.label
+          : T("stripUnknownCategory", [UI.fmtPctRange(quote.pctMin, quote.pctMax)])
       )
     );
-    panel.appendChild(panelRow("Envío gratis", data.freeShipping ? "Sí" : "No"));
-    if (data.seller) panel.appendChild(panelRow("Vendedor", data.seller));
+    panel.appendChild(panelRow(T("stripFreeShipping"), data.freeShipping ? T("yes") : T("no")));
+    if (data.seller) panel.appendChild(panelRow(T("stripSeller"), data.seller));
     panel.appendChild(
       panelRow(
-        `Comisión (${UI.fmtPctRange(b.pctMin, b.pctMax)})`,
+        T("stripCommission", [UI.fmtPctRange(b.pctMin, b.pctMax)]),
         UI.fmtCharge(b.commissionMinMXN, b.commissionMaxMXN)
       )
     );
     if (b.fixedCostMXN > 0) {
-      panel.appendChild(panelRow("Cargo fijo (< $299)", UI.fmtCharge(b.fixedCostMXN)));
+      panel.appendChild(panelRow(T("stripFixedCost"), UI.fmtCharge(b.fixedCostMXN)));
     }
     panel.appendChild(
-      panelRow("Recibirás aprox. (antes de envío)", UI.fmtRange(b.netMinMXN, b.netMaxMXN))
+      panelRow(T("stripNetBeforeShipping"), UI.fmtRange(b.netMinMXN, b.netMaxMXN))
     );
     panel.appendChild(
-      el("div", `${PREFIX}-strip__brand`, `${BRAND.name} · estimado, tarifas al ${SOURCE.meta.retrievedAt}`)
+      el("div", `${PREFIX}-strip__brand`,
+        T("stripFooter", [BRAND.name, SOURCE.meta.retrievedAt]))
     );
     strip.appendChild(panel);
 

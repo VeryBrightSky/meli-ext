@@ -120,6 +120,82 @@ test("charge formatting keeps minus sign on both range bounds", () => {
   assert.equal(UI.fmtMoney(1234567.89), "$1,234,567.89");
 });
 
+test("solveTargetPrice: target margin accounts for commission and shipping", () => {
+  // tech classic 10%: P·(1 − 0.10 − 0.20) = 400 + 50 → P = 642.86
+  const p = CALC.solveTargetPrice({
+    costMXN: 400,
+    shippingMXN: 50,
+    marginPct: 20,
+    ratePct: 10,
+    fixedCostFn: SOURCE.getFixedCost
+  });
+  assert.equal(p, 642.86);
+  // verify: profit at that price ≈ 20% of price
+  const profit = p - p * 0.1 - 50 - 400;
+  assert.ok(Math.abs(profit / p - 0.2) < 0.001);
+});
+
+test("solveTargetPrice: breakeven (margin 0)", () => {
+  const p = CALC.solveTargetPrice({
+    costMXN: 400,
+    shippingMXN: 50,
+    marginPct: 0,
+    ratePct: 10,
+    fixedCostFn: SOURCE.getFixedCost
+  });
+  assert.equal(p, 500); // 450 / 0.9
+});
+
+test("solveTargetPrice: fixed-cost tier pulled in for low prices", () => {
+  // cost 30, rate 10%: naive P = 33.33 (<99 → +$25 fixed) → (30+25)/0.9 = 61.11
+  const p = CALC.solveTargetPrice({
+    costMXN: 30,
+    shippingMXN: 0,
+    marginPct: 0,
+    ratePct: 10,
+    fixedCostFn: SOURCE.getFixedCost
+  });
+  assert.equal(p, 61.11);
+});
+
+test("solveTargetPrice: unreachable margin returns null", () => {
+  assert.equal(
+    CALC.solveTargetPrice({
+      costMXN: 100,
+      shippingMXN: 0,
+      marginPct: 85,
+      ratePct: 16,
+      fixedCostFn: SOURCE.getFixedCost
+    }),
+    null
+  );
+  assert.equal(
+    CALC.solveTargetPrice({
+      costMXN: 0,
+      shippingMXN: 0,
+      marginPct: 20,
+      ratePct: 10,
+      fixedCostFn: SOURCE.getFixedCost
+    }),
+    null
+  );
+});
+
+test("getFixedCost exposed on the fee source", () => {
+  assert.equal(SOURCE.getFixedCost(50), 25);
+  assert.equal(SOURCE.getFixedCost(299), 0);
+});
+
+test("locales: en keys exactly match es_MX keys", () => {
+  const es = JSON.parse(readFileSync(join(root, "_locales/es_MX/messages.json"), "utf8"));
+  const en = JSON.parse(readFileSync(join(root, "_locales/en/messages.json"), "utf8"));
+  assert.deepEqual(Object.keys(en).sort(), Object.keys(es).sort());
+  for (const key of Object.keys(es)) {
+    assert.ok(es[key].message.length > 0, `es_MX ${key} empty`);
+    assert.ok(en[key].message.length > 0, `en ${key} empty`);
+  }
+});
+
 test("fee table meta carries source citations and retrieval date", () => {
   assert.ok(SOURCE.meta.version.startsWith("2026-"));
   assert.equal(SOURCE.meta.retrievedAt, "2026-06-12");

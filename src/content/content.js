@@ -399,8 +399,12 @@
       window.location.href
     );
 
-    const { enabled = true } = await chrome.storage.sync.get("enabled");
-    if (!enabled) {
+    const settings = await chrome.storage.sync.get({
+      enabled: true,
+      cardEnabled: true,
+      stripsEnabled: true
+    });
+    if (!settings.enabled) {
       log("disabled in options, exiting");
       return;
     }
@@ -414,9 +418,17 @@
 
     switch (pageType) {
       case PageType.PRODUCT:
+        if (!settings.cardEnabled) {
+          log("product card disabled in settings");
+          break;
+        }
         await injectProductCard();
         break;
       case PageType.SEARCH:
+        if (!settings.stripsEnabled) {
+          log("search strips disabled in settings");
+          break;
+        }
         await waitForPageSettled();
         globalThis.MST_QUICKVIEW.init();
         break;

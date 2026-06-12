@@ -42,8 +42,64 @@ body {
   accent-color: #3483fa;
 }
 
+.setting--field {
+  justify-content: space-between;
+  margin-top: 12px;
+}
+
+.setting--field input,
+.setting--field select {
+  font-family: inherit;
+  font-size: 13px;
+  padding: 4px 8px;
+  border: 1px solid rgba(0, 0, 0, 0.17);
+  border-radius: 6px;
+  background: #fff;
+}
+
+.setting--field input {
+  width: 90px;
+  text-align: right;
+}
+
+.setting--field input:focus,
+.setting--field select:focus {
+  outline: none;
+  border-color: #3483fa;
+  box-shadow: 0 0 0 2px rgba(52, 131, 250, 0.2);
+}
+
+.setting + .setting {
+  margin-top: 12px;
+}
+
+.reset {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.reset button {
+  font-family: inherit;
+  font-size: 13px;
+  padding: 6px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.17);
+  border-radius: 6px;
+  background: #fff;
+  color: #f23d4f;
+  cursor: pointer;
+}
+
+.reset button:hover {
+  background: rgba(242, 61, 79, 0.06);
+}
+
 .hint {
   font-size: 12px;
   color: rgba(0, 0, 0, 0.55);
   margin: 16px 0 0;
+}
+
+.hint--ok {
+  color: #00a650;
 }

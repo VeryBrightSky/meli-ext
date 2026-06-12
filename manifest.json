@@ -3,6 +3,7 @@
   "name": "MELI Seller Tools (dev)",
   "version": "0.1.0",
   "description": "Fee calculator, net payout and seller insights for MercadoLibre Mexico listings.",
+  "default_locale": "es_MX",
   "icons": {
     "16": "src/assets/icons/icon16.png",
     "48": "src/assets/icons/icon48.png",
@@ -26,6 +27,7 @@
       ],
       "js": [
         "src/config/branding.js",
+        "src/config/i18n.js",
         "src/fees/fee-table.js",
         "src/fees/calculator.js",
         "src/fees/fee-source.js",

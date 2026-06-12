@@ -14,17 +14,39 @@
       </header>
 
       <label class="setting">
-        <input type="checkbox" id="enabled" />
-        <span>Mostrar tarjetas en MercadoLibre</span>
+        <input type="checkbox" id="card-enabled" />
+        <span id="lbl-card"></span>
       </label>
 
-      <p class="hint">
-        Más opciones llegarán en próximas versiones (idioma, costos por
-        defecto, envíos).
-      </p>
+      <label class="setting">
+        <input type="checkbox" id="strips-enabled" />
+        <span id="lbl-strips"></span>
+      </label>
+
+      <label class="setting setting--field">
+        <span id="lbl-shipping"></span>
+        <input type="text" inputmode="decimal" id="default-shipping" placeholder="0.00" />
+      </label>
+
+      <label class="setting setting--field">
+        <span id="lbl-type"></span>
+        <select id="default-type">
+          <option value="auto" id="opt-auto"></option>
+          <option value="classic">Clásica</option>
+          <option value="premium">Premium</option>
+        </select>
+      </label>
+
+      <div class="reset">
+        <button type="button" id="reset-btn"></button>
+        <p class="hint" id="reset-hint"></p>
+        <p class="hint hint--ok" id="reset-status" hidden></p>
+      </div>
     </main>
 
     <script src="../config/branding.js"></script>
+    <script src="../config/i18n.js"></script>
+    <script src="../fees/calculator.js"></script>
     <script src="options.js"></script>
   </body>
 </html>
