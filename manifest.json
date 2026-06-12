@@ -26,6 +26,11 @@
       ],
       "js": [
         "src/config/branding.js",
+        "src/fees/fee-table.js",
+        "src/fees/calculator.js",
+        "src/fees/fee-source.js",
+        "src/content/page-data.js",
+        "src/content/card.js",
         "src/content/content.js"
       ],
       "css": [

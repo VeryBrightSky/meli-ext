@@ -244,38 +244,14 @@
     });
   }
 
-  // --- Card shell ------------------------------------------------------------
+  // --- Card -------------------------------------------------------------------
 
-  function buildCardShell() {
-    const card = document.createElement("section");
-    card.id = CARD_ID;
-    card.className = `${PREFIX}-card`;
+  // Page data is collected once on first successful anchor; re-injections
+  // reuse it (card state itself lives in MST_CARD and survives re-renders).
+  let pageData = null;
 
-    // Skeleton rows — replaced by Phase 1 with real fee/payout content.
-    const body = document.createElement("div");
-    body.className = `${PREFIX}-card__body`;
-    for (const width of ["60%", "85%", "40%"]) {
-      const row = document.createElement("div");
-      row.className = `${PREFIX}-skeleton`;
-      row.style.width = width;
-      body.appendChild(row);
-    }
-    card.appendChild(body);
-
-    // Third-party attribution footer — legal requirement, every injected card.
-    const footer = document.createElement("footer");
-    footer.className = `${PREFIX}-card__brand`;
-    const logo = document.createElement("img");
-    logo.src = chrome.runtime.getURL(BRAND.logoPath);
-    logo.alt = "";
-    logo.width = 12;
-    logo.height = 12;
-    const label = document.createElement("span");
-    label.textContent = BRAND.name;
-    footer.append(logo, label);
-    card.appendChild(footer);
-
-    return card;
+  function buildCard() {
+    return globalThis.MST_CARD.build(pageData);
   }
 
   // Post-injection self-check: confirm the card actually renders on screen;
@@ -326,7 +302,7 @@
   function insertCard() {
     const found = findProductAnchor();
     if (!found) return null;
-    found.el.insertAdjacentElement("afterend", buildCardShell());
+    found.el.insertAdjacentElement("afterend", buildCard());
     return found;
   }
 
@@ -396,7 +372,15 @@
     }
     if (document.getElementById(CARD_ID)) return;
     logAnchorChoice(found);
-    found.el.insertAdjacentElement("afterend", buildCardShell());
+
+    pageData = globalThis.MST_PAGE.collect(found.el);
+    if (!pageData.price) {
+      warn("price not found on page (itemprop meta + andes-money-amount both missed) — not injecting");
+      pageData = null;
+      return;
+    }
+
+    found.el.insertAdjacentElement("afterend", buildCard());
     log("card injected ✔");
     logCardVisibilityReport(document.getElementById(CARD_ID));
     watchCardPersistence();
