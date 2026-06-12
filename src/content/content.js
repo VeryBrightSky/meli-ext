@@ -335,7 +335,12 @@
       }
     };
 
-    const observer = new MutationObserver(() => {
+    const observer = new MutationObserver((mutations) => {
+      // Ignore mutations we caused ourselves (recalc patches, input edits):
+      // reacting to them would loop. Card removal is still caught because the
+      // removal record's target is the card's PARENT, outside the card.
+      const card = document.getElementById(CARD_ID);
+      if (card && mutations.every((m) => card.contains(m.target))) return;
       if (pending) return;
       pending = true;
       // Debounce: let the page's render batch finish, and rate-limit the

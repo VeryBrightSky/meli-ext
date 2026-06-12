@@ -1,7 +1,7 @@
-// Seller fee card UI. Renders the breakdown from MST_CALC + MST_FEE_SOURCE
-// and owns the card's interactive state (listing type toggle, category
-// picker, shipping & product-cost inputs). DOM-only module: no page
-// extraction (page-data.js) and no fee math (calculator.js).
+// Seller fee card UI. The DOM is built ONCE; recalculations patch text nodes
+// in place so inputs are stable nodes that never lose focus mid-typing.
+// DOM-only module: no page extraction (page-data.js), no fee math
+// (calculator.js).
 "use strict";
 
 globalThis.MST_CARD = (() => {
@@ -13,7 +13,9 @@ globalThis.MST_CARD = (() => {
 
   const mxn = new Intl.NumberFormat("es-MX", {
     style: "currency",
-    currency: "MXN"
+    currency: "MXN",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
   });
 
   // Mutable card state — survives re-injection because the module outlives
@@ -27,6 +29,9 @@ globalThis.MST_CARD = (() => {
     shippingCostMXN: 0,
     productCostMXN: 0
   };
+
+  // Live references into the current card DOM, repopulated on each build().
+  const refs = {};
 
   function fmtRange(min, max) {
     return min === max ? mxn.format(min) : `${mxn.format(min)} – ${mxn.format(max)}`;
@@ -43,32 +48,85 @@ globalThis.MST_CARD = (() => {
     return node;
   }
 
-  function row(label, valueText, modifier) {
-    const r = el("div", `${PREFIX}-row${modifier ? ` ${PREFIX}-row--${modifier}` : ""}`);
-    r.appendChild(el("span", `${PREFIX}-row__label`, label));
-    r.appendChild(el("span", `${PREFIX}-row__value`, valueText));
-    return r;
+  function buildRow(labelText, modifier) {
+    const root = el("div", `${PREFIX}-row${modifier ? ` ${PREFIX}-row--${modifier}` : ""}`);
+    const label = el("span", `${PREFIX}-row__label`, labelText);
+    const value = el("span", `${PREFIX}-row__value`, "");
+    root.append(label, value);
+    return { root, label, value };
   }
 
-  function moneyInput(value, placeholder, onChange) {
+  // Patch a row's texts; flash the row when a value actually changed.
+  function patchRow(rowRef, labelText, valueText, flash) {
+    if (labelText !== null && rowRef.label.textContent !== labelText) {
+      rowRef.label.textContent = labelText;
+    }
+    if (rowRef.value.textContent === valueText) return;
+    rowRef.value.textContent = valueText;
+    if (flash) {
+      rowRef.root.classList.remove(`${PREFIX}-row--flash`);
+      void rowRef.root.offsetWidth; // restart the animation
+      rowRef.root.classList.add(`${PREFIX}-row--flash`);
+    }
+  }
+
+  function debounced(fn, ms = 200) {
+    let timer = null;
+    const wrapped = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        timer = null;
+        fn();
+      }, ms);
+    };
+    wrapped.flush = () => {
+      if (timer === null) return;
+      clearTimeout(timer);
+      timer = null;
+      fn();
+    };
+    return wrapped;
+  }
+
+  // Money input: type=text + inputmode=decimal so commas are typeable.
+  // Never reformatted while focused; normalized to "123.45" on blur.
+  // Enter confirms (blurs). Recalc is debounced on 'input'.
+  function moneyInput(getValue, onValue) {
     const input = document.createElement("input");
-    input.type = "number";
-    input.min = "0";
-    input.step = "0.01";
-    input.placeholder = placeholder;
+    input.type = "text";
+    input.inputMode = "decimal";
+    input.autocomplete = "off";
+    input.placeholder = "0.00";
     input.className = `${PREFIX}-input`;
-    if (value > 0) input.value = String(value);
-    input.addEventListener("input", () => {
-      const parsed = Number.parseFloat(input.value);
-      onChange(Number.isFinite(parsed) && parsed >= 0 ? parsed : 0);
+
+    const apply = () => onValue(CALC.parseMoney(input.value));
+    const debouncedApply = debounced(apply);
+
+    input.addEventListener("input", debouncedApply);
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        input.blur();
+      }
     });
+    input.addEventListener("blur", () => {
+      debouncedApply.flush();
+      const v = getValue();
+      input.value = v > 0 ? v.toFixed(2) : "";
+    });
+
+    input.syncFromState = () => {
+      if (document.activeElement === input) return; // never fight the user
+      const v = getValue();
+      input.value = v > 0 ? v.toFixed(2) : "";
+    };
     return input;
   }
 
   function persistInputs() {
     const record = { shippingCostMXN: state.shippingCostMXN };
     chrome.storage.local.set({ [`${PREFIX}:defaults`]: record });
-    if (state.itemId && state.productCostMXN > 0) {
+    if (state.itemId) {
       chrome.storage.local.set({
         [`${PREFIX}:cost:${state.itemId}`]: state.productCostMXN
       });
@@ -79,28 +137,78 @@ globalThis.MST_CARD = (() => {
     const keys = [`${PREFIX}:defaults`];
     if (state.itemId) keys.push(`${PREFIX}:cost:${state.itemId}`);
     const stored = await chrome.storage.local.get(keys);
-    state.shippingCostMXN = stored[`${PREFIX}:defaults`]?.shippingCostMXN ?? 0;
-    state.productCostMXN = stored[`${PREFIX}:cost:${state.itemId}`] ?? 0;
+    // Sanitize: storage may hold junk from previous buggy sessions.
+    state.shippingCostMXN = CALC.parseMoney(stored[`${PREFIX}:defaults`]?.shippingCostMXN ?? 0);
+    state.productCostMXN = CALC.parseMoney(stored[`${PREFIX}:cost:${state.itemId}`] ?? 0);
   }
 
-  // --- Render -----------------------------------------------------------------
+  // --- Update (no DOM rebuilding) ---------------------------------------------
 
-  function render(card) {
+  function update(flash = true) {
+    if (!refs.card) return;
     const quote = SOURCE.getQuote({
       priceMXN: state.priceMXN,
       listingTypeId: state.listingTypeId,
       categoryGroupId: state.categoryGroupId
     });
-    const breakdown = CALC.computeBreakdown(quote, {
+    const b = CALC.computeBreakdown(quote, {
       priceMXN: state.priceMXN,
       shippingCostMXN: state.shippingCostMXN,
       productCostMXN: state.productCostMXN
     });
 
-    const body = card.querySelector(`.${PREFIX}-card__body`);
-    body.replaceChildren();
+    patchRow(
+      refs.commission,
+      `Comisión (${fmtPctRange(b.pctMin, b.pctMax)})`,
+      `−${fmtRange(b.commissionMinMXN, b.commissionMaxMXN)}`,
+      flash
+    );
 
-    // Header: title + "Estimado" badge with the legal/accuracy tooltip.
+    refs.fixed.root.style.display = b.fixedCostMXN > 0 ? "" : "none";
+    if (b.fixedCostMXN > 0) {
+      patchRow(refs.fixed, null, `−${mxn.format(b.fixedCostMXN)}`, flash);
+    }
+
+    patchRow(refs.net, null, fmtRange(b.netMinMXN, b.netMaxMXN), flash);
+
+    const hasProfit = b.profitMinMXN !== undefined;
+    refs.profit.root.style.display = hasProfit ? "" : "none";
+    if (hasProfit) {
+      patchRow(
+        refs.profit,
+        null,
+        `${fmtRange(b.profitMinMXN, b.profitMaxMXN)} (${fmtPctRange(b.marginMinPct, b.marginMaxPct)})`,
+        flash
+      );
+      refs.profit.root.classList.toggle(`${PREFIX}-row--loss`, b.profitMaxMXN < 0);
+    }
+
+    // Category hint + toggle button states.
+    if (!state.categoryGroupId) {
+      refs.hint.textContent = `Sin categoría, la comisión oficial va de ${fmtPctRange(quote.pctMin, quote.pctMax)}.`;
+      refs.hint.style.display = "";
+    } else if (state.categoryAutoDetected) {
+      refs.hint.textContent = "Detectada de la página — corrígela si no coincide.";
+      refs.hint.style.display = "";
+    } else {
+      refs.hint.style.display = "none";
+    }
+    for (const [id, btn] of Object.entries(refs.toggleButtons)) {
+      btn.classList.toggle(`${PREFIX}-toggle__btn--active`, state.listingTypeId === id);
+    }
+  }
+
+  // --- Build (once per injection) -----------------------------------------------
+
+  function buildSkeletonRows(body) {
+    for (const width of ["60%", "85%", "40%"]) {
+      const skeletonRow = el("div", `${PREFIX}-skeleton`);
+      skeletonRow.style.width = width;
+      body.appendChild(skeletonRow);
+    }
+  }
+
+  function buildCalculator(body) {
     const header = el("div", `${PREFIX}-header`);
     header.appendChild(el("h2", `${PREFIX}-title`, "Calculadora del vendedor"));
     const badge = el("span", `${PREFIX}-badge`, "Estimado");
@@ -114,26 +222,29 @@ globalThis.MST_CARD = (() => {
     header.appendChild(badge);
     body.appendChild(header);
 
-    body.appendChild(row("Precio de venta", mxn.format(state.priceMXN)));
+    const priceRow = buildRow("Precio de venta");
+    priceRow.value.textContent = mxn.format(state.priceMXN);
+    body.appendChild(priceRow.root);
 
     // Listing type toggle.
     const typeRow = el("div", `${PREFIX}-row`);
     typeRow.appendChild(el("span", `${PREFIX}-row__label`, "Publicación"));
     const toggle = el("div", `${PREFIX}-toggle`);
+    refs.toggleButtons = {};
     for (const [id, label] of [["classic", "Clásica"], ["premium", "Premium"]]) {
       const btn = el("button", `${PREFIX}-toggle__btn`, label);
       btn.type = "button";
-      if (state.listingTypeId === id) btn.classList.add(`${PREFIX}-toggle__btn--active`);
       btn.addEventListener("click", () => {
         state.listingTypeId = id;
-        render(card);
+        update();
       });
+      refs.toggleButtons[id] = btn;
       toggle.appendChild(btn);
     }
     typeRow.appendChild(toggle);
     body.appendChild(typeRow);
 
-    // Category: detected label or picker.
+    // Category picker.
     const catRow = el("div", `${PREFIX}-row`);
     catRow.appendChild(el("span", `${PREFIX}-row__label`, "Categoría"));
     const select = document.createElement("select");
@@ -149,82 +260,56 @@ globalThis.MST_CARD = (() => {
     select.addEventListener("change", () => {
       state.categoryGroupId = select.value || null;
       state.categoryAutoDetected = false;
-      render(card);
+      update();
     });
     catRow.appendChild(select);
     body.appendChild(catRow);
-    if (state.categoryGroupId && state.categoryAutoDetected) {
-      body.appendChild(el("div", `${PREFIX}-hint`, "Detectada de la página — corrígela si no coincide."));
-    } else if (!state.categoryGroupId) {
-      body.appendChild(
-        el("div", `${PREFIX}-hint`,
-          `Sin categoría, la comisión oficial va de ${fmtPctRange(quote.pctMin, quote.pctMax)}.`)
-      );
-    }
+    refs.hint = el("div", `${PREFIX}-hint`, "");
+    body.appendChild(refs.hint);
 
-    body.appendChild(
-      row(
-        `Comisión (${fmtPctRange(breakdown.pctMin, breakdown.pctMax)})`,
-        `−${fmtRange(breakdown.commissionMinMXN, breakdown.commissionMaxMXN)}`
-      )
-    );
+    refs.commission = buildRow("Comisión");
+    body.appendChild(refs.commission.root);
 
-    if (breakdown.fixedCostMXN > 0) {
-      body.appendChild(
-        row("Cargo fijo (precio < $299)", `−${mxn.format(breakdown.fixedCostMXN)}`)
-      );
-    }
+    refs.fixed = buildRow("Cargo fijo (precio < $299)");
+    body.appendChild(refs.fixed.root);
 
-    // Shipping: editable estimate.
+    // Shipping input.
     const shipRow = el("div", `${PREFIX}-row`);
     const shipLabel =
       state.priceMXN >= SOURCE.freeShippingThresholdMXN
         ? "Tu costo de envío (envío gratis ≥ $299)"
         : "Tu costo de envío";
     shipRow.appendChild(el("span", `${PREFIX}-row__label`, shipLabel));
-    shipRow.appendChild(
-      moneyInput(state.shippingCostMXN, "0.00", (v) => {
+    refs.shippingInput = moneyInput(
+      () => state.shippingCostMXN,
+      (v) => {
         state.shippingCostMXN = v;
         persistInputs();
-        render(card);
-      })
+        update();
+      }
     );
+    shipRow.appendChild(refs.shippingInput);
     body.appendChild(shipRow);
 
-    body.appendChild(
-      row("Recibirás aprox.", fmtRange(breakdown.netMinMXN, breakdown.netMaxMXN), "total")
-    );
+    refs.net = buildRow("Recibirás aprox.", "total");
+    body.appendChild(refs.net.root);
 
-    // Profit margin.
+    // Product cost input → profit margin.
     const costRow = el("div", `${PREFIX}-row`);
     costRow.appendChild(el("span", `${PREFIX}-row__label`, "Costo de tu producto"));
-    costRow.appendChild(
-      moneyInput(state.productCostMXN, "0.00", (v) => {
+    refs.costInput = moneyInput(
+      () => state.productCostMXN,
+      (v) => {
         state.productCostMXN = v;
         persistInputs();
-        render(card);
-      })
+        update();
+      }
     );
+    costRow.appendChild(refs.costInput);
     body.appendChild(costRow);
 
-    if (breakdown.profitMinMXN !== undefined) {
-      const profitText =
-        `${fmtRange(breakdown.profitMinMXN, breakdown.profitMaxMXN)} ` +
-        `(${fmtPctRange(breakdown.marginMinPct, breakdown.marginMaxPct)})`;
-      const profitRow = row("Ganancia", profitText, "profit");
-      if (breakdown.profitMaxMXN < 0) profitRow.classList.add(`${PREFIX}-row--loss`);
-      body.appendChild(profitRow);
-    }
-  }
-
-  // --- Public -----------------------------------------------------------------
-
-  function buildSkeletonRows(body) {
-    for (const width of ["60%", "85%", "40%"]) {
-      const skeletonRow = el("div", `${PREFIX}-skeleton`);
-      skeletonRow.style.width = width;
-      body.appendChild(skeletonRow);
-    }
+    refs.profit = buildRow("Ganancia", "profit");
+    body.appendChild(refs.profit.root);
   }
 
   // Builds the card element. With pageData it renders the live calculator;
@@ -261,8 +346,14 @@ globalThis.MST_CARD = (() => {
       state.categoryAutoDetected = true;
     }
 
-    restoreInputs().then(() => render(card));
-    render(card);
+    refs.card = card;
+    buildCalculator(body);
+    update(false);
+    restoreInputs().then(() => {
+      refs.shippingInput.syncFromState();
+      refs.costInput.syncFromState();
+      update(false);
+    });
     return card;
   }
 

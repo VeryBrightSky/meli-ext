@@ -103,6 +103,21 @@
   color: #f23d4f;
 }
 
+/* Recalc feedback: rows briefly flash when their value changes. */
+@keyframes mst-flash {
+  0% {
+    background: rgba(52, 131, 250, 0.12);
+  }
+  100% {
+    background: transparent;
+  }
+}
+
+.mst-row--flash {
+  animation: mst-flash 0.7s ease-out;
+  border-radius: 4px;
+}
+
 .mst-hint {
   font-size: 12px;
   color: rgba(0, 0, 0, 0.55);

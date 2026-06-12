@@ -86,6 +86,25 @@ test("category matching from breadcrumbs (accents stripped)", () => {
   assert.equal(SOURCE.matchCategory([]), null);
 });
 
+test("parseMoney handles Mexican separator styles", () => {
+  const p = CALC.parseMoney;
+  assert.equal(p("827"), 827);
+  assert.equal(p("827.50"), 827.5);
+  assert.equal(p("1,234.56"), 1234.56);
+  assert.equal(p("1.234,56"), 1234.56); // dot-thousands, comma-decimal
+  assert.equal(p("4,99"), 4.99); // lone comma + 2 digits = decimal
+  assert.equal(p("1,234"), 1234); // lone comma + 3 digits = thousands
+  assert.equal(p("1,234,567"), 1234567);
+  assert.equal(p("$ 450"), 450);
+  assert.equal(p("$1,199.00"), 1199);
+  assert.equal(p(""), 0);
+  assert.equal(p("abc"), 0);
+  assert.equal(p("-50"), 0); // negative clamped
+  assert.equal(p(4.9922), 4.99); // sanitizes stored junk
+  assert.equal(p(null), 0);
+  assert.equal(p(undefined), 0);
+});
+
 test("fee table meta carries source citations and retrieval date", () => {
   assert.ok(SOURCE.meta.version.startsWith("2026-"));
   assert.equal(SOURCE.meta.retrievedAt, "2026-06-12");

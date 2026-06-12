@@ -6,6 +6,33 @@
 globalThis.MST_CALC = (() => {
   const round2 = (n) => Math.round(n * 100) / 100;
 
+  // Parse user-typed money. Mexican users mix separators: "1,234.56",
+  // "1234.56", "4,99", "$ 450". Rule: with both separators the rightmost one
+  // is decimal; a lone comma is decimal only when followed by 1–2 digits.
+  function parseMoney(raw) {
+    if (typeof raw === "number") return Number.isFinite(raw) && raw >= 0 ? round2(raw) : 0;
+    if (typeof raw !== "string") return 0;
+    let s = raw.trim().replace(/[$\s]/g, "");
+    if (!s) return 0;
+    const lastComma = s.lastIndexOf(",");
+    const lastDot = s.lastIndexOf(".");
+    if (lastComma > -1 && lastDot > -1) {
+      if (lastComma > lastDot) {
+        s = s.replace(/\./g, "").replace(/,/g, ".");
+      } else {
+        s = s.replace(/,/g, "");
+      }
+    } else if (lastComma > -1) {
+      const digitsAfter = s.length - lastComma - 1;
+      const singleComma = s.indexOf(",") === lastComma;
+      s = singleComma && digitsAfter >= 1 && digitsAfter <= 2
+        ? s.replace(",", ".")
+        : s.replace(/,/g, "");
+    }
+    const n = Number.parseFloat(s);
+    return Number.isFinite(n) && n >= 0 ? round2(n) : 0;
+  }
+
   // quote: { pctMin, pctMax, fixedCostMXN } (from fee source)
   // inputs: { priceMXN, shippingCostMXN, productCostMXN }
   // Returns min/max bounds; min === max when the rate is exact.
@@ -44,5 +71,5 @@ globalThis.MST_CALC = (() => {
     return breakdown;
   }
 
-  return Object.freeze({ computeBreakdown, round2 });
+  return Object.freeze({ computeBreakdown, round2, parseMoney });
 })();
