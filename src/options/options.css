@@ -1,0 +1,49 @@
+/* Options page — same Andes-like card language as the injected UI. */
+
+body {
+  margin: 0;
+  padding: 32px 16px;
+  background: #ededed;
+  font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  color: rgba(0, 0, 0, 0.9);
+}
+
+.card {
+  max-width: 480px;
+  margin: 0 auto;
+  background: #fff;
+  border-radius: 6px;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.12);
+  padding: 16px;
+}
+
+.card__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.card__header h1 {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.setting {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.setting input {
+  accent-color: #3483fa;
+}
+
+.hint {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.55);
+  margin: 16px 0 0;
+}

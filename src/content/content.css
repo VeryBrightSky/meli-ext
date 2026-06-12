@@ -1,0 +1,55 @@
+/* Injected UI styles. Mirrors MELI's Andes "Medios de pago" box: white card,
+   6px radius, soft shadow, 16px padding, inherited font. All selectors are
+   prefixed with .mst- (see EXT_BRAND.cssPrefix) to avoid collisions. */
+
+.mst-card {
+  font-family: inherit;
+  background: #fff;
+  border-radius: 6px;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.12);
+  padding: 16px;
+  margin: 16px 0;
+  color: rgba(0, 0, 0, 0.9);
+  box-sizing: border-box;
+}
+
+.mst-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Skeleton loader rows, MELI gray, fixed height so the card never jumps. */
+.mst-skeleton {
+  height: 14px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #ededed 25%, #f5f5f5 50%, #ededed 75%);
+  background-size: 200% 100%;
+  animation: mst-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes mst-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* Third-party attribution corner. */
+.mst-card__brand {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  margin-top: 12px;
+  font-size: 11px;
+  line-height: 1;
+  color: rgba(0, 0, 0, 0.55);
+}
+
+.mst-card__brand img {
+  display: block;
+  border-radius: 2px;
+}

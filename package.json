@@ -1,0 +1,14 @@
+{
+  "name": "meli-ext",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Chrome extension (MV3) for MercadoLibre Mexico sellers — fees, net payout, listing insights.",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "build:release": "node scripts/build.mjs --release",
+    "icons": "python3 scripts/gen-icons.py",
+    "check": "node --check src/config/branding.js && node --check src/content/content.js && node --check src/background/service-worker.js && node --check src/options/options.js && node -e \"JSON.parse(require('fs').readFileSync('manifest.json'))\" && echo OK",
+    "test": "npm run check"
+  }
+}

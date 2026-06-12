@@ -1,0 +1,41 @@
+{
+  "manifest_version": 3,
+  "name": "MELI Seller Tools (dev)",
+  "version": "0.1.0",
+  "description": "Fee calculator, net payout and seller insights for MercadoLibre Mexico listings.",
+  "icons": {
+    "16": "src/assets/icons/icon16.png",
+    "48": "src/assets/icons/icon48.png",
+    "128": "src/assets/icons/icon128.png"
+  },
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "https://api.mercadolibre.com/*"
+  ],
+  "background": {
+    "service_worker": "src/background/service-worker.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://articulo.mercadolibre.com.mx/*",
+        "https://www.mercadolibre.com.mx/*",
+        "https://listado.mercadolibre.com.mx/*"
+      ],
+      "js": [
+        "src/config/branding.js",
+        "src/content/content.js"
+      ],
+      "css": [
+        "src/content/content.css"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "options_ui": {
+    "page": "src/options/options.html",
+    "open_in_tab": true
+  }
+}
