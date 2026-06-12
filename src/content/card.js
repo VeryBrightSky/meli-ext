@@ -128,7 +128,9 @@ globalThis.MST_CARD = (() => {
 
   async function restoreInputs() {
     const keys = [`${PREFIX}:defaults`];
-    if (state.itemId) keys.push(`${PREFIX}:cost:${state.itemId}`);
+    if (state.itemId) {
+      keys.push(`${PREFIX}:cost:${state.itemId}`, `${PREFIX}:catpick:${state.itemId}`);
+    }
     const [stored, settings] = await Promise.all([
       chrome.storage.local.get(keys),
       chrome.storage.sync.get({ defaultShippingMXN: 0, defaultListingType: "auto" })
@@ -144,12 +146,17 @@ globalThis.MST_CARD = (() => {
     if (settings.defaultListingType !== "auto") {
       state.listingTypeId = settings.defaultListingType === "premium" ? "premium" : "classic";
     }
+    // Manual category pick saved for this listing beats auto-detection.
+    const savedPick = stored[`${PREFIX}:catpick:${state.itemId}`];
+    if (savedPick && SOURCE.listCategoryGroups().some((g) => g.id === savedPick)) {
+      state.categoryGroupId = savedPick;
+      state.categoryAutoDetected = false;
+    }
   }
 
   // --- Update (no DOM rebuilding) ---------------------------------------------
 
-  function update(flash = true) {
-    if (!refs.card) return;
+  function computeCurrent() {
     const quote = SOURCE.getQuote({
       priceMXN: state.priceMXN,
       listingTypeId: state.listingTypeId,
@@ -160,6 +167,12 @@ globalThis.MST_CARD = (() => {
       shippingCostMXN: state.shippingCostMXN,
       productCostMXN: state.productCostMXN
     });
+    return { quote, b };
+  }
+
+  function update(flash = true) {
+    if (!refs.card) return;
+    const { quote, b } = computeCurrent();
 
     patchRow(
       refs.commission,
@@ -172,6 +185,13 @@ globalThis.MST_CARD = (() => {
     if (b.fixedCostMXN > 0) {
       patchRow(refs.fixed, null, fmtCharge(b.fixedCostMXN), flash);
     }
+
+    patchRow(
+      refs.effective,
+      null,
+      fmtPctRange(b.effectiveRateMinPct, b.effectiveRateMaxPct),
+      flash
+    );
 
     patchRow(refs.net, null, fmtRange(b.netMinMXN, b.netMaxMXN), flash);
 
@@ -297,8 +317,18 @@ globalThis.MST_CARD = (() => {
     select.addEventListener("change", () => {
       state.categoryGroupId = select.value || null;
       state.categoryAutoDetected = false;
+      if (state.itemId) {
+        // Remember the manual pick for this listing (like product cost).
+        const key = `${PREFIX}:catpick:${state.itemId}`;
+        if (state.categoryGroupId) {
+          chrome.storage.local.set({ [key]: state.categoryGroupId });
+        } else {
+          chrome.storage.local.remove(key);
+        }
+      }
       update();
     });
+    refs.categorySelect = select;
     catRow.appendChild(select);
     body.appendChild(catRow);
     refs.hint = el("div", `${PREFIX}-hint`, "");
@@ -309,6 +339,9 @@ globalThis.MST_CARD = (() => {
 
     refs.fixed = buildRow(T("rowFixedCost"));
     body.appendChild(refs.fixed.root);
+
+    refs.effective = buildRow(T("rowEffectiveRate"));
+    body.appendChild(refs.effective.root);
 
     // Shipping input.
     const shipRow = el("div", `${PREFIX}-row`);
@@ -372,6 +405,78 @@ globalThis.MST_CARD = (() => {
 
     refs.target = buildRow(T("rowTargetPrice"), "total");
     body.appendChild(refs.target.root);
+
+    // Copy plain-text summary (WhatsApp/notes friendly).
+    const copyBtn = el("button", `${PREFIX}-copy`, T("btnCopy"));
+    copyBtn.type = "button";
+    copyBtn.addEventListener("click", async () => {
+      const ok = await copyText(buildSummaryText());
+      copyBtn.textContent = ok ? T("btnCopied") : T("btnCopyError");
+      copyBtn.disabled = true;
+      setTimeout(() => {
+        copyBtn.textContent = T("btnCopy");
+        copyBtn.disabled = false;
+      }, 2000);
+    });
+    body.appendChild(copyBtn);
+  }
+
+  function buildSummaryText() {
+    const { quote, b } = computeCurrent();
+    const lines = [];
+    lines.push(`${T("cardTitle")} — ${window.location.href}`);
+    lines.push(`${T("rowPrice")}: ${fmtMoney(b.priceMXN)}`);
+    lines.push(
+      `${T("rowListingType")}: ${state.listingTypeId === "premium" ? T("typePremium") : T("typeClassic")}`
+    );
+    if (quote.categoryGroup) {
+      lines.push(`${T("rowCategory")}: ${quote.categoryGroup.label}`);
+    }
+    lines.push(
+      `${T("rowCommission", [fmtPctRange(b.pctMin, b.pctMax)])}: ` +
+        fmtCharge(b.commissionMinMXN, b.commissionMaxMXN)
+    );
+    if (b.fixedCostMXN > 0) {
+      lines.push(`${T("rowFixedCost")}: ${fmtCharge(b.fixedCostMXN)}`);
+    }
+    lines.push(
+      `${T("rowEffectiveRate")}: ${fmtPctRange(b.effectiveRateMinPct, b.effectiveRateMaxPct)}`
+    );
+    if (b.shippingCostMXN > 0) {
+      lines.push(`${T("rowShipping")}: ${fmtCharge(b.shippingCostMXN)}`);
+    }
+    lines.push(`${T("rowNet")}: ${fmtRange(b.netMinMXN, b.netMaxMXN)}`);
+    if (b.profitMinMXN !== undefined) {
+      lines.push(`${T("rowProductCost")}: ${fmtMoney(b.productCostMXN)}`);
+      lines.push(
+        `${T("rowProfit")}: ${fmtRange(b.profitMinMXN, b.profitMaxMXN)} ` +
+          `(${fmtPctRange(b.marginMinPct, b.marginMaxPct)})`
+      );
+    }
+    lines.push(`${T("badgeEstimate")} · ${SOURCE.meta.retrievedAt} · ${BRAND.name}`);
+    return lines.join("\n");
+  }
+
+  async function copyText(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      // Clipboard API can fail without focus/permission — textarea fallback.
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        const ok = document.execCommand("copy");
+        ta.remove();
+        return ok;
+      } catch {
+        return false;
+      }
+    }
   }
 
   // Builds the card element. With pageData it renders the live calculator;
@@ -402,7 +507,11 @@ globalThis.MST_CARD = (() => {
     state.priceMXN = pageData.price.value;
     state.itemId = pageData.itemId;
     state.listingTypeId = pageData.listingTypeGuess;
-    const matched = SOURCE.matchCategory(pageData.breadcrumbs);
+    // Structured data first (language-stable), visible breadcrumb fallback.
+    // A manually saved pick for this listing overrides both (restoreInputs).
+    const matched =
+      SOURCE.matchCategory(pageData.structuredCategory?.names ?? []) ??
+      SOURCE.matchCategory(pageData.breadcrumbs);
     if (matched && !state.categoryGroupId) {
       state.categoryGroupId = matched;
       state.categoryAutoDetected = true;
@@ -415,6 +524,7 @@ globalThis.MST_CARD = (() => {
       refs.shippingInput.syncFromState();
       refs.costInput.syncFromState();
       refs.marginInput.syncFromState();
+      refs.categorySelect.value = state.categoryGroupId ?? "";
       update(false);
     });
     return card;

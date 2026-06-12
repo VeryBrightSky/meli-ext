@@ -57,7 +57,13 @@ globalThis.MST_CALC = (() => {
       fixedCostMXN: fixedCost,
       shippingCostMXN: shipping,
       netMinMXN: netMin,
-      netMaxMXN: netMax
+      netMaxMXN: netMax,
+      // Total MELI fees (commission + fixed charge, NOT shipping) as % of
+      // the sale price — the "real bite" at a glance.
+      effectiveRateMinPct:
+        price > 0 ? round2(((commissionMin + fixedCost) / price) * 100) : 0,
+      effectiveRateMaxPct:
+        price > 0 ? round2(((commissionMax + fixedCost) / price) * 100) : 0
     };
 
     if (inputs.productCostMXN > 0) {

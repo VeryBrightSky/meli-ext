@@ -181,6 +181,23 @@ test("solveTargetPrice: unreachable margin returns null", () => {
   );
 });
 
+test("effective rate combines commission and fixed charge as % of price", () => {
+  // $120, tech classic 10% + $30 fixed → (12 + 30) / 120 = 35%
+  const q = SOURCE.getQuote({ priceMXN: 120, listingTypeId: "classic", categoryGroupId: "tech" });
+  const b = CALC.computeBreakdown(q, { priceMXN: 120, shippingCostMXN: 0, productCostMXN: 0 });
+  assert.equal(b.effectiveRateMinPct, 35);
+  assert.equal(b.effectiveRateMaxPct, 35);
+  // $827 no fixed charge → exactly the commission rate
+  const q2 = SOURCE.getQuote({ priceMXN: 827, listingTypeId: "classic", categoryGroupId: "tech" });
+  const b2 = CALC.computeBreakdown(q2, { priceMXN: 827, shippingCostMXN: 0, productCostMXN: 0 });
+  assert.equal(b2.effectiveRateMinPct, 10);
+  // unknown category → range
+  const q3 = SOURCE.getQuote({ priceMXN: 1000, listingTypeId: "classic", categoryGroupId: null });
+  const b3 = CALC.computeBreakdown(q3, { priceMXN: 1000, shippingCostMXN: 0, productCostMXN: 0 });
+  assert.equal(b3.effectiveRateMinPct, 8);
+  assert.equal(b3.effectiveRateMaxPct, 16);
+});
+
 test("getFixedCost exposed on the fee source", () => {
   assert.equal(SOURCE.getFixedCost(50), 25);
   assert.equal(SOURCE.getFixedCost(299), 0);

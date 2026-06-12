@@ -31,7 +31,7 @@ closed in 2024, so live rates require OAuth (planned V2 via the
 npm test            # syntax checks + unit tests (fees, solver, locales)
 npm run build       # stamp manifest from branding.js, refresh dist/
 npm run build:release  # release name (no "(dev)"), CWS zip
-npm run icons       # regenerate placeholder icons
+npm run icons       # regenerate icon artwork (reproducible, pure stdlib)
 ```
 
 Load unpacked: `chrome://extensions` → Developer mode → Load unpacked → repo
