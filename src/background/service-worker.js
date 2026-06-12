@@ -1,23 +1,15 @@
-// MV3 service worker. Content scripts cannot fetch api.mercadolibre.com
-// cross-origin, so all public API calls are proxied through here (Phase 1).
-// Phase 0 wires up the message router with a ping handler so the channel is
-// testable end to end.
+// MV3 service worker. v1.0.0 makes NO network requests — fee data is the
+// bundled table (src/fees/fee-table.js).
+//
+// V2 (authed listing_prices lookups): re-add the
+// "https://api.mercadolibre.com/*" host permission and a fetch handler here;
+// content scripts can't call the API cross-origin, so it must be proxied
+// through this worker. The UI already talks to the swappable fee-source
+// interface, so nothing else changes.
 "use strict";
 
-const MELI_API_BASE = "https://api.mercadolibre.com";
-
 const handlers = {
-  ping: async () => ({ pong: true, version: chrome.runtime.getManifest().version }),
-
-  // Phase 1: GET /sites/MLM/listing_prices?price=X — commission by listing type.
-  fetchListingPrices: async ({ price }) => {
-    const url = `${MELI_API_BASE}/sites/MLM/listing_prices?price=${encodeURIComponent(price)}`;
-    const res = await fetch(url);
-    if (!res.ok) {
-      throw new Error(`MELI API ${res.status} for ${url}`);
-    }
-    return res.json();
-  }
+  ping: async () => ({ pong: true, version: chrome.runtime.getManifest().version })
 };
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {

@@ -84,5 +84,6 @@ Capture in Spanish UI. No personal data visible in any screenshot.
 - [ ] Privacy policy URL (host `PRIVACY.md` contents publicly)
 - [ ] Upload zip from `npm run build:release`
 - [ ] Justify permissions in the developer dashboard: `storage` (user
-      settings), host `mercadolibre.com.mx` (render cards on listings),
-      `api.mercadolibre.com` (reserved for user-initiated fee lookups, V2)
+      settings), host `mercadolibre.com.mx` (render cards on listings).
+      Note: `api.mercadolibre.com` was removed for v1.0.0 (nothing calls
+      it); re-add with justification when V2 ships authed fee lookups.

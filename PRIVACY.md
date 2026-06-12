@@ -16,9 +16,8 @@ Esta extensión **no recopila, transmite ni vende ningún dato personal**.
   de mercadolibre.com.mx que estás viendo, para mostrar la calculadora. No
   rastrea tu navegación ni visita páginas en segundo plano.
 - **Permisos:** `storage` (guardar tus ajustes) y acceso a
-  `mercadolibre.com.mx` (mostrar las tarjetas). El permiso a
-  `api.mercadolibre.com` está reservado para consultas de tarifas iniciadas
-  por ti en versiones futuras.
+  `mercadolibre.com.mx` (mostrar las tarjetas). La extensión no hace ninguna
+  petición de red.
 - **Eliminación de datos:** usa "Borrar datos guardados" en las opciones de la
   extensión, o desinstálala — todo se borra con ella.
 
@@ -34,7 +33,7 @@ This extension **does not collect, transmit, or sell any personal data**.
   mercadolibre.com.mx pages you are viewing, to render the calculator. It does
   not track your browsing or visit pages in the background.
 - **Permissions:** `storage` (saving your settings) and access to
-  `mercadolibre.com.mx` (rendering the cards). The `api.mercadolibre.com`
-  permission is reserved for user-initiated fee lookups in future versions.
+  `mercadolibre.com.mx` (rendering the cards). The extension makes no network
+  requests.
 - **Data deletion:** use "Clear saved data" in the extension options, or
   uninstall it — everything is deleted with it.
