@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "MELI Seller Tools (dev)",
-  "version": "0.1.0",
-  "description": "Fee calculator, net payout and seller insights for MercadoLibre Mexico listings.",
+  "name": "Netio (dev)",
+  "version": "1.0.0",
+  "description": "Calculadora de comisiones, ganancias y precios para vendedores de Mercado Libre México.",
   "default_locale": "es_419",
   "icons": {
     "16": "src/assets/icons/icon16.png",

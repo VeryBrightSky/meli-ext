@@ -1,11 +1,11 @@
-# MELI Seller Tools (working name)
+# Netio
 
 Chrome extension (Manifest V3, vanilla JS) for **MercadoLibre Mexico sellers**:
 fee and net-payout calculator on product pages, plus a Quick View fee strip on
 search results. Spanish (es-MX) first, English fallback.
 
-> Final product name is TBD. All branding lives in `src/config/branding.js`;
-> `npm run build` stamps it into `manifest.json`.
+> All branding lives in `src/config/branding.js`; `npm run build` stamps it
+> into `manifest.json`.
 
 ## Features
 
@@ -36,7 +36,7 @@ npm run icons       # regenerate icon artwork (reproducible, pure stdlib)
 
 Load unpacked: `chrome://extensions` → Developer mode → Load unpacked → repo
 root (or `dist/`). Open any `mercadolibre.com.mx` listing; diagnostics are
-logged under the `[MELI Seller Tools]` console prefix.
+logged under the `[Netio]` console prefix.
 
 ## Structure
 

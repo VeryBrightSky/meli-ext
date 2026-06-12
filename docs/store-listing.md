@@ -1,8 +1,7 @@
 # Chrome Web Store Listing
 
-> Replace "MELI Seller Tools" with the final name (branding.js) before
-> submission. Category: **Shopping** (or Productivity → Tools). Language:
-> Spanish (Mexico), with English listing as secondary.
+> Category: **Shopping** (or Productivity → Tools). Language: Spanish
+> (Mexico), with English listing as secondary.
 
 ## Single purpose statement (for the CWS review form)
 
@@ -11,8 +10,8 @@ the listing pages they visit.
 
 ## Título / Title
 
-- ES: `MELI Seller Tools — Calculadora de comisiones para vendedores`
-- EN: `MELI Seller Tools — Fee calculator for sellers`
+- ES: `Netio — Calculadora de comisiones para vendedores`
+- EN: `Netio — Fee calculator for sellers`
 
 ## Descripción corta / Short description (≤132 chars)
 

@@ -5,8 +5,8 @@
 // MELI renders .ui-pdp-price in multiple subtrees (sticky header, hidden
 // variants), so anchor selection filters by actual visibility, not DOM order.
 //
-// Diagnostics: every decision is logged with the [MELI Seller Tools] prefix
-// so failures on real pages can be debugged from a console paste.
+// Diagnostics: every decision is logged with a [<brand name>] prefix so
+// failures on real pages can be debugged from a console paste.
 "use strict";
 
 (() => {

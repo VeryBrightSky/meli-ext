@@ -6,12 +6,12 @@
 
 globalThis.EXT_BRAND = Object.freeze({
   // Display name shown in injected cards and the options page.
-  name: "MELI Seller Tools",
+  name: "Netio",
   // Name used in manifest.json. "(dev)" suffix is stripped by the release build.
-  manifestName: "MELI Seller Tools (dev)",
-  version: "0.1.0",
+  manifestName: "Netio (dev)",
+  version: "1.0.0",
   description:
-    "Fee calculator, net payout and seller insights for MercadoLibre Mexico listings.",
+    "Calculadora de comisiones, ganancias y precios para vendedores de Mercado Libre México.",
   // Path relative to the extension root; resolve with chrome.runtime.getURL().
   logoPath: "src/assets/icons/icon16.png",
   // Andes design tokens — keep in sync with src/content/content.css.
