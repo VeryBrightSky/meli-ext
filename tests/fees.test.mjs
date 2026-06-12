@@ -186,12 +186,12 @@ test("getFixedCost exposed on the fee source", () => {
   assert.equal(SOURCE.getFixedCost(299), 0);
 });
 
-test("locales: en keys exactly match es_MX keys", () => {
-  const es = JSON.parse(readFileSync(join(root, "_locales/es_MX/messages.json"), "utf8"));
+test("locales: en keys exactly match es_419 keys", () => {
+  const es = JSON.parse(readFileSync(join(root, "_locales/es_419/messages.json"), "utf8"));
   const en = JSON.parse(readFileSync(join(root, "_locales/en/messages.json"), "utf8"));
   assert.deepEqual(Object.keys(en).sort(), Object.keys(es).sort());
   for (const key of Object.keys(es)) {
-    assert.ok(es[key].message.length > 0, `es_MX ${key} empty`);
+    assert.ok(es[key].message.length > 0, `es_419 ${key} empty`);
     assert.ok(en[key].message.length > 0, `en ${key} empty`);
   }
 });

@@ -1,5 +1,6 @@
-// Tiny chrome.i18n wrapper. Source locale is es_MX (default_locale), en is
-// the fallback translation. Returns the key itself when the runtime is
+// Tiny chrome.i18n wrapper. Source locale is es_419 (default_locale; Chrome
+// has no es_MX — Latin American Spanish is the closest), en is the fallback
+// translation. Returns the key itself when the runtime is
 // unavailable (Node tests) so missing strings are visible, never blank.
 "use strict";
 

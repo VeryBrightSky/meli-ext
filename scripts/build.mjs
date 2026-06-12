@@ -22,8 +22,38 @@ const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
 manifest.name = release ? BRAND.name : BRAND.manifestName;
 manifest.version = BRAND.version;
 manifest.description = BRAND.description;
+
+// Chrome silently treats an unsupported default_locale as unspecified and
+// then refuses to load the extension ("Localization used, but default_locale
+// wasn't specified"). es_MX is NOT supported — es / es_419 are the options.
+// https://developer.chrome.com/docs/extensions/reference/api/i18n#locales
+const CHROME_LOCALES = new Set([
+  "ar", "am", "bg", "bn", "ca", "cs", "da", "de", "el", "en", "en_AU",
+  "en_GB", "en_US", "es", "es_419", "et", "fa", "fi", "fil", "fr", "gu",
+  "he", "hi", "hr", "hu", "id", "it", "ja", "kn", "ko", "lt", "lv", "ml",
+  "mr", "ms", "nl", "no", "pl", "pt_BR", "pt_PT", "ro", "ru", "sk", "sl",
+  "sr", "sv", "sw", "ta", "te", "th", "tr", "uk", "vi", "zh_CN", "zh_TW"
+]);
+if (manifest.default_locale) {
+  if (!CHROME_LOCALES.has(manifest.default_locale)) {
+    console.error(
+      `FATAL: default_locale "${manifest.default_locale}" is not a Chrome-supported extension locale.`
+    );
+    process.exit(1);
+  }
+  if (!existsSync(join(root, "_locales", manifest.default_locale, "messages.json"))) {
+    console.error(
+      `FATAL: _locales/${manifest.default_locale}/messages.json missing for default_locale.`
+    );
+    process.exit(1);
+  }
+}
+
 writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n");
-console.log(`manifest.json stamped: "${manifest.name}" v${manifest.version}`);
+console.log(
+  `manifest.json stamped: "${manifest.name}" v${manifest.version}` +
+    (manifest.default_locale ? ` (default_locale ${manifest.default_locale} ✓)` : "")
+);
 
 const dist = join(root, "dist");
 rmSync(dist, { recursive: true, force: true });

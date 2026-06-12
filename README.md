@@ -42,7 +42,7 @@ logged under the `[MELI Seller Tools]` console prefix.
 
 ```
 manifest.json            MV3 manifest (name/version stamped by the build)
-_locales/                es_MX (default) + en
+_locales/                es_419 (default; Chrome has no es_MX) + en
 src/config/              branding.js (single branding source), i18n.js
 src/fees/                fee-table.js (data) → fee-source.js (interface)
                          → calculator.js (pure math, unit-tested)
