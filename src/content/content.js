@@ -1,6 +1,9 @@
-// Content script entry point. Detects the page type, finds a safe anchor
+// Content script entry point. Detects the page type, finds a VISIBLE anchor
 // under the price block, and injects the (skeleton-state) card shell that
 // Phase 1 will populate with fee/payout data.
+//
+// MELI renders .ui-pdp-price in multiple subtrees (sticky header, hidden
+// variants), so anchor selection filters by actual visibility, not DOM order.
 //
 // Diagnostics: every decision is logged with the [MELI Seller Tools] prefix
 // so failures on real pages can be debugged from a console paste.
@@ -14,6 +17,9 @@
 
   const log = (...args) => console.log(TAG, ...args);
   const warn = (...args) => console.warn(TAG, ...args);
+
+  const describe = (el) =>
+    `<${el.tagName.toLowerCase()}${el.id ? ` id="${el.id}"` : ""} class="${el.className}">`;
 
   // --- Page detection -------------------------------------------------------
 
@@ -45,43 +51,121 @@
     );
   }
 
+  // --- Visibility ------------------------------------------------------------
+
+  function isVisible(el) {
+    if (!el || !el.isConnected) return false;
+    const rect = el.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return false;
+    const style = getComputedStyle(el);
+    return (
+      style.display !== "none" &&
+      style.visibility !== "hidden" &&
+      style.opacity !== "0"
+    );
+  }
+
+  function hasFixedOrStickyAncestor(el) {
+    for (let node = el; node && node !== document.body; node = node.parentElement) {
+      const position = getComputedStyle(node).position;
+      if (position === "fixed" || position === "sticky") return true;
+    }
+    return false;
+  }
+
   // --- Anchor lookup ---------------------------------------------------------
 
-  // Layered strategies, most specific first. Each returns the element the
-  // card is inserted AFTER (inline under the price, never covering buy
-  // buttons or shipping info).
+  // Layered strategies, most specific first. Each returns ALL candidates;
+  // selection then filters by visibility and avoids sticky-header duplicates.
   const ANCHOR_STRATEGIES = [
     {
       name: "pdp-price-container",
-      find: () => document.querySelector(".ui-pdp-price")
+      findAll: () => document.querySelectorAll(".ui-pdp-price")
     },
     {
       name: "pdp-price-fuzzy",
-      find: () => document.querySelector('[class*="ui-pdp-price"]')
+      findAll: () => document.querySelectorAll('[class*="ui-pdp-price"]')
     },
     {
       name: "legacy-price-id",
-      find: () => document.querySelector("#price")
+      findAll: () => document.querySelectorAll("#price")
     },
     {
-      // Semantic fallback: first Andes money amount inside the main content,
-      // climbed to its nearest block container. Survives pdp class renames.
+      // Semantic fallback: Andes money amounts inside the main content,
+      // climbed to their nearest block container. Survives pdp class renames.
       name: "andes-money-amount",
-      find: () => {
-        const money = document.querySelector(
+      findAll: () => {
+        const blocks = [];
+        for (const money of document.querySelectorAll(
           "main .andes-money-amount, #root-app .andes-money-amount"
-        );
-        return money ? money.closest("div") : null;
+        )) {
+          const block = money.closest("div");
+          if (block && !blocks.includes(block)) blocks.push(block);
+        }
+        return blocks;
       }
     }
   ];
 
+  // Among visible candidates prefer ones outside fixed/sticky containers
+  // (sticky-header price duplicate), then the largest on-screen rect (the
+  // main buybox price dwarfs thumbnails and badges).
+  function pickBestCandidate(visible) {
+    const inFlow = visible.filter((el) => !hasFixedOrStickyAncestor(el));
+    const pool = inFlow.length > 0 ? inFlow : visible;
+    return pool.reduce((best, el) => {
+      const area = (e) => {
+        const r = e.getBoundingClientRect();
+        return r.width * r.height;
+      };
+      return area(el) > area(best) ? el : best;
+    });
+  }
+
+  // Silent (called from observers at high frequency); callers log the result.
   function findProductAnchor() {
     for (const strategy of ANCHOR_STRATEGIES) {
-      const el = strategy.find();
-      if (el) return { el, strategyName: strategy.name };
+      const candidates = [...strategy.findAll()];
+      if (candidates.length === 0) continue;
+      const visible = candidates.filter(isVisible);
+      if (visible.length === 0) continue;
+      return {
+        el: pickBestCandidate(visible),
+        strategyName: strategy.name,
+        candidateCount: candidates.length,
+        visibleCount: visible.length
+      };
     }
     return null;
+  }
+
+  function logAnchorChoice(found) {
+    log(
+      `anchor via "${found.strategyName}": ${found.candidateCount} candidate(s), ` +
+        `${found.visibleCount} visible, chose ${describe(found.el)}`
+    );
+  }
+
+  // When no strategy matches, report what IS on the page so a console paste
+  // is enough to write the missing selector.
+  function logAnchorDiagnostics() {
+    const lines = ANCHOR_STRATEGIES.map((s) => {
+      const candidates = [...s.findAll()];
+      return `${s.name}: ${candidates.length} candidate(s), ${candidates.filter(isVisible).length} visible`;
+    });
+    const probes = [
+      ".ui-pdp-container",
+      ".andes-money-amount",
+      "#buybox",
+      "main",
+      "#root-app"
+    ].map((sel) => `${sel} -> ${document.querySelectorAll(sel).length}`);
+    warn(
+      "no VISIBLE anchor found.\n  strategies:\n    " +
+        lines.join("\n    ") +
+        "\n  probes:\n    " +
+        probes.join("\n    ")
+    );
   }
 
   // --- Hydration settling ----------------------------------------------------
@@ -128,9 +212,8 @@
     log(`DOM settled after ${waitedMs}ms`);
   }
 
-  // MELI hydrates parts of the PDP after document_idle, so wait for the
-  // anchor with an observer instead of polling. Gives up after 15s — we must
-  // never break the host page.
+  // Wait for a visible anchor with an observer instead of polling. Gives up
+  // after 15s — we must never break the host page.
   function waitForAnchor(timeoutMs = 15000) {
     return new Promise((resolve) => {
       const existing = findProductAnchor();
@@ -138,13 +221,13 @@
         resolve(existing);
         return;
       }
-      log("price block not in DOM yet, watching for it…");
+      log("no visible price block yet, watching for it…");
       const observer = new MutationObserver(() => {
         const found = findProductAnchor();
         if (found) {
           observer.disconnect();
           clearTimeout(timer);
-          log("price block appeared after initial load");
+          log("visible price block appeared after initial load");
           resolve(found);
         }
       });
@@ -154,31 +237,11 @@
       }, timeoutMs);
       observer.observe(document.documentElement, {
         childList: true,
-        subtree: true
+        subtree: true,
+        attributes: true,
+        attributeFilter: ["class", "style", "hidden"]
       });
     });
-  }
-
-  // When no strategy matches, report what IS on the page so a console paste
-  // is enough to write the missing selector.
-  function logAnchorDiagnostics() {
-    const probes = [
-      ".ui-pdp-container",
-      ".ui-pdp-price",
-      '[class*="ui-pdp"]',
-      ".andes-money-amount",
-      "#buybox",
-      "#price",
-      "main",
-      "#root-app"
-    ];
-    const counts = probes.map(
-      (sel) => `${sel} -> ${document.querySelectorAll(sel).length}`
-    );
-    warn(
-      "no anchor strategy matched. Selector probe results:\n  " +
-        counts.join("\n  ")
-    );
   }
 
   // --- Card shell ------------------------------------------------------------
@@ -215,50 +278,108 @@
     return card;
   }
 
+  // Post-injection self-check: confirm the card actually renders on screen;
+  // if not, walk ancestors and name the one hiding it.
+  function logCardVisibilityReport(card) {
+    const rect = card.getBoundingClientRect();
+    const style = getComputedStyle(card);
+    log("card self-check:", {
+      rect: {
+        x: Math.round(rect.x),
+        y: Math.round(rect.y),
+        w: Math.round(rect.width),
+        h: Math.round(rect.height)
+      },
+      display: style.display,
+      visibility: style.visibility,
+      opacity: style.opacity
+    });
+    if (isVisible(card)) {
+      log("card visible on screen ✔");
+      return true;
+    }
+    warn("card is in the DOM but NOT visible. Ancestor audit:");
+    for (
+      let node = card.parentElement;
+      node && node !== document.documentElement;
+      node = node.parentElement
+    ) {
+      const s = getComputedStyle(node);
+      const r = node.getBoundingClientRect();
+      if (
+        s.display === "none" ||
+        s.visibility === "hidden" ||
+        s.opacity === "0" ||
+        r.width === 0 ||
+        r.height === 0
+      ) {
+        warn(
+          `  hidden ancestor ${describe(node)} ` +
+            `display=${s.display} visibility=${s.visibility} opacity=${s.opacity} ` +
+            `size=${Math.round(r.width)}x${Math.round(r.height)}`
+        );
+      }
+    }
+    return false;
+  }
+
   function insertCard() {
     const found = findProductAnchor();
-    if (!found || !found.el.isConnected) return null;
+    if (!found) return null;
     found.el.insertAdjacentElement("afterend", buildCardShell());
     return found;
   }
 
-  // The page's React app can re-render the price section and silently drop
-  // our card. Watch for that and re-inject — capped so we never loop-fight a
-  // page that is determined to remove us.
+  // --- Persistence -----------------------------------------------------------
+
+  // The page's React app can re-render the price section and drop the card,
+  // or toggle our anchor's subtree hidden. Watch for both and re-inject at a
+  // currently-visible anchor — capped so we never loop-fight the page.
   const MAX_REINJECTS = 5;
 
   function watchCardPersistence() {
     let reinjects = 0;
     let pending = false;
+
+    const recover = (reason) => {
+      if (reinjects >= MAX_REINJECTS) {
+        warn(`${reason}, but re-inject cap (${MAX_REINJECTS}) reached, giving up`);
+        observer.disconnect();
+        return;
+      }
+      reinjects++;
+      log(`${reason}, re-anchoring (${reinjects}/${MAX_REINJECTS})`);
+      document.getElementById(CARD_ID)?.remove();
+      const found = insertCard();
+      if (found) {
+        logAnchorChoice(found);
+        logCardVisibilityReport(document.getElementById(CARD_ID));
+      } else {
+        warn("no visible anchor available, will retry on next page mutation");
+      }
+    };
+
     const observer = new MutationObserver(() => {
-      const card = document.getElementById(CARD_ID);
-      if (card && card.isConnected) return;
       if (pending) return;
       pending = true;
-      // Debounce: let the page's render batch finish before re-entering.
+      // Debounce: let the page's render batch finish, and rate-limit the
+      // visibility checks (rect + computed style) to one per 200ms.
       setTimeout(() => {
         pending = false;
-        if (document.getElementById(CARD_ID)) return;
-        if (reinjects >= MAX_REINJECTS) {
-          warn(
-            `card removed again but re-inject cap (${MAX_REINJECTS}) reached, giving up`
-          );
-          observer.disconnect();
-          return;
-        }
-        reinjects++;
-        log(`card removed by page re-render, re-injecting (${reinjects}/${MAX_REINJECTS})`);
-        const found = insertCard();
-        if (found) {
-          log(`card re-injected ✔ (anchor: "${found.strategyName}")`);
+        const card = document.getElementById(CARD_ID);
+        if (card && isVisible(card)) return;
+        if (!card) {
+          recover("card removed by page re-render");
         } else {
-          warn("anchor no longer in DOM, will retry on next page mutation");
+          recover("card's subtree went hidden");
         }
-      }, 150);
+      }, 200);
     });
     observer.observe(document.documentElement, {
       childList: true,
-      subtree: true
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["class", "style", "hidden"]
     });
   }
 
@@ -274,13 +395,10 @@
       return;
     }
     if (document.getElementById(CARD_ID)) return;
-    const { el, strategyName } = found;
-    log(
-      `anchor found via "${strategyName}":`,
-      `<${el.tagName.toLowerCase()} class="${el.className}">`
-    );
-    el.insertAdjacentElement("afterend", buildCardShell());
+    logAnchorChoice(found);
+    found.el.insertAdjacentElement("afterend", buildCardShell());
     log("card injected ✔");
+    logCardVisibilityReport(document.getElementById(CARD_ID));
     watchCardPersistence();
   }
 
