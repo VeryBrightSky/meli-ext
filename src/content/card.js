@@ -10,13 +10,7 @@ globalThis.MST_CARD = (() => {
   const CARD_ID = `${PREFIX}-card-root`;
   const SOURCE = globalThis.MST_FEE_SOURCE;
   const CALC = globalThis.MST_CALC;
-
-  const mxn = new Intl.NumberFormat("es-MX", {
-    style: "currency",
-    currency: "MXN",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  });
+  const UI = globalThis.MST_UI;
 
   // Mutable card state — survives re-injection because the module outlives
   // the DOM node (persistence watcher rebuilds from this).
@@ -33,13 +27,7 @@ globalThis.MST_CARD = (() => {
   // Live references into the current card DOM, repopulated on each build().
   const refs = {};
 
-  function fmtRange(min, max) {
-    return min === max ? mxn.format(min) : `${mxn.format(min)} – ${mxn.format(max)}`;
-  }
-
-  function fmtPctRange(min, max) {
-    return min === max ? `${min}%` : `${min}%–${max}%`;
-  }
+  const { fmtMoney, fmtRange, fmtCharge, fmtPctRange } = UI;
 
   function el(tag, className, text) {
     const node = document.createElement(tag);
@@ -160,13 +148,13 @@ globalThis.MST_CARD = (() => {
     patchRow(
       refs.commission,
       `Comisión (${fmtPctRange(b.pctMin, b.pctMax)})`,
-      `−${fmtRange(b.commissionMinMXN, b.commissionMaxMXN)}`,
+      fmtCharge(b.commissionMinMXN, b.commissionMaxMXN),
       flash
     );
 
     refs.fixed.root.style.display = b.fixedCostMXN > 0 ? "" : "none";
     if (b.fixedCostMXN > 0) {
-      patchRow(refs.fixed, null, `−${mxn.format(b.fixedCostMXN)}`, flash);
+      patchRow(refs.fixed, null, fmtCharge(b.fixedCostMXN), flash);
     }
 
     patchRow(refs.net, null, fmtRange(b.netMinMXN, b.netMaxMXN), flash);
@@ -223,7 +211,7 @@ globalThis.MST_CARD = (() => {
     body.appendChild(header);
 
     const priceRow = buildRow("Precio de venta");
-    priceRow.value.textContent = mxn.format(state.priceMXN);
+    priceRow.value.textContent = fmtMoney(state.priceMXN);
     body.appendChild(priceRow.root);
 
     // Listing type toggle.

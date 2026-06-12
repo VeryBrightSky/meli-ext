@@ -417,8 +417,8 @@
         await injectProductCard();
         break;
       case PageType.SEARCH:
-        // Phase 2: Quick View strip on search results.
-        log("search page support lands in Phase 2");
+        await waitForPageSettled();
+        globalThis.MST_QUICKVIEW.init();
         break;
       default:
         break;

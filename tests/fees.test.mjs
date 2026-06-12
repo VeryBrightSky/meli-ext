@@ -7,11 +7,17 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
-for (const file of ["src/fees/fee-table.js", "src/fees/calculator.js", "src/fees/fee-source.js"]) {
+for (const file of [
+  "src/fees/fee-table.js",
+  "src/fees/calculator.js",
+  "src/fees/fee-source.js",
+  "src/content/format.js"
+]) {
   new Function(readFileSync(join(root, file), "utf8"))();
 }
 const SOURCE = globalThis.MST_FEE_SOURCE;
 const CALC = globalThis.MST_CALC;
+const UI = globalThis.MST_UI;
 
 test("tech category quote is exact and matches the table", () => {
   const q = SOURCE.getQuote({ priceMXN: 827, listingTypeId: "classic", categoryGroupId: "tech" });
@@ -103,6 +109,15 @@ test("parseMoney handles Mexican separator styles", () => {
   assert.equal(p(4.9922), 4.99); // sanitizes stored junk
   assert.equal(p(null), 0);
   assert.equal(p(undefined), 0);
+});
+
+test("charge formatting keeps minus sign on both range bounds", () => {
+  assert.equal(UI.fmtCharge(2.88, 5.77), "−$2.88 – −$5.77");
+  assert.equal(UI.fmtCharge(82.7), "−$82.70");
+  assert.equal(UI.fmtCharge(82.7, 82.7), "−$82.70");
+  assert.equal(UI.fmtRange(744.3, 744.3), "$744.30");
+  assert.equal(UI.fmtRange(840, 920), "$840.00 – $920.00");
+  assert.equal(UI.fmtMoney(1234567.89), "$1,234,567.89");
 });
 
 test("fee table meta carries source citations and retrieval date", () => {
