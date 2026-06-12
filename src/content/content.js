@@ -84,6 +84,50 @@
     return null;
   }
 
+  // --- Hydration settling ----------------------------------------------------
+
+  // MELI's PDP is a React app that hydrates after load. Injecting before
+  // hydration finishes causes a mismatch (React error #418) and our card gets
+  // wiped by the re-render. Wait for window load, then for the DOM to go
+  // quiet (no mutations for `quietMs`), capped at `maxMs` so a busy page
+  // (carousels, ads) can't stall us forever.
+  function waitForLoad() {
+    if (document.readyState === "complete") return Promise.resolve();
+    return new Promise((resolve) =>
+      window.addEventListener("load", resolve, { once: true })
+    );
+  }
+
+  function waitForDomQuiet(quietMs = 600, maxMs = 6000) {
+    return new Promise((resolve) => {
+      const started = performance.now();
+      const done = () => {
+        observer.disconnect();
+        clearTimeout(quietTimer);
+        clearTimeout(capTimer);
+        resolve(Math.round(performance.now() - started));
+      };
+      let quietTimer = setTimeout(done, quietMs);
+      const capTimer = setTimeout(done, maxMs);
+      const observer = new MutationObserver(() => {
+        clearTimeout(quietTimer);
+        quietTimer = setTimeout(done, quietMs);
+      });
+      observer.observe(document.documentElement, {
+        childList: true,
+        subtree: true,
+        attributes: true
+      });
+    });
+  }
+
+  async function waitForPageSettled() {
+    await waitForLoad();
+    log("page loaded, waiting for hydration to settle…");
+    const waitedMs = await waitForDomQuiet();
+    log(`DOM settled after ${waitedMs}ms`);
+  }
+
   // MELI hydrates parts of the PDP after document_idle, so wait for the
   // anchor with an observer instead of polling. Gives up after 15s — we must
   // never break the host page.
@@ -171,11 +215,59 @@
     return card;
   }
 
+  function insertCard() {
+    const found = findProductAnchor();
+    if (!found || !found.el.isConnected) return null;
+    found.el.insertAdjacentElement("afterend", buildCardShell());
+    return found;
+  }
+
+  // The page's React app can re-render the price section and silently drop
+  // our card. Watch for that and re-inject — capped so we never loop-fight a
+  // page that is determined to remove us.
+  const MAX_REINJECTS = 5;
+
+  function watchCardPersistence() {
+    let reinjects = 0;
+    let pending = false;
+    const observer = new MutationObserver(() => {
+      const card = document.getElementById(CARD_ID);
+      if (card && card.isConnected) return;
+      if (pending) return;
+      pending = true;
+      // Debounce: let the page's render batch finish before re-entering.
+      setTimeout(() => {
+        pending = false;
+        if (document.getElementById(CARD_ID)) return;
+        if (reinjects >= MAX_REINJECTS) {
+          warn(
+            `card removed again but re-inject cap (${MAX_REINJECTS}) reached, giving up`
+          );
+          observer.disconnect();
+          return;
+        }
+        reinjects++;
+        log(`card removed by page re-render, re-injecting (${reinjects}/${MAX_REINJECTS})`);
+        const found = insertCard();
+        if (found) {
+          log(`card re-injected ✔ (anchor: "${found.strategyName}")`);
+        } else {
+          warn("anchor no longer in DOM, will retry on next page mutation");
+        }
+      }, 150);
+    });
+    observer.observe(document.documentElement, {
+      childList: true,
+      subtree: true
+    });
+  }
+
   async function injectProductCard() {
     if (document.getElementById(CARD_ID)) {
       log("card already injected, skipping");
       return;
     }
+    await waitForPageSettled();
     const found = await waitForAnchor();
     if (!found) {
       logAnchorDiagnostics();
@@ -189,6 +281,7 @@
     );
     el.insertAdjacentElement("afterend", buildCardShell());
     log("card injected ✔");
+    watchCardPersistence();
   }
 
   // --- Entry -----------------------------------------------------------------

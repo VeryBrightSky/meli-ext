@@ -37,5 +37,15 @@
   "options_ui": {
     "page": "src/options/options.html",
     "open_in_tab": true
-  }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "src/assets/icons/*.png"
+      ],
+      "matches": [
+        "https://*.mercadolibre.com.mx/*"
+      ]
+    }
+  ]
 }
