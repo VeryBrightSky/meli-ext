@@ -215,6 +215,16 @@
   color: rgba(0, 0, 0, 0.55);
 }
 
+/* Toggle rows (Full, retenciones) */
+.mst-toggle-row {
+  cursor: pointer;
+}
+
+.mst-toggle-row input[type="checkbox"] {
+  accent-color: #3483fa;
+  margin: 0;
+}
+
 /* What-if price */
 .mst-pricewrap {
   display: inline-flex;

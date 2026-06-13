@@ -29,14 +29,29 @@ globalThis.MST_FEE_SOURCE = (() => {
     return tier ? tier.amountMXN : 0;
   }
 
-  function getQuote({ priceMXN, listingTypeId, categoryGroupId }) {
+  // The per-unit charge below $299 depends on listing type (Clásica only) and
+  // on Full mode (variable weight/price service cost replaces it entirely).
+  // Returns price → charge so solvers see the same discontinuities as quotes.
+  function fixedCostFnFor({ listingTypeId, fullWeightKg = null }) {
+    if (fullWeightKg !== null) {
+      return (priceMXN) =>
+        priceMXN >= table.fixedCost.thresholdMXN
+          ? 0
+          : globalThis.MST_SHIPPING.fullServiceCost(fullWeightKg, priceMXN) ?? 0;
+    }
+    const type = listingTypeId === "premium" ? "premium" : "classic";
+    return table.fixedCost.appliesTo.includes(type) ? fixedCostFor : () => 0;
+  }
+
+  function getQuote({ priceMXN, listingTypeId, categoryGroupId, fullWeightKg = null }) {
     const type = listingTypeId === "premium" ? "premium" : "classic";
     const group = findGroup(categoryGroupId);
     const rate = group ? group[type] : table.defaults[type];
     return {
       pctMin: rate.pctMin,
       pctMax: rate.pctMax,
-      fixedCostMXN: fixedCostFor(priceMXN),
+      fixedCostMXN: fixedCostFnFor({ listingTypeId, fullWeightKg })(priceMXN),
+      isFullServiceCost: fullWeightKg !== null && priceMXN < table.fixedCost.thresholdMXN,
       categoryGroup: group ? { id: group.id, label: group.label } : null,
       confidence: rate.confidence
     };
@@ -66,6 +81,8 @@ globalThis.MST_FEE_SOURCE = (() => {
     freeShippingThresholdMXN: table.freeShippingThresholdMXN,
     getQuote,
     getFixedCost: fixedCostFor,
+    fixedCostFnFor,
+    withholdings: table.withholdings,
     // Prices where the fixed charge steps (sweet-spot candidates).
     getFixedCostThresholds: () => table.fixedCost.tiers.map((t) => t.maxPriceExclusive),
     listCategoryGroups,

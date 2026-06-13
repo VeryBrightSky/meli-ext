@@ -120,10 +120,26 @@ globalThis.MST_CALC = (() => {
     return best;
   }
 
+  // Tax withholdings (Mexico, since 2026-01-01): IVA retained on the
+  // VAT-exclusive base, ISR retained on the same base. Rates assume the
+  // seller's RFC is registered with the platform.
+  function computeWithholdings(priceMXN, { vatPct = 16, ivaRetPct = 8, isrRetPct = 2.5 } = {}) {
+    const base = priceMXN / (1 + vatPct / 100);
+    const iva = round2((base * ivaRetPct) / 100);
+    const isr = round2((base * isrRetPct) / 100);
+    return {
+      baseMXN: round2(base),
+      ivaMXN: iva,
+      isrMXN: isr,
+      totalMXN: round2(iva + isr)
+    };
+  }
+
   return Object.freeze({
     computeBreakdown,
     solveTargetPrice,
     findSweetSpot,
+    computeWithholdings,
     round2,
     parseMoney
   });

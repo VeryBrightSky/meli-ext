@@ -38,8 +38,9 @@ globalThis.MST_FEE_TABLE = Object.freeze({
     ],
     caveats: [
       "MELI ya no publica el porcentaje exacto por categoría; los valores por grupo son de fuentes secundarias.",
-      "Fuentes discrepan sobre si Premium está exento del cargo fijo; esta tabla lo cobra en ambos tipos (estimación conservadora).",
-      "No incluye retenciones fiscales (ISR/IVA) ni el costo real de Mercado Envíos."
+      "Cargo fijo: SOLO Clásica (verificado abr 2026; Premium exento a cualquier precio).",
+      "Tramos del cargo fijo: MELI no publica los límites exactos; se adoptó el consenso multi-fuente de abr 2026 ($0–98.99→$25, $99–198.99→$30, $199–298.99→$37), que supersede el límite $149/$150 reportado antes por Tiendanube.",
+      "Vendedores Full: desde el 6 abr 2026, los productos < $299 pagan un costo de servicio variable por peso y tramo de precio en lugar del cargo fijo (ver shipping-table.js fullServiceCost)."
     ]
   },
 
@@ -52,17 +53,28 @@ globalThis.MST_FEE_TABLE = Object.freeze({
   minPriceMXN: 35,
   freeShippingThresholdMXN: 299,
 
-  // Per-unit fixed cost for low-price items. Applies below thresholdMXN to
-  // both listing types (see caveats). Tiers: price < maxPriceExclusive.
+  // Per-unit fixed cost for low-price items. CLÁSICA ONLY (Premium exempt at
+  // any price — verified Apr 2026). Tiers: price < maxPriceExclusive.
   fixedCost: {
     thresholdMXN: 299,
-    appliesTo: ["classic", "premium"],
+    appliesTo: ["classic"],
     confidence: "secondary",
     tiers: [
       { maxPriceExclusive: 99, amountMXN: 25 },
-      { maxPriceExclusive: 150, amountMXN: 30 },
+      { maxPriceExclusive: 199, amountMXN: 30 },
       { maxPriceExclusive: 299, amountMXN: 37 }
     ]
+  },
+
+  // Tax withholdings on marketplace sales (Ley de Ingresos 2026, in force
+  // since 2026-01-01). Rates assume the seller's RFC is registered with
+  // MELI; unregistered sellers face higher withholding.
+  withholdings: {
+    since: "2026-01-01",
+    vatPct: 16,
+    ivaRetPct: 8,
+    isrRetPct: 2.5,
+    confidence: "secondary"
   },
 
   // Category groups per ProfitOS (02/02/2026). aliases are accent-stripped

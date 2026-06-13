@@ -101,7 +101,8 @@ const rowValue = (label) => `
 `;
 
 async function typeInto(page, index, text) {
-  const inputs = await page.$$(".mst-card input");
+  // .mst-input only — the card also contains checkbox toggles.
+  const inputs = await page.$$(".mst-card input.mst-input");
   await inputs[index].focus();
   // Triple-click select-all is unreliable in headless; select programmatically
   // so typing replaces any pre-filled value (e.g. the what-if price).
@@ -131,14 +132,23 @@ try {
   await page.waitForSelector("#mst-card-root", { visible: true, timeout: 20000 });
   pass("card injects and is visible");
 
-  assert.equal(await page.$eval(".mst-card input", (i) => i.value), "827.00");
-  assert.equal(await page.$eval(".mst-card input", (i) => i.disabled), true);
+  assert.equal(await page.$eval(".mst-card input.mst-input", (i) => i.value), "827.00");
+  assert.equal(await page.$eval(".mst-card input.mst-input", (i) => i.disabled), true);
   pass("price pre-filled 827.00 and read-only (what-if locked)");
 
   assert.equal(await page.evaluate(rowValue("Comisión")), "−$82.70");
   assert.equal(await page.evaluate(rowValue("Costo total MELI")), "10%");
   assert.equal(await page.evaluate(rowValue("Recibirás aprox.")), "$744.30");
   pass("free fee card intact: 10% category via structured data, net $744.30");
+
+  // Retenciones is FREE (accuracy feature), default off (row hidden/empty).
+  assert.equal(await page.evaluate(rowValue("IVA retenido")), "");
+  await page.click(".mst-withholdings-toggle");
+  await sleep(300);
+  assert.equal(await page.evaluate(rowValue("IVA retenido")), "−$57.03");
+  assert.equal(await page.evaluate(rowValue("ISR retenido")), "−$17.82");
+  assert.equal(await page.evaluate(rowValue("Neto después")), "$669.45"); // 744.30 − 74.85
+  pass("retenciones (free): IVA −$57.03, ISR −$17.82, neto después $669.45");
 
   await typeInto(page, 1, "50"); // shipping
   await typeInto(page, 2, "400"); // product cost
@@ -164,9 +174,10 @@ try {
   assert.equal(await page.$eval(".mst-upsell", (e) => e.hidden), false);
   const upsellText = await page.$eval(".mst-upsell", (e) => e.textContent);
   assert.ok(upsellText.includes("7 días"), "upsell missing trial copy");
-  assert.ok(upsellText.includes("$4.99"), "upsell missing monthly price");
-  assert.ok(upsellText.includes("$39.99"), "upsell missing yearly price");
-  pass("locked feature click opens upsell (trial + founder pricing), never on load");
+  assert.ok(upsellText.includes("$89 MXN/mes"), "upsell missing monthly price");
+  assert.ok(upsellText.includes("$699 MXN/año"), "upsell missing yearly price");
+  assert.ok(upsellText.includes("ahorra 35%"), "upsell missing yearly savings");
+  pass("locked feature click opens upsell (trial + MXN founder pricing), never on load");
 
   await page.click(".mst-copy");
   await sleep(300);
@@ -236,10 +247,24 @@ try {
 
   await typeInto(page, 0, "280");
   assert.equal(await page.evaluate(rowValue("Comisión")), "−$28.00");
+  assert.equal(await page.evaluate(rowValue("Cargo fijo")), "−$37.00");
   assert.equal(await page.evaluate(rowValue("Recibirás aprox.")), "$165.00");
   const spotText = await page.$eval(".mst-sweetspot", (e) => e.textContent);
   assert.ok(spotText.includes("$299.00") && spotText.includes("$54.10"), spotText);
   pass("what-if 280 + sweet spot $299.00 / +$54.10");
+
+  // Mercado Envíos Full: under-$299 fixed charge becomes the weight/price
+  // service cost (default weight ≤0.3 kg, tier $199–298.99 → $35) and the
+  // sweet spot recomputes against the Full discontinuity.
+  await page.click(".mst-full-toggle");
+  await sleep(300);
+  assert.equal(await page.evaluate(rowValue("Costo de servicio Full")), "−$35.00");
+  const fullSpot = await page.$eval(".mst-sweetspot", (e) => e.textContent);
+  assert.ok(fullSpot.includes("$52.10"), `Full sweet spot wrong: ${fullSpot}`); // 19·0.9 + 35
+  await page.click(".mst-full-toggle");
+  await sleep(300);
+  assert.equal(await page.evaluate(rowValue("Cargo fijo")), "−$37.00");
+  pass("Full toggle swaps fijo −$37.00 ↔ servicio −$35.00, sweet spot follows ($52.10)");
 
   await page.click(".mst-sweetspot");
   await sleep(300);

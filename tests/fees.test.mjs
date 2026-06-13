@@ -39,17 +39,33 @@ test("unknown category falls back to official ranges", () => {
   assert.equal(p.pctMax, 20.5);
 });
 
-test("fixed cost tiers and boundaries", () => {
+test("fixed cost tiers and boundaries (Apr 2026: 99/199/299)", () => {
   const fc = (price) =>
     SOURCE.getQuote({ priceMXN: price, listingTypeId: "classic", categoryGroupId: "tech" }).fixedCostMXN;
   assert.equal(fc(35), 25);
   assert.equal(fc(98.99), 25);
   assert.equal(fc(99), 30);
-  assert.equal(fc(149.99), 30);
-  assert.equal(fc(150), 37);
+  assert.equal(fc(198.99), 30);
+  assert.equal(fc(199), 37);
   assert.equal(fc(298.99), 37);
   assert.equal(fc(299), 0);
   assert.equal(fc(300), 0);
+});
+
+test("fixed cost applies ONLY to Clásica — Premium exempt at any price", () => {
+  const fcPremium = (price) =>
+    SOURCE.getQuote({ priceMXN: price, listingTypeId: "premium", categoryGroupId: "tech" }).fixedCostMXN;
+  assert.equal(fcPremium(50), 0);
+  assert.equal(fcPremium(120), 0);
+  assert.equal(fcPremium(250), 0);
+  // breakdown flows through: $120 premium has commission only
+  const q = SOURCE.getQuote({ priceMXN: 120, listingTypeId: "premium", categoryGroupId: "tech" });
+  const b = CALC.computeBreakdown(q, { priceMXN: 120, shippingCostMXN: 0, productCostMXN: 0 });
+  assert.equal(b.fixedCostMXN, 0);
+  assert.equal(b.netMaxMXN, 105); // 120 − 12.5%
+  // fixedCostFnFor mirrors it
+  assert.equal(SOURCE.fixedCostFnFor({ listingTypeId: "premium" })(120), 0);
+  assert.equal(SOURCE.fixedCostFnFor({ listingTypeId: "classic" })(120), 30);
 });
 
 test("breakdown math: tech classic at $827", () => {
@@ -259,12 +275,36 @@ test("sweet spot: worst-case 16% rate at $280 still gains $52.96", () => {
   assert.deepEqual(spot, { targetPriceMXN: 299, netGainMXN: 52.96 });
 });
 
-test("sweet spot: tier INCREASES never nudge ($95→$99 loses, $145→$150 loses)", () => {
+test("sweet spot: losing or out-of-window tier crossings do not nudge", () => {
   const args = { ratePct: 10, fixedCostFn: SOURCE.getFixedCost, thresholds: SOURCE.getFixedCostThresholds() };
-  // net(95)=60.50 vs net(99)=59.10 → −1.40, and $150/$299 outside +20%
+  // net(95)=60.50 vs net(99)=59.10 → −1.40; $199/$299 outside +20%
   assert.equal(CALC.findSweetSpot({ ...args, priceMXN: 95 }), null);
-  // net(145)=100.50 vs net(150)=98.00 → −2.50
-  assert.equal(CALC.findSweetSpot({ ...args, priceMXN: 145 }), null);
+  // $150: no threshold within +20% (limit 180 < 199)
+  assert.equal(CALC.findSweetSpot({ ...args, priceMXN: 150 }), null);
+});
+
+test("sweet spot: $190 → $199 marginally wins (+$1.10 despite higher tier)", () => {
+  // (199−190)·0.9 − (37−30) = 8.10 − 7 = 1.10
+  const spot = CALC.findSweetSpot({
+    priceMXN: 190,
+    ratePct: 10,
+    fixedCostFn: SOURCE.getFixedCost,
+    thresholds: SOURCE.getFixedCostThresholds()
+  });
+  assert.deepEqual(spot, { targetPriceMXN: 199, netGainMXN: 1.1 });
+});
+
+test("sweet spot: Full mode uses the service-cost discontinuities", () => {
+  // 1kg item @ $280 (tier3: $39 service) → at $299 service cost vanishes:
+  // gain = 19·0.9 + 39 = 56.10
+  const fn = SOURCE.fixedCostFnFor({ listingTypeId: "classic", fullWeightKg: 1 });
+  const spot = CALC.findSweetSpot({
+    priceMXN: 280,
+    ratePct: 10,
+    fixedCostFn: fn,
+    thresholds: SOURCE.getFixedCostThresholds()
+  });
+  assert.deepEqual(spot, { targetPriceMXN: 299, netGainMXN: 56.1 });
 });
 
 test("sweet spot: no threshold nearby → null ($310 and $827)", () => {
@@ -285,7 +325,33 @@ test("sweet spot: $260 still reaches $299 within +20% window", () => {
 });
 
 test("fixed-cost thresholds come from the table", () => {
-  assert.deepEqual(SOURCE.getFixedCostThresholds(), [99, 150, 299]);
+  assert.deepEqual(SOURCE.getFixedCostThresholds(), [99, 199, 299]);
+});
+
+test("Full service cost: weight × price-tier matrix lookups", () => {
+  const f = SHIPPING.fullServiceCost;
+  assert.equal(f(0.3, 50), 25); // ≤0.3 kg, tier 1
+  assert.equal(f(0.3, 99), 32); // price boundary → tier 2
+  assert.equal(f(0.3, 250), 35); // tier 3
+  assert.equal(f(0.5, 50), 28.5);
+  assert.equal(f(1, 150), 38);
+  assert.equal(f(60, 50), 183); // heaviest bracket
+  assert.equal(f(61, 50), null); // above the table
+  assert.equal(f(1, 299), null); // ≥ $299: no service cost
+  assert.equal(f(0, 50), null);
+});
+
+test("withholdings: IVA 8% + ISR 2.5% of the VAT-exclusive base", () => {
+  // price 116 → base exactly 100
+  const w = CALC.computeWithholdings(116, SOURCE.withholdings);
+  assert.deepEqual(w, { baseMXN: 100, ivaMXN: 8, isrMXN: 2.5, totalMXN: 10.5 });
+  // the $827 test listing
+  const w2 = CALC.computeWithholdings(827, SOURCE.withholdings);
+  assert.equal(w2.baseMXN, 712.93);
+  assert.equal(w2.ivaMXN, 57.03);
+  assert.equal(w2.isrMXN, 17.82);
+  assert.equal(w2.totalMXN, 74.85);
+  assert.equal(SOURCE.withholdings.since, "2026-01-01");
 });
 
 test("getFixedCost exposed on the fee source", () => {
@@ -354,6 +420,24 @@ test("gate: paid user is pro regardless of trial", () => {
       now
     ).pro,
     true
+  );
+});
+
+test("gate: ExtPay v3.1 multi-plan — paid via either plan is Pro", () => {
+  const now = Date.UTC(2026, 5, 12);
+  for (const nickname of ["pro-monthly", "pro-yearly"]) {
+    const user = {
+      paid: true,
+      paidAt: new Date(now - 1000).toISOString(),
+      plan: { nickname, unitAmountCents: nickname === "pro-monthly" ? 8900 : 69900, currency: "mxn" },
+      subscriptionStatus: "active"
+    };
+    assert.equal(GATE.computeProStatus(user, now).pro, true, nickname);
+  }
+  // canceled-but-not-paid v3.1 shape stays locked
+  assert.equal(
+    GATE.computeProStatus({ paid: false, plan: null, subscriptionStatus: "canceled" }, now).pro,
+    false
   );
 });
 

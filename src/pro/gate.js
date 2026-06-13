@@ -67,8 +67,11 @@ globalThis.MST_GATE = (() => {
 
   const isPro = () => current.pro;
   const status = () => current;
-  const send = (type) => chrome.runtime.sendMessage({ type }).catch(() => {});
-  const openUpgrade = () => send("openPaymentPage");
+  const send = (type, payload) =>
+    chrome.runtime.sendMessage({ type, payload }).catch(() => {});
+  // plan: ExtPay plan nickname ("pro-monthly" / "pro-yearly"); omit for the
+  // generic choose-plan page.
+  const openUpgrade = (plan) => send("openPaymentPage", plan ? { plan } : undefined);
   const startTrial = () => send("openTrialPage");
   const openLogin = () => send("openLoginPage");
   const openDashboard = () => send("openDashboard");

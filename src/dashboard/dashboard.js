@@ -15,7 +15,8 @@
   document.getElementById("brand-logo").src = chrome.runtime.getURL(BRAND.logoPath);
   document.getElementById("dash-title").textContent = T("dashTitle");
 
-  const send = (type) => chrome.runtime.sendMessage({ type }).catch(() => null);
+  const send = (type, payload) =>
+    chrome.runtime.sendMessage({ type, payload }).catch(() => null);
 
   // --- Pro gate ----------------------------------------------------------------
   const status = await globalThis.MST_GATE.refresh();
@@ -28,9 +29,12 @@
     const trial = document.getElementById("trial-btn");
     trial.textContent = T("upsellTrial");
     trial.addEventListener("click", () => send("openTrialPage"));
-    const plans = document.getElementById("plans-btn");
-    plans.textContent = T("upsellPlans");
-    plans.addEventListener("click", () => send("openPaymentPage"));
+    const monthly = document.getElementById("monthly-btn");
+    monthly.textContent = T("upsellMonthly");
+    monthly.addEventListener("click", () => send("openPaymentPage", { plan: BRAND.plans.monthly }));
+    const yearly = document.getElementById("yearly-btn");
+    yearly.textContent = T("upsellYearly");
+    yearly.addEventListener("click", () => send("openPaymentPage", { plan: BRAND.plans.yearly }));
     return;
   }
 

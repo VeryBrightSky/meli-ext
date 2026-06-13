@@ -180,16 +180,13 @@
     "message": "Netio PRO"
   },
   "upsellBody": {
-    "message": "Unlock: editable what-if price, target price by margin, optimal-price alerts, Clásica vs Premium comparison, CSV export, Profit Dashboard, monthly profit, weight-based shipping estimate, research mode and price history."
+    "message": "Unlock: editable what-if price, target price by margin, optimal-price alerts, Clásica vs Premium comparison, CSV export, Profit Dashboard, monthly profit, research mode and price history."
   },
   "upsellPricing": {
-    "message": "7-day free trial. Then $$4.99 USD/mo or $$39.99 USD/yr (founder price)."
+    "message": "7-day free trial. Then $$89 MXN/mo or $$699 MXN/yr (save 35%) — founder price."
   },
   "upsellTrial": {
     "message": "Try free for 7 days"
-  },
-  "upsellPlans": {
-    "message": "See plans"
   },
   "proSweetSpotName": {
     "message": "Optimal-price alert"
@@ -277,5 +274,32 @@
   },
   "inputMarginAria": {
     "message": "Target margin in percent"
+  },
+  "rowFull": {
+    "message": "Do you use Mercado Envíos Full?"
+  },
+  "rowServiceCost": {
+    "message": "Full service cost"
+  },
+  "rowWithholdings": {
+    "message": "Show withholdings (IVA/ISR)"
+  },
+  "rowIvaWithheld": {
+    "message": "IVA withheld (8%)"
+  },
+  "rowIsrWithheld": {
+    "message": "ISR withheld (2.5%)"
+  },
+  "rowNetAfterWithholdings": {
+    "message": "Net after withholdings"
+  },
+  "withholdingsHint": {
+    "message": "Withholdings in force since 2026-01-01. Assumes your RFC is registered with Mercado Libre."
+  },
+  "upsellMonthly": {
+    "message": "$$89 MXN/mo"
+  },
+  "upsellYearly": {
+    "message": "$$699 MXN/yr (save 35%)"
   }
 }

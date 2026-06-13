@@ -27,10 +27,13 @@ globalThis.MST_UPSELL = (() => {
     const trialBtn = el("button", `${PREFIX}-upsell__cta`, T("upsellTrial"));
     trialBtn.type = "button";
     trialBtn.addEventListener("click", () => GATE.startTrial());
-    const payBtn = el("button", `${PREFIX}-upsell__alt`, T("upsellPlans"));
-    payBtn.type = "button";
-    payBtn.addEventListener("click", () => GATE.openUpgrade());
-    actions.append(trialBtn, payBtn);
+    const monthlyBtn = el("button", `${PREFIX}-upsell__alt`, T("upsellMonthly"));
+    monthlyBtn.type = "button";
+    monthlyBtn.addEventListener("click", () => GATE.openUpgrade(BRAND.plans.monthly));
+    const yearlyBtn = el("button", `${PREFIX}-upsell__alt`, T("upsellYearly"));
+    yearlyBtn.type = "button";
+    yearlyBtn.addEventListener("click", () => GATE.openUpgrade(BRAND.plans.yearly));
+    actions.append(trialBtn, monthlyBtn, yearlyBtn);
     panel.appendChild(actions);
     return panel;
   }

@@ -27,8 +27,15 @@ globalThis.MST_CARD = (() => {
     targetMarginPct: 0,
     salesPerMonth: 0,
     compareOpen: false,
+    usesFull: false,
+    showWithholdings: false,
+    weightKg: 0,
     pro: false
   };
+
+  // Full mode needs a weight; default to the smallest bracket when unset.
+  const fullWeightKg = () =>
+    state.usesFull ? (state.weightKg > 0 ? state.weightKg : 0.3) : null;
 
   // Live references into the current card DOM, repopulated on each build().
   const refs = {};
@@ -126,7 +133,8 @@ globalThis.MST_CARD = (() => {
     if (state.itemId) {
       chrome.storage.local.set({
         [`${PREFIX}:cost:${state.itemId}`]: state.productCostMXN,
-        [`${PREFIX}:sales:${state.itemId}`]: state.salesPerMonth
+        [`${PREFIX}:sales:${state.itemId}`]: state.salesPerMonth,
+        [`${PREFIX}:weight:${state.itemId}`]: state.weightKg
       });
       // Listing snapshot for the dashboard (only meaningful with a cost).
       if (state.productCostMXN > 0) {
@@ -150,13 +158,22 @@ globalThis.MST_CARD = (() => {
       keys.push(
         `${PREFIX}:cost:${state.itemId}`,
         `${PREFIX}:catpick:${state.itemId}`,
-        `${PREFIX}:sales:${state.itemId}`
+        `${PREFIX}:sales:${state.itemId}`,
+        `${PREFIX}:weight:${state.itemId}`
       );
     }
     const [stored, settings] = await Promise.all([
       chrome.storage.local.get(keys),
-      chrome.storage.sync.get({ defaultShippingMXN: 0, defaultListingType: "auto" })
+      chrome.storage.sync.get({
+        defaultShippingMXN: 0,
+        defaultListingType: "auto",
+        usesFull: false,
+        showWithholdings: false
+      })
     ]);
+    state.usesFull = settings.usesFull === true;
+    state.showWithholdings = settings.showWithholdings === true;
+    state.weightKg = CALC.parseMoney(stored[`${PREFIX}:weight:${state.itemId}`] ?? 0);
     const defaults = stored[`${PREFIX}:defaults`];
     // Sanitize: storage may hold junk from previous buggy sessions. Card-level
     // saved values win over the options-page default.
@@ -183,7 +200,8 @@ globalThis.MST_CARD = (() => {
     const quote = SOURCE.getQuote({
       priceMXN: state.priceMXN,
       listingTypeId: state.listingTypeId,
-      categoryGroupId: state.categoryGroupId
+      categoryGroupId: state.categoryGroupId,
+      fullWeightKg: fullWeightKg()
     });
     const b = CALC.computeBreakdown(quote, {
       priceMXN: state.priceMXN,
@@ -198,6 +216,12 @@ globalThis.MST_CARD = (() => {
     const { quote, b } = computeCurrent();
 
     const pro = state.pro;
+    // One discontinuity model for this render: quotes, sweet spot and the
+    // solver all see the same fixed-charge/Full-service-cost function.
+    const fixedCostFn = SOURCE.fixedCostFnFor({
+      listingTypeId: state.listingTypeId,
+      fullWeightKg: fullWeightKg()
+    });
 
     // What-if price: reset link only when diverging from the page price.
     refs.resetPrice.style.display =
@@ -212,7 +236,7 @@ globalThis.MST_CARD = (() => {
       ? CALC.findSweetSpot({
           priceMXN: state.priceMXN,
           ratePct: quote.pctMax,
-          fixedCostFn: SOURCE.getFixedCost,
+          fixedCostFn,
           thresholds: SOURCE.getFixedCostThresholds()
         })
       : null;
@@ -244,7 +268,8 @@ globalThis.MST_CARD = (() => {
         SOURCE.getQuote({
           priceMXN: state.priceMXN,
           listingTypeId: "classic",
-          categoryGroupId: state.categoryGroupId
+          categoryGroupId: state.categoryGroupId,
+          fullWeightKg: fullWeightKg()
         }),
         inputs
       );
@@ -252,7 +277,8 @@ globalThis.MST_CARD = (() => {
         SOURCE.getQuote({
           priceMXN: state.priceMXN,
           listingTypeId: "premium",
-          categoryGroupId: state.categoryGroupId
+          categoryGroupId: state.categoryGroupId,
+          fullWeightKg: fullWeightKg()
         }),
         inputs
       );
@@ -279,7 +305,33 @@ globalThis.MST_CARD = (() => {
 
     refs.fixed.root.style.display = b.fixedCostMXN > 0 ? "" : "none";
     if (b.fixedCostMXN > 0) {
-      patchRow(refs.fixed, null, fmtCharge(b.fixedCostMXN), flash);
+      patchRow(
+        refs.fixed,
+        quote.isFullServiceCost ? T("rowServiceCost") : T("rowFixedCost"),
+        fmtCharge(b.fixedCostMXN),
+        flash
+      );
+    }
+
+    // Withholdings (informational; does not change "Recibirás aprox.").
+    const showW = state.showWithholdings;
+    refs.iva.root.style.display = showW ? "" : "none";
+    refs.isr.root.style.display = showW ? "" : "none";
+    refs.netAfter.root.style.display = showW ? "" : "none";
+    refs.withholdingsHint.style.display = showW ? "" : "none";
+    if (showW) {
+      const w = CALC.computeWithholdings(state.priceMXN, SOURCE.withholdings);
+      patchRow(refs.iva, null, fmtCharge(w.ivaMXN), flash);
+      patchRow(refs.isr, null, fmtCharge(w.isrMXN), flash);
+      patchRow(
+        refs.netAfter,
+        null,
+        fmtRange(
+          CALC.round2(b.netMinMXN - w.totalMXN),
+          CALC.round2(b.netMaxMXN - w.totalMXN)
+        ),
+        flash
+      );
     }
 
     patchRow(
@@ -312,7 +364,7 @@ globalThis.MST_CARD = (() => {
         shippingMXN: state.shippingCostMXN,
         marginPct,
         ratePct,
-        fixedCostFn: SOURCE.getFixedCost
+        fixedCostFn
       });
 
     refs.breakeven.root.style.display = hasCost ? "" : "none";
@@ -512,33 +564,49 @@ globalThis.MST_CARD = (() => {
     refs.effective = buildRow(T("rowEffectiveRate"));
     body.appendChild(refs.effective.root);
 
-    // Weight → shipping estimate from the bundled Mercado Envíos table (Pro).
-    // Manual input below always overrides.
-    if (state.pro) {
-      const weightRow = el("div", `${PREFIX}-row`);
-      weightRow.appendChild(el("span", `${PREFIX}-row__label`, T("rowWeight")));
-      const weightSel = document.createElement("select");
-      weightSel.className = `${PREFIX}-select`;
-      weightSel.setAttribute("aria-label", T("rowWeight"));
-      weightSel.appendChild(new Option(T("weightNone"), ""));
-      for (const bracket of globalThis.MST_SHIPPING.brackets) {
-        weightSel.appendChild(
-          new Option(`≤ ${bracket.maxKg} kg — ${fmtMoney(bracket.costMXN)}`, String(bracket.maxKg))
-        );
-      }
-      weightSel.addEventListener("change", () => {
-        const kg = Number.parseFloat(weightSel.value);
-        const cost = globalThis.MST_SHIPPING.costForWeight(kg);
+    // Weight selector (free — Full mode needs it for accuracy). Picking a
+    // weight also fills the shipping estimate for ≥$299 items; the manual
+    // shipping input below always overrides.
+    const weightRow = el("div", `${PREFIX}-row`);
+    weightRow.appendChild(el("span", `${PREFIX}-row__label`, T("rowWeight")));
+    const weightSel = document.createElement("select");
+    weightSel.className = `${PREFIX}-select`;
+    weightSel.setAttribute("aria-label", T("rowWeight"));
+    weightSel.appendChild(new Option(T("weightNone"), ""));
+    for (const bracket of globalThis.MST_SHIPPING.brackets) {
+      weightSel.appendChild(new Option(`≤ ${bracket.maxKg} kg`, String(bracket.maxKg)));
+    }
+    weightSel.addEventListener("change", () => {
+      const kg = Number.parseFloat(weightSel.value);
+      state.weightKg = Number.isFinite(kg) && kg > 0 ? kg : 0;
+      if (state.weightKg > 0 && state.priceMXN >= SOURCE.freeShippingThresholdMXN) {
+        const cost = globalThis.MST_SHIPPING.costForWeight(state.weightKg);
         if (cost !== null) {
           state.shippingCostMXN = cost;
           refs.shippingInput.syncFromState();
-          persistInputs();
-          update();
         }
-      });
-      weightRow.appendChild(weightSel);
-      body.appendChild(weightRow);
-    }
+      }
+      persistInputs();
+      update();
+    });
+    refs.weightSelect = weightSel;
+    weightRow.appendChild(weightSel);
+    body.appendChild(weightRow);
+
+    // Mercado Envíos Full toggle: under-$299 items pay the variable
+    // weight/price service cost instead of the fixed charge (since 2026-04-06).
+    const fullRow = el("label", `${PREFIX}-row ${PREFIX}-toggle-row`);
+    const fullCheck = document.createElement("input");
+    fullCheck.type = "checkbox";
+    fullCheck.className = `${PREFIX}-full-toggle`;
+    fullCheck.addEventListener("change", () => {
+      state.usesFull = fullCheck.checked;
+      chrome.storage.sync.set({ usesFull: state.usesFull });
+      update();
+    });
+    refs.fullToggle = fullCheck;
+    fullRow.append(el("span", `${PREFIX}-row__label`, T("rowFull")), fullCheck);
+    body.appendChild(fullRow);
 
     // Shipping input. Label is price-dependent (what-if can cross $299).
     const shipRow = el("div", `${PREFIX}-row`);
@@ -558,6 +626,29 @@ globalThis.MST_CARD = (() => {
 
     refs.net = buildRow(T("rowNet"), "total");
     body.appendChild(refs.net.root);
+
+    // Retenciones (free — accuracy feature): informational rows, default off.
+    const wRow = el("label", `${PREFIX}-row ${PREFIX}-toggle-row`);
+    const wCheck = document.createElement("input");
+    wCheck.type = "checkbox";
+    wCheck.className = `${PREFIX}-withholdings-toggle`;
+    wCheck.addEventListener("change", () => {
+      state.showWithholdings = wCheck.checked;
+      chrome.storage.sync.set({ showWithholdings: state.showWithholdings });
+      update();
+    });
+    refs.withholdingsToggle = wCheck;
+    wRow.append(el("span", `${PREFIX}-row__label`, T("rowWithholdings")), wCheck);
+    body.appendChild(wRow);
+
+    refs.iva = buildRow(T("rowIvaWithheld"));
+    body.appendChild(refs.iva.root);
+    refs.isr = buildRow(T("rowIsrWithheld"));
+    body.appendChild(refs.isr.root);
+    refs.netAfter = buildRow(T("rowNetAfterWithholdings"), "total");
+    body.appendChild(refs.netAfter.root);
+    refs.withholdingsHint = el("div", `${PREFIX}-hint`, T("withholdingsHint"));
+    body.appendChild(refs.withholdingsHint);
 
     // Sweet-spot nudge: clicking applies the suggested what-if price.
     refs.sweetspot = el("button", `${PREFIX}-sweetspot`, "");
@@ -796,6 +887,9 @@ globalThis.MST_CARD = (() => {
       refs.marginInput?.syncFromState();
       refs.salesInput?.syncFromState();
       refs.categorySelect.value = state.categoryGroupId ?? "";
+      refs.weightSelect.value = state.weightKg > 0 ? String(state.weightKg) : "";
+      refs.fullToggle.checked = state.usesFull;
+      refs.withholdingsToggle.checked = state.showWithholdings;
       update(false);
     });
     return card;

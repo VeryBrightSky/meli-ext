@@ -23,7 +23,8 @@ const handlers = {
     return globalThis.MST_GATE.computeProStatus(user, Date.now());
   },
 
-  openPaymentPage: async () => extpay.openPaymentPage(),
+  // payload.plan: ExtPay v3.1 plan nickname → plan-specific checkout page.
+  openPaymentPage: async (payload) => extpay.openPaymentPage(payload?.plan),
   // Trial starts when the user opts in here — never on install.
   openTrialPage: async () => extpay.openTrialPage("7 días"),
   openLoginPage: async () => extpay.openLoginPage(),

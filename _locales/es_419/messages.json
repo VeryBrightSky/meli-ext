@@ -180,16 +180,13 @@
     "message": "Netio PRO"
   },
   "upsellBody": {
-    "message": "Desbloquea: precio editable (¿y si…?), precio objetivo por margen, aviso de precio óptimo, comparador Clásica vs Premium, exportar CSV, Tablero de Ganancias, ganancia mensual, envío estimado por peso, modo investigación e histórico de precios."
+    "message": "Desbloquea: precio editable (¿y si…?), precio objetivo por margen, aviso de precio óptimo, comparador Clásica vs Premium, exportar CSV, Tablero de Ganancias, ganancia mensual, modo investigación e histórico de precios."
   },
   "upsellPricing": {
-    "message": "7 días de prueba gratis. Después $$4.99 USD/mes o $$39.99 USD/año (precio de fundador)."
+    "message": "7 días de prueba gratis. Después $$89 MXN/mes o $$699 MXN/año (ahorra 35%) — precio de fundador."
   },
   "upsellTrial": {
     "message": "Probar gratis 7 días"
-  },
-  "upsellPlans": {
-    "message": "Ver planes"
   },
   "proSweetSpotName": {
     "message": "Aviso de precio óptimo"
@@ -277,5 +274,32 @@
   },
   "inputMarginAria": {
     "message": "Margen deseado en porcentaje"
+  },
+  "rowFull": {
+    "message": "¿Usas Mercado Envíos Full?"
+  },
+  "rowServiceCost": {
+    "message": "Costo de servicio Full"
+  },
+  "rowWithholdings": {
+    "message": "Mostrar retenciones (IVA/ISR)"
+  },
+  "rowIvaWithheld": {
+    "message": "IVA retenido (8%)"
+  },
+  "rowIsrWithheld": {
+    "message": "ISR retenido (2.5%)"
+  },
+  "rowNetAfterWithholdings": {
+    "message": "Neto después de retenciones"
+  },
+  "withholdingsHint": {
+    "message": "Retenciones vigentes desde el 01/01/2026. Asume RFC registrado ante Mercado Libre."
+  },
+  "upsellMonthly": {
+    "message": "$$89 MXN/mes"
+  },
+  "upsellYearly": {
+    "message": "$$699 MXN/año (ahorra 35%)"
   }
 }
