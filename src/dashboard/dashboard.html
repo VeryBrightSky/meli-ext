@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="es-MX">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tablero</title>
+    <link rel="stylesheet" href="dashboard.css" />
+  </head>
+  <body>
+    <main class="wrap">
+      <header class="head">
+        <img id="brand-logo" alt="" width="28" height="28" />
+        <h1 id="dash-title"></h1>
+        <button type="button" id="export-btn" hidden></button>
+      </header>
+
+      <section id="upsell" hidden>
+        <h2 id="upsell-title"></h2>
+        <p id="upsell-body"></p>
+        <p id="upsell-pricing"></p>
+        <div class="actions">
+          <button type="button" id="trial-btn"></button>
+          <button type="button" id="plans-btn"></button>
+        </div>
+      </section>
+
+      <section id="content" hidden>
+        <p class="note" id="shipping-note"></p>
+        <p class="note" id="empty-note" hidden></p>
+        <table id="table">
+          <thead><tr id="head-row"></tr></thead>
+          <tbody id="rows"></tbody>
+          <tfoot><tr id="totals-row"></tr></tfoot>
+        </table>
+      </section>
+    </main>
+
+    <script src="../config/branding.js"></script>
+    <script src="../config/i18n.js"></script>
+    <script src="../fees/fee-table.js"></script>
+    <script src="../fees/calculator.js"></script>
+    <script src="../fees/fee-source.js"></script>
+    <script src="../content/format.js"></script>
+    <script src="../pro/gate.js"></script>
+    <script src="dashboard.js"></script>
+  </body>
+</html>

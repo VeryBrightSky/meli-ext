@@ -85,6 +85,10 @@ globalThis.MST_QUICKVIEW = (() => {
     return r;
   }
 
+  // Modo investigación (Pro): assumed acquisition cost as % of price, set in
+  // options; strips then show an estimated profit per result.
+  let acquisitionPct = 0;
+
   function buildStrip(data) {
     const quote = SOURCE.getQuote({
       priceMXN: data.priceMXN,
@@ -147,6 +151,15 @@ globalThis.MST_QUICKVIEW = (() => {
     panel.appendChild(
       panelRow(T("stripNetBeforeShipping"), UI.fmtRange(b.netMinMXN, b.netMaxMXN))
     );
+    if (globalThis.MST_GATE.isPro() && acquisitionPct > 0) {
+      const cost = CALC.round2((data.priceMXN * acquisitionPct) / 100);
+      panel.appendChild(
+        panelRow(
+          T("researchProfit", [String(acquisitionPct)]),
+          UI.fmtRange(CALC.round2(b.netMinMXN - cost), CALC.round2(b.netMaxMXN - cost))
+        )
+      );
+    }
     panel.appendChild(
       el("div", `${PREFIX}-strip__brand`,
         T("stripFooter", [BRAND.name, SOURCE.meta.retrievedAt]))
@@ -234,6 +247,7 @@ globalThis.MST_QUICKVIEW = (() => {
   }
 
   // Inject (or refresh) the export bar above the results list. Idempotent.
+  // CSV export is Pro: locked state shows a PRO chip and opens the upsell.
   function ensureExportBar(firstItem, stripCount) {
     const ID = `${PREFIX}-export`;
     let bar = document.getElementById(ID);
@@ -249,8 +263,28 @@ globalThis.MST_QUICKVIEW = (() => {
       logo.height = 12;
       const btn = el("button", `${PREFIX}-export__btn`, "");
       btn.type = "button";
-      btn.addEventListener("click", downloadCsv);
-      bar.append(logo, btn, el("span", `${PREFIX}-export__brand`, BRAND.name));
+      const wrap = el("div", `${PREFIX}-export__main`);
+      wrap.append(logo, btn);
+      if (globalThis.MST_GATE.isPro()) {
+        btn.addEventListener("click", downloadCsv);
+        if (acquisitionPct > 0) {
+          wrap.appendChild(
+            el("span", `${PREFIX}-export__research`, T("researchActive", [String(acquisitionPct)]))
+          );
+        }
+      } else {
+        const upsell = globalThis.MST_UPSELL.attach(bar);
+        const open = () => {
+          upsell.panel.hidden = false;
+        };
+        btn.classList.add(`${PREFIX}-locked`);
+        btn.addEventListener("click", open);
+        wrap.appendChild(globalThis.MST_UPSELL.chip(open));
+      }
+      bar.prepend(wrap);
+      bar.querySelector(`.${PREFIX}-export__main`).appendChild(
+        el("span", `${PREFIX}-export__brand`, BRAND.name)
+      );
       list.parentElement.insertBefore(bar, list);
     }
     bar.querySelector(`.${PREFIX}-export__btn`).textContent =
@@ -287,7 +321,9 @@ globalThis.MST_QUICKVIEW = (() => {
     return { injected, total: items.length, selector };
   }
 
-  function init() {
+  async function init() {
+    const settings = await chrome.storage.sync.get({ acquisitionPct: 0 });
+    acquisitionPct = CALC.parseMoney(settings.acquisitionPct);
     // Category browse pages have a breadcrumb; keyword searches usually don't.
     const crumbs = [
       ...document.querySelectorAll(".andes-breadcrumb a, .andes-breadcrumb__link")

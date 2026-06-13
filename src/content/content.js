@@ -385,6 +385,9 @@
       return;
     }
 
+    // Local price history snapshot for this visit (capped, storage.local).
+    globalThis.MST_HISTORY.record(pageData.itemId, pageData.price.value).catch(() => {});
+
     found.el.insertAdjacentElement("afterend", buildCard());
     log("card injected ✔");
     logCardVisibilityReport(document.getElementById(CARD_ID));
@@ -408,6 +411,10 @@
       log("disabled in options, exiting");
       return;
     }
+
+    // Resolve Pro entitlement once per page load before any UI builds.
+    const proStatus = await globalThis.MST_GATE.refresh();
+    log("pro status:", proStatus);
 
     let pageType = detectPageType();
     if (!pageType && sniffProductDom()) {

@@ -84,6 +84,22 @@ Capture in Spanish UI. No personal data visible in any screenshot.
 - [ ] Privacy policy URL (host `PRIVACY.md` contents publicly)
 - [ ] Upload zip from `npm run build:release`
 - [ ] Justify permissions in the developer dashboard: `storage` (user
-      settings), host `mercadolibre.com.mx` (render cards on listings).
+      settings), host `mercadolibre.com.mx` (render cards on listings),
+      host `extensionpay.com` (subscription/payment verification for the
+      optional Pro tier — processed by ExtensionPay via Stripe).
       Note: `api.mercadolibre.com` was removed for v1.0.0 (nothing calls
       it); re-add with justification when V2 ships authed fee lookups.
+
+## Data-usage declaration (v1.2+, Pro tier)
+
+- Personally identifiable information: **email address** — collected by
+  ExtensionPay (payment provider) only when the user starts a trial or pays.
+  Used for account/subscription management. Not sold, not shared beyond the
+  payment provider (Stripe), not used for unrelated purposes.
+- Authentication information: subscription status token handled by
+  ExtensionPay.
+- Everything else (costs, sales, price history, settings): stored locally in
+  the browser, never transmitted.
+- Update the "no data collected" answer from v1.0.0 accordingly — declare the
+  above instead. Disclose ExtensionPay/Stripe as the payment processor in the
+  listing description.

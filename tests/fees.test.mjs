@@ -9,15 +9,19 @@ import { fileURLToPath } from "node:url";
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 for (const file of [
   "src/fees/fee-table.js",
+  "src/fees/shipping-table.js",
   "src/fees/calculator.js",
   "src/fees/fee-source.js",
-  "src/content/format.js"
+  "src/content/format.js",
+  "src/pro/gate.js"
 ]) {
   new Function(readFileSync(join(root, file), "utf8"))();
 }
 const SOURCE = globalThis.MST_FEE_SOURCE;
 const CALC = globalThis.MST_CALC;
 const UI = globalThis.MST_UI;
+const GATE = globalThis.MST_GATE;
+const SHIPPING = globalThis.MST_SHIPPING;
 
 test("tech category quote is exact and matches the table", () => {
   const q = SOURCE.getQuote({ priceMXN: 827, listingTypeId: "classic", categoryGroupId: "tech" });
@@ -297,6 +301,96 @@ test("locales: en keys exactly match es_419 keys", () => {
     assert.ok(es[key].message.length > 0, `es_419 ${key} empty`);
     assert.ok(en[key].message.length > 0, `en ${key} empty`);
   }
+  // chrome.i18n: "$" + digit is a substitution placeholder; literal prices
+  // must be escaped "$$4.99" or they silently render as ".99".
+  for (const [loc, data] of [["es_419", es], ["en", en]]) {
+    for (const [key, val] of Object.entries(data)) {
+      const unescapedLiteral = /(?<!\$)\$\d{2,}|(?<!\$)\$\d\.\d/.exec(val.message);
+      assert.equal(
+        unescapedLiteral,
+        null,
+        `${loc}/${key}: unescaped literal dollar "${unescapedLiteral?.[0]}" — use $$`
+      );
+    }
+  }
+});
+
+test("gate: never-paid user is not pro", () => {
+  const now = Date.UTC(2026, 5, 12);
+  assert.deepEqual(GATE.computeProStatus({ paid: false }, now), {
+    pro: false,
+    paid: false,
+    trialActive: false
+  });
+  assert.equal(GATE.computeProStatus(null, now).pro, false);
+});
+
+test("gate: active trial is pro, expired trial is not", () => {
+  const now = Date.UTC(2026, 5, 12);
+  const active = GATE.computeProStatus(
+    { paid: false, trialStartedAt: new Date(now - 3 * 24 * 3600 * 1000).toISOString() },
+    now
+  );
+  assert.deepEqual(active, { pro: true, paid: false, trialActive: true });
+  const expired = GATE.computeProStatus(
+    { paid: false, trialStartedAt: new Date(now - 8 * 24 * 3600 * 1000).toISOString() },
+    now
+  );
+  assert.deepEqual(expired, { pro: false, paid: false, trialActive: false });
+  // boundary: exactly 7 days → expired
+  const edge = GATE.computeProStatus(
+    { paid: false, trialStartedAt: new Date(now - GATE.TRIAL_MS).toISOString() },
+    now
+  );
+  assert.equal(edge.pro, false);
+});
+
+test("gate: paid user is pro regardless of trial", () => {
+  const now = Date.UTC(2026, 5, 12);
+  assert.equal(GATE.computeProStatus({ paid: true }, now).pro, true);
+  assert.equal(
+    GATE.computeProStatus(
+      { paid: true, trialStartedAt: new Date(now - 30 * 24 * 3600 * 1000).toISOString() },
+      now
+    ).pro,
+    true
+  );
+});
+
+test("gate: unreachable ExtPay fails OPEN for cached-entitled, CLOSED otherwise", () => {
+  // fresh wins over cache
+  assert.equal(
+    GATE.resolveStatus({ pro: false, paid: false, trialActive: false }, { pro: true, paid: true }).pro,
+    false
+  );
+  // unreachable + cached entitled → pro (fail open for paying users)
+  const open = GATE.resolveStatus(null, { pro: true, paid: true, trialActive: false });
+  assert.equal(open.pro, true);
+  assert.equal(open.source, "cache");
+  // unreachable + cached not-entitled → closed
+  assert.equal(GATE.resolveStatus(null, { pro: false, paid: false }).pro, false);
+  // unreachable + no cache → closed
+  const closed = GATE.resolveStatus(null, null);
+  assert.equal(closed.pro, false);
+  assert.equal(closed.source, "default");
+});
+
+test("shipping table: bracket lookup boundaries", () => {
+  assert.equal(SHIPPING.costForWeight(0.2), 52.4);
+  assert.equal(SHIPPING.costForWeight(0.3), 52.4); // inclusive upper bound
+  assert.equal(SHIPPING.costForWeight(0.31), 56.0);
+  assert.equal(SHIPPING.costForWeight(1), 59.6);
+  assert.equal(SHIPPING.costForWeight(10), 129.2);
+  assert.equal(SHIPPING.costForWeight(30), 225.2);
+  assert.equal(SHIPPING.costForWeight(31), null); // above the table
+  assert.equal(SHIPPING.costForWeight(0), null);
+  assert.equal(SHIPPING.costForWeight(-1), null);
+});
+
+test("shipping table meta carries source citation and date", () => {
+  assert.equal(SHIPPING.meta.retrievedAt, "2026-06-12");
+  assert.ok(SHIPPING.meta.sources.length >= 1);
+  assert.equal(SHIPPING.brackets.length, 13);
 });
 
 test("fee table meta carries source citations and retrieval date", () => {

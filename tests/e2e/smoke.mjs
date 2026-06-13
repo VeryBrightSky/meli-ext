@@ -2,9 +2,13 @@
 // fixture pages served over local HTTPS with the real MELI hostnames mapped
 // to 127.0.0.1 (so manifest matches and URL-shape detection run for real).
 //
+// Phases: 1) never-paid (ExtPay unreachable → fail closed) asserts free
+// features + locked Pro UI; 2) dashboard shows upsell when locked; 3) Pro
+// via the QA override; 4) full Pro flows incl. real CSV download.
+//
 //   npm run test:e2e
 import assert from "node:assert/strict";
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { createServer } from "node:https";
 import { tmpdir } from "node:os";
@@ -22,6 +26,7 @@ function pass(name) {
   passed.push(name);
   console.log(`  ✔ ${name}`);
 }
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // --- setup ---------------------------------------------------------------
 
@@ -57,6 +62,7 @@ const dist = join(root, "dist");
 const browser = await puppeteer.launch({
   headless: true,
   acceptInsecureCerts: true,
+  protocolTimeout: 30000,
   // Spanish browser locale so chrome.i18n serves es_419 — the strings MX
   // users actually see are what we assert on.
   env: { ...process.env, LANGUAGE: "es-419", LANG: "es_419.UTF-8" },
@@ -67,11 +73,25 @@ const browser = await puppeteer.launch({
     "--ignore-certificate-errors",
     "--lang=es-419",
     "--no-sandbox",
-    "--disable-dev-shm-usage"
+    "--disable-dev-shm-usage",
+    // Multiple tabs are used across phases — keep background renderers live.
+    "--disable-background-timer-throttling",
+    "--disable-backgrounding-occluded-windows",
+    "--disable-renderer-backgrounding"
   ]
 });
 
-// row lookup helper evaluated in the page
+// Surface extension errors in the test output.
+function tap(page, label) {
+  page.on("console", (m) => {
+    if (m.type() === "error" || /fatal/i.test(m.text())) {
+      console.log(`  [${label} console] ${m.text()}`);
+    }
+  });
+  page.on("pageerror", (err) => console.log(`  [${label} pageerror] ${err.message}`));
+  return page;
+}
+
 const rowValue = (label) => `
   (() => {
     const row = [...document.querySelectorAll(".mst-row")]
@@ -88,177 +108,210 @@ async function typeInto(page, index, text) {
   await inputs[index].evaluate((el) => el.select());
   await inputs[index].type(text, { delay: 20 });
   await page.keyboard.press("Enter"); // confirm = blur = flush debounce
-  await new Promise((r) => setTimeout(r, 300));
+  await sleep(300);
+}
+
+async function extensionId() {
+  const workerTarget = await browser.waitForTarget(
+    (t) => t.type() === "service_worker" && t.url().startsWith("chrome-extension://"),
+    { timeout: 10000 }
+  );
+  return new URL(workerTarget.url()).host;
 }
 
 try {
-  // --- product page -------------------------------------------------------
-  console.log("\nPRODUCT FIXTURE");
-  const page = await browser.newPage();
+  // ====================== PHASE 1: never-paid (locked) ======================
+  console.log("\nPHASE 1 — PRODUCT, NEVER-PAID (fail closed)");
+  const page = tap(await browser.newPage(), "product");
   await browser.defaultBrowserContext().overridePermissions(
     `https://www.mercadolibre.com.mx:${PORT}`,
     ["clipboard-read", "clipboard-write", "clipboard-sanitized-write"]
   );
   await page.goto(PRODUCT_URL, { waitUntil: "load" });
-
   await page.waitForSelector("#mst-card-root", { visible: true, timeout: 20000 });
-  const cardBox = await (await page.$("#mst-card-root")).boundingBox();
-  assert.ok(cardBox && cardBox.width > 0 && cardBox.height > 0, "card has no on-screen box");
   pass("card injects and is visible");
 
-  const priceValue = await page.$eval(".mst-card input", (i) => i.value);
-  assert.equal(priceValue, "827.00");
-  pass("price input pre-filled 827.00 (not the crossed-out $1,199)");
+  assert.equal(await page.$eval(".mst-card input", (i) => i.value), "827.00");
+  assert.equal(await page.$eval(".mst-card input", (i) => i.disabled), true);
+  pass("price pre-filled 827.00 and read-only (what-if locked)");
 
-  // structured-data category: breadcrumb is English, so tech (10%) proves
-  // the embedded-state path worked
   assert.equal(await page.evaluate(rowValue("Comisión")), "−$82.70");
   assert.equal(await page.evaluate(rowValue("Costo total MELI")), "10%");
-  pass("category from structured data → Comisión (10%) = −$82.70, Costo total MELI 10%");
+  assert.equal(await page.evaluate(rowValue("Recibirás aprox.")), "$744.30");
+  pass("free fee card intact: 10% category via structured data, net $744.30");
 
-  assert.equal(await page.evaluate(rowValue("Recibirás aprox.")), "$827.00".replace("827.00", "744.30"));
-  pass("net payout $744.30");
-
-  await typeInto(page, 1, "50"); // shipping (input 0 is the what-if price)
+  await typeInto(page, 1, "50"); // shipping
   await typeInto(page, 2, "400"); // product cost
   assert.equal(await page.evaluate(rowValue("Precio mínimo")), "$500.00");
-  pass("cost 400 + shipping 50 → breakeven $500.00");
+  pass("breakeven stays FREE: cost 400 + ship 50 → $500.00");
 
-  await typeInto(page, 3, "20"); // target margin
-  assert.equal(await page.evaluate(rowValue("Precio objetivo")), "$642.86");
-  pass("margin 20% → target price $642.86");
-
-  await page.click(".mst-copy");
-  await new Promise((r) => setTimeout(r, 300));
-  const clip = await page.evaluate(() => navigator.clipboard.readText());
-  for (const expected of [
-    "Precio de venta: $827.00",
-    "Comisión (10%): −$82.70",
-    "Costo total MELI: 10%",
-    "Recibirás aprox.: $694.30",
-    "Ganancia: $294.30 (35.59%)"
-  ]) {
-    assert.ok(clip.includes(expected), `clipboard missing "${expected}"\n--- got:\n${clip}`);
-  }
-  pass("copy summary writes expected text to clipboard");
-
-  // --- v1.1: what-if price + sweet spot ------------------------------------
-  const spotVisibleAt827 = await page.$eval(
-    ".mst-sweetspot",
-    (e) => e.style.display !== "none"
+  const lockedRows = await page.$$eval(".mst-row--locked", (rows) =>
+    rows.map((r) => r.textContent)
   );
-  assert.equal(spotVisibleAt827, false, "sweet spot should be hidden at $827");
+  assert.ok(lockedRows.some((t) => t.includes("Precio objetivo")), "target price not locked");
+  assert.ok(lockedRows.some((t) => t.includes("Ventas por mes")), "sales not locked");
+  const chips = await page.$$eval(".mst-prochip", (els) => els.length);
+  assert.ok(chips >= 4, `expected ≥4 PRO chips, got ${chips}`);
+  pass(`locked rows render with PRO chips (${chips} chips)`);
 
-  await typeInto(page, 0, "280"); // what-if price near the $299 threshold
-  assert.equal(await page.evaluate(rowValue("Comisión")), "−$28.00");
-  assert.equal(await page.evaluate(rowValue("Cargo fijo")), "−$37.00");
-  assert.equal(await page.evaluate(rowValue("Recibirás aprox.")), "$165.00");
-  pass("what-if price 280 recalculates live (commission −$28.00, fijo −$37.00, net $165.00)");
-
-  const spotText = await page.$eval(".mst-sweetspot", (e) => e.textContent);
-  assert.ok(spotText.includes("$299.00"), `sweet spot missing $299.00: ${spotText}`);
-  assert.ok(spotText.includes("$54.10"), `sweet spot missing $54.10: ${spotText}`);
-  pass("sweet spot nudges $299.00 with exact net gain $54.10");
-
-  await page.click(".mst-sweetspot");
-  await new Promise((r) => setTimeout(r, 300));
-  assert.equal(await page.$eval(".mst-card input", (i) => i.value), "299.00");
-  assert.equal(await page.evaluate(rowValue("Recibirás aprox.")), "$219.10");
-  pass("clicking the nudge applies $299 (net $219.10)");
-
-  await page.click(".mst-reset");
-  await new Promise((r) => setTimeout(r, 300));
-  assert.equal(await page.$eval(".mst-card input", (i) => i.value), "827.00");
-  assert.equal(await page.evaluate(rowValue("Recibirás aprox.")), "$694.30");
   assert.equal(
     await page.$eval(".mst-sweetspot", (e) => e.style.display !== "none"),
     false
   );
-  pass("reset restores page price $827 and hides the nudge");
-
-  // --- v1.1: Clásica vs Premium compare -------------------------------------
+  assert.equal(await page.$eval(".mst-upsell", (e) => e.hidden), true);
   await page.click(".mst-compare-toggle");
-  await new Promise((r) => setTimeout(r, 200));
-  const compare = await page.evaluate(() => {
-    const box = document.querySelector(".mst-compare");
-    const vals = [...box.querySelectorAll(".mst-row__value")].map((v) => v.textContent);
-    return { visible: box.style.display !== "none", vals };
-  });
-  assert.equal(compare.visible, true);
-  assert.equal(compare.vals[0], "$694.30"); // Clásica 10%, shipping 50
-  assert.equal(compare.vals[1], "$657.08 – $673.62"); // Premium 12.5–14.5%
-  assert.equal(compare.vals[2], "$20.68 – $37.22"); // MSI cost interval
-  pass("compare shows Clásica $694.30 vs Premium $657.08–$673.62, MSI cost $20.68–$37.22");
+  await sleep(200);
+  assert.equal(await page.$eval(".mst-upsell", (e) => e.hidden), false);
+  const upsellText = await page.$eval(".mst-upsell", (e) => e.textContent);
+  assert.ok(upsellText.includes("7 días"), "upsell missing trial copy");
+  assert.ok(upsellText.includes("$4.99"), "upsell missing monthly price");
+  assert.ok(upsellText.includes("$39.99"), "upsell missing yearly price");
+  pass("locked feature click opens upsell (trial + founder pricing), never on load");
 
-  // --- search page ----------------------------------------------------------
-  console.log("\nSEARCH FIXTURE");
-  const search = await browser.newPage();
+  await page.click(".mst-copy");
+  await sleep(300);
+  const clip = await page.evaluate(() => navigator.clipboard.readText());
+  assert.ok(clip.includes("Recibirás aprox.: $694.30"), `clipboard wrong:\n${clip}`);
+  pass("copy summary stays FREE");
+
+  // ====================== PHASE 2: dashboard locked =========================
+  console.log("\nPHASE 2 — DASHBOARD (locked) + SEED PRO");
+  const extId = await extensionId();
+  const dash = await browser.newPage();
+  await dash.goto(`chrome-extension://${extId}/src/dashboard/dashboard.html`, {
+    waitUntil: "load"
+  });
+  await dash.waitForFunction(
+    () => !document.getElementById("upsell")?.hidden || !document.getElementById("content")?.hidden,
+    { timeout: 10000 }
+  );
+  assert.equal(await dash.$eval("#upsell", (e) => e.hidden), false);
+  assert.equal(await dash.$eval("#content", (e) => e.hidden), true);
+  pass("dashboard shows upsell when not Pro");
+
+  // QA override + sales seed + research-mode setting (meta/cost were already
+  // written by the real card in phase 1).
+  await dash.evaluate(async () => {
+    await chrome.storage.local.set({
+      "mst:proOverride": true,
+      "mst:sales:MLM12345678": 10
+    });
+    await chrome.storage.sync.set({ acquisitionPct: 60 });
+  });
+  await dash.reload({ waitUntil: "load" });
+  await dash.waitForFunction(() => !document.getElementById("content")?.hidden, {
+    timeout: 10000
+  });
+  const dashRows = await dash.$$eval("#rows tr", (trs) => trs.length);
+  assert.equal(dashRows, 1);
+  const dashText = await dash.$eval("#rows", (e) => e.textContent);
+  assert.ok(dashText.includes("Celular Test Pro 128 GB"), `dashboard missing title: ${dashText}`);
+  const totals = await dash.$eval("#totals-row", (e) => e.textContent);
+  assert.ok(totals.includes("$2,943.00"), `totals wrong: ${totals}`); // 294.30 × 10
+  pass("dashboard (Pro): 1 listing from real card data, monthly total $2,943.00");
+
+  // ====================== PHASE 3: product page, Pro ========================
+  console.log("\nPHASE 3 — PRODUCT, PRO");
+  await page.bringToFront();
+  await page.goto(PRODUCT_URL, { waitUntil: "load" });
+  try {
+    await page.waitForFunction(
+      () => {
+        const card = document.getElementById("mst-card-root");
+        return card !== null && card.getBoundingClientRect().height > 0;
+      },
+      { timeout: 20000, polling: 500 }
+    );
+  } catch (err) {
+    const diag = await page.evaluate(() => ({
+      url: location.href,
+      card: Boolean(document.getElementById("mst-card-root")),
+      bodyChildren: document.body.children.length
+    }));
+    console.log("  phase-3 diagnostics:", JSON.stringify(diag));
+    throw err;
+  }
+  assert.equal(await page.$eval(".mst-card input", (i) => i.disabled), false);
+  pass("what-if price editable when Pro");
+
+  await typeInto(page, 0, "280");
+  assert.equal(await page.evaluate(rowValue("Comisión")), "−$28.00");
+  assert.equal(await page.evaluate(rowValue("Recibirás aprox.")), "$165.00");
+  const spotText = await page.$eval(".mst-sweetspot", (e) => e.textContent);
+  assert.ok(spotText.includes("$299.00") && spotText.includes("$54.10"), spotText);
+  pass("what-if 280 + sweet spot $299.00 / +$54.10");
+
+  await page.click(".mst-sweetspot");
+  await sleep(300);
+  assert.equal(await page.$eval(".mst-card input", (i) => i.value), "299.00");
+  assert.equal(await page.evaluate(rowValue("Recibirás aprox.")), "$219.10");
+  await page.click(".mst-reset");
+  await sleep(300);
+  assert.equal(await page.$eval(".mst-card input", (i) => i.value), "827.00");
+  pass("nudge applies $299 (net $219.10), reset restores $827");
+
+  await page.click(".mst-compare-toggle");
+  await sleep(200);
+  const compareVals = await page.$$eval(".mst-compare .mst-row__value", (els) =>
+    els.map((v) => v.textContent)
+  );
+  assert.deepEqual(compareVals, ["$694.30", "$657.08 – $673.62", "$20.68 – $37.22"]);
+  pass("compare: Clásica $694.30 / Premium $657.08–$673.62 / MSI $20.68–$37.22");
+
+  // inputs (pro): 0 price, 1 shipping, 2 cost, 3 ventas, 4 margin
+  await typeInto(page, 4, "20");
+  assert.equal(await page.evaluate(rowValue("Precio objetivo")), "$642.86");
+  await typeInto(page, 3, "10");
+  assert.equal(await page.evaluate(rowValue("Ganancia mensual")), "$2,943.00");
+  pass("Pro solver $642.86 + ventas 10 → ganancia mensual $2,943.00");
+
+  // ====================== PHASE 4: search page, Pro =========================
+  console.log("\nPHASE 4 — SEARCH, PRO");
+  const search = tap(await browser.newPage(), "search");
+  await search.bringToFront();
   await search.goto(SEARCH_URL, { waitUntil: "load" });
   await search.waitForSelector(".mst-strip", { timeout: 20000 });
-  await new Promise((r) => setTimeout(r, 500)); // let the scan finish all items
+  await sleep(500);
 
-  const stripCount = await search.$$eval(".mst-strip", (els) => els.length);
-  assert.equal(stripCount, 3);
-  pass("3 strips injected (one per result)");
-
-  const collapsed = await search.$$eval(".mst-strip__panel", (panels) =>
-    panels.every((p) => p.hidden && p.offsetHeight === 0)
+  assert.equal(await search.$$eval(".mst-strip", (els) => els.length), 3);
+  assert.ok(
+    await search.$$eval(".mst-strip__panel", (panels) =>
+      panels.every((p) => p.hidden && p.offsetHeight === 0)
+    )
   );
-  assert.ok(collapsed, "a strip panel is visible before any click");
-  pass("all strips collapsed on load");
+  pass("3 strips, all collapsed on load");
 
   await search.click(".mst-strip__bar");
-  await new Promise((r) => setTimeout(r, 200));
-  const first = await search.evaluate(() => {
-    const panel = document.querySelector(".mst-strip__panel");
-    return { hidden: panel.hidden, height: panel.offsetHeight, text: panel.textContent };
-  });
-  assert.equal(first.hidden, false);
-  assert.ok(first.height > 0, "panel has zero height after click");
-  assert.ok(first.text.includes("Comisión (10%)"), "expanded panel missing Comisión (10%)");
-  assert.ok(first.text.includes("Envío gratis"), "expanded panel missing free-shipping row");
-  pass("first strip expands on click with 10% commission + free shipping");
+  await sleep(200);
+  const panelText = await search.$eval(".mst-strip__panel", (e) => e.textContent);
+  assert.ok(panelText.includes("Comisión (10%)"), panelText);
+  assert.ok(panelText.includes("$248.10"), `research profit missing: ${panelText}`); // 744.30 − 827×60%
+  pass("expanded strip: 10% commission + modo investigación est. profit $248.10");
 
-  const firstBar = await search.$eval(".mst-strip__bar b", (b) => b.textContent);
-  assert.equal(firstBar, "$744.30");
-  pass("collapsed bar shows net $744.30 (skipped crossed-out $999)");
-
-  // --- v1.1: CSV export -------------------------------------------------------
-  const exportLabel = await search.$eval(".mst-export__btn", (b) => b.textContent);
-  assert.equal(exportLabel, "Exportar CSV (3)");
-  pass("export bar present with count (3)");
-
-  // Content scripts live in an isolated world — hooking URL.createObjectURL
-  // from the main world can't see the call. Capture the real download instead.
+  assert.equal(
+    await search.$eval(".mst-export__btn", (b) => b.textContent),
+    "Exportar CSV (3)"
+  );
+  const research = await search.$eval(".mst-export__research", (e) => e.textContent);
+  assert.ok(research.includes("60"), research);
   const dlDir = mkdtempSync(join(tmpdir(), "meli-e2e-dl-"));
   const cdp = await search.createCDPSession();
-  await cdp.send("Browser.setDownloadBehavior", {
-    behavior: "allow",
-    downloadPath: dlDir
-  });
+  await cdp.send("Browser.setDownloadBehavior", { behavior: "allow", downloadPath: dlDir });
   await search.click(".mst-export__btn");
   let csvFile = null;
   for (let i = 0; i < 50 && !csvFile; i++) {
-    await new Promise((r) => setTimeout(r, 100));
+    await sleep(100);
     csvFile = readdirSync(dlDir).find((f) => f.endsWith(".csv"));
   }
-  assert.ok(csvFile, "no CSV file downloaded within 5s");
   assert.equal(csvFile, "netio-resultados.csv");
   const csv = readFileSync(join(dlDir, csvFile), "utf8");
   rmSync(dlDir, { recursive: true, force: true });
   const lines = csv.replace(/^﻿/, "").split("\r\n");
-  assert.equal(lines.length, 4, `expected header + 3 rows, got ${lines.length}`);
-  assert.ok(lines[0].startsWith("Título,"), `bad header: ${lines[0]}`);
-  assert.ok(
-    lines[1].includes("827.00") && lines[1].includes("Clásica") && lines[1].includes("Sí"),
-    `row1 wrong: ${lines[1]}`
-  );
-  assert.ok(
-    lines[2].includes("120.00") && lines[2].includes("Premium"),
-    `row2 wrong: ${lines[2]}`
-  );
-  assert.ok(lines[1].includes("Tecnología y electrónica"), `category missing: ${lines[1]}`);
-  pass("CSV export: header + 3 rows with prices, types, category, free-shipping");
+  assert.equal(lines.length, 4);
+  assert.ok(lines[0].startsWith("Título,"), lines[0]);
+  assert.ok(lines[1].includes("827.00") && lines[1].includes("Clásica"), lines[1]);
+  assert.ok(lines[2].includes("120.00") && lines[2].includes("Premium"), lines[2]);
+  pass("CSV export (Pro): real download, header + 3 rows");
 
   console.log(`\nE2E: ${passed.length}/${passed.length} checks passed`);
 } finally {

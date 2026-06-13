@@ -9,9 +9,13 @@ globalThis.EXT_BRAND = Object.freeze({
   name: "Netio",
   // Name used in manifest.json. "(dev)" suffix is stripped by the release build.
   manifestName: "Netio (dev)",
-  version: "1.1.0",
+  version: "1.2.0",
   description:
     "Calculadora de comisiones, ganancias y precios para vendedores de Mercado Libre México.",
+  // ExtensionPay id (register at extensionpay.com). REPLACE before release —
+  // with the placeholder, Pro verification fails closed (everything locked,
+  // payments unavailable) but free features are unaffected.
+  extpayId: "REPLACE-WITH-EXTPAY-ID",
   // Path relative to the extension root; resolve with chrome.runtime.getURL().
   logoPath: "src/assets/icons/icon16.png",
   // Andes design tokens — keep in sync with src/content/content.css.

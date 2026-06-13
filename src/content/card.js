@@ -25,7 +25,9 @@ globalThis.MST_CARD = (() => {
     shippingCostMXN: 0,
     productCostMXN: 0,
     targetMarginPct: 0,
-    compareOpen: false
+    salesPerMonth: 0,
+    compareOpen: false,
+    pro: false
   };
 
   // Live references into the current card DOM, repopulated on each build().
@@ -123,15 +125,33 @@ globalThis.MST_CARD = (() => {
     chrome.storage.local.set({ [`${PREFIX}:defaults`]: record });
     if (state.itemId) {
       chrome.storage.local.set({
-        [`${PREFIX}:cost:${state.itemId}`]: state.productCostMXN
+        [`${PREFIX}:cost:${state.itemId}`]: state.productCostMXN,
+        [`${PREFIX}:sales:${state.itemId}`]: state.salesPerMonth
       });
+      // Listing snapshot for the dashboard (only meaningful with a cost).
+      if (state.productCostMXN > 0) {
+        chrome.storage.local.set({
+          [`${PREFIX}:meta:${state.itemId}`]: {
+            title: document.title.split("|")[0].trim().slice(0, 120),
+            priceMXN: state.pagePriceMXN,
+            listingTypeId: state.listingTypeId,
+            categoryGroupId: state.categoryGroupId,
+            url: window.location.href.split("#")[0],
+            updatedAt: Date.now()
+          }
+        });
+      }
     }
   }
 
   async function restoreInputs() {
     const keys = [`${PREFIX}:defaults`];
     if (state.itemId) {
-      keys.push(`${PREFIX}:cost:${state.itemId}`, `${PREFIX}:catpick:${state.itemId}`);
+      keys.push(
+        `${PREFIX}:cost:${state.itemId}`,
+        `${PREFIX}:catpick:${state.itemId}`,
+        `${PREFIX}:sales:${state.itemId}`
+      );
     }
     const [stored, settings] = await Promise.all([
       chrome.storage.local.get(keys),
@@ -145,6 +165,7 @@ globalThis.MST_CARD = (() => {
     );
     state.targetMarginPct = CALC.parseMoney(defaults?.targetMarginPct ?? 0);
     state.productCostMXN = CALC.parseMoney(stored[`${PREFIX}:cost:${state.itemId}`] ?? 0);
+    state.salesPerMonth = CALC.parseMoney(stored[`${PREFIX}:sales:${state.itemId}`] ?? 0);
     if (settings.defaultListingType !== "auto") {
       state.listingTypeId = settings.defaultListingType === "premium" ? "premium" : "classic";
     }
@@ -176,21 +197,25 @@ globalThis.MST_CARD = (() => {
     if (!refs.card) return;
     const { quote, b } = computeCurrent();
 
+    const pro = state.pro;
+
     // What-if price: reset link only when diverging from the page price.
     refs.resetPrice.style.display =
-      state.priceMXN !== state.pagePriceMXN ? "" : "none";
+      pro && state.priceMXN !== state.pagePriceMXN ? "" : "none";
     refs.shipLabel.textContent =
       state.priceMXN >= SOURCE.freeShippingThresholdMXN
         ? T("rowShippingFree")
         : T("rowShipping");
 
-    // Sweet spot (worst-case rate so the promised gain is conservative).
-    const spot = CALC.findSweetSpot({
-      priceMXN: state.priceMXN,
-      ratePct: quote.pctMax,
-      fixedCostFn: SOURCE.getFixedCost,
-      thresholds: SOURCE.getFixedCostThresholds()
-    });
+    // Sweet spot (worst-case rate so the promised gain is conservative). Pro.
+    const spot = pro
+      ? CALC.findSweetSpot({
+          priceMXN: state.priceMXN,
+          ratePct: quote.pctMax,
+          fixedCostFn: SOURCE.getFixedCost,
+          thresholds: SOURCE.getFixedCostThresholds()
+        })
+      : null;
     refs.sweetspot.style.display = spot ? "" : "none";
     if (spot) {
       refs.sweetspot.textContent = T("sweetSpot", [
@@ -202,14 +227,14 @@ globalThis.MST_CARD = (() => {
       delete refs.sweetspot.dataset.target;
     }
 
-    // Clásica vs Premium comparison.
-    refs.compareBtn.setAttribute("aria-pressed", String(state.compareOpen));
+    // Clásica vs Premium comparison. Pro.
+    refs.compareBtn.setAttribute("aria-pressed", String(pro && state.compareOpen));
     refs.compareBtn.classList.toggle(
       `${PREFIX}-compare-toggle--active`,
-      state.compareOpen
+      pro && state.compareOpen
     );
-    refs.compareBox.style.display = state.compareOpen ? "" : "none";
-    if (state.compareOpen) {
+    refs.compareBox.style.display = pro && state.compareOpen ? "" : "none";
+    if (pro && state.compareOpen) {
       const inputs = {
         priceMXN: state.priceMXN,
         shippingCostMXN: state.shippingCostMXN,
@@ -297,18 +322,37 @@ globalThis.MST_CARD = (() => {
       patchRow(refs.breakeven, null, lo !== null && hi !== null ? fmtRange(lo, hi) : "—", flash);
     }
 
-    refs.targetMarginRow.style.display = hasCost ? "" : "none";
-    const hasTarget = hasCost && state.targetMarginPct > 0;
-    refs.target.root.style.display = hasTarget ? "" : "none";
-    if (hasTarget) {
-      const lo = solve(quote.pctMin, state.targetMarginPct);
-      const hi = solve(quote.pctMax, state.targetMarginPct);
-      patchRow(
-        refs.target,
-        null,
-        lo !== null && hi !== null ? fmtRange(lo, hi) : T("targetUnreachable"),
-        flash
-      );
+    if (pro) {
+      refs.targetMarginRow.style.display = hasCost ? "" : "none";
+      const hasTarget = hasCost && state.targetMarginPct > 0;
+      refs.target.root.style.display = hasTarget ? "" : "none";
+      if (hasTarget) {
+        const lo = solve(quote.pctMin, state.targetMarginPct);
+        const hi = solve(quote.pctMax, state.targetMarginPct);
+        patchRow(
+          refs.target,
+          null,
+          lo !== null && hi !== null ? fmtRange(lo, hi) : T("targetUnreachable"),
+          flash
+        );
+      }
+
+      // Monthly profit: profit per unit × user-entered sales/month.
+      const hasMonthly =
+        hasCost && state.salesPerMonth > 0 && b.profitMinMXN !== undefined;
+      refs.salesRow.style.display = hasCost ? "" : "none";
+      refs.monthly.root.style.display = hasMonthly ? "" : "none";
+      if (hasMonthly) {
+        patchRow(
+          refs.monthly,
+          null,
+          fmtRange(
+            CALC.round2(b.profitMinMXN * state.salesPerMonth),
+            CALC.round2(b.profitMaxMXN * state.salesPerMonth)
+          ),
+          flash
+        );
+      }
     }
 
     // Category hint + toggle button states.
@@ -339,6 +383,11 @@ globalThis.MST_CARD = (() => {
   }
 
   function buildCalculator(body) {
+    // Assigned at the end once the upsell panel exists; locked features call
+    // it through this closure.
+    let openUpsell = () => {};
+    const UPSELL = globalThis.MST_UPSELL;
+
     const header = el("div", `${PREFIX}-header`);
     header.appendChild(el("h2", `${PREFIX}-title`, T("cardTitle")));
     const badge = el("span", `${PREFIX}-badge`, T("badgeEstimate"));
@@ -367,6 +416,12 @@ globalThis.MST_CARD = (() => {
     );
     refs.priceInput.setAttribute("aria-label", T("rowPrice"));
     priceWrap.append(refs.resetPrice, refs.priceInput);
+    if (!state.pro) {
+      // What-if editing is Pro: input stays visible (shows the page price)
+      // but read-only, with a chip that opens the upsell.
+      refs.priceInput.disabled = true;
+      priceWrap.appendChild(UPSELL.chip(() => openUpsell()));
+    }
     priceRow.appendChild(priceWrap);
     body.appendChild(priceRow);
 
@@ -391,7 +446,12 @@ globalThis.MST_CARD = (() => {
     // Clásica vs Premium side-by-side comparison.
     refs.compareBtn = el("button", `${PREFIX}-compare-toggle`, T("btnCompare"));
     refs.compareBtn.type = "button";
+    if (!state.pro) refs.compareBtn.classList.add(`${PREFIX}-locked`);
     refs.compareBtn.addEventListener("click", () => {
+      if (!state.pro) {
+        openUpsell();
+        return;
+      }
       state.compareOpen = !state.compareOpen;
       update(false);
     });
@@ -452,6 +512,34 @@ globalThis.MST_CARD = (() => {
     refs.effective = buildRow(T("rowEffectiveRate"));
     body.appendChild(refs.effective.root);
 
+    // Weight → shipping estimate from the bundled Mercado Envíos table (Pro).
+    // Manual input below always overrides.
+    if (state.pro) {
+      const weightRow = el("div", `${PREFIX}-row`);
+      weightRow.appendChild(el("span", `${PREFIX}-row__label`, T("rowWeight")));
+      const weightSel = document.createElement("select");
+      weightSel.className = `${PREFIX}-select`;
+      weightSel.setAttribute("aria-label", T("rowWeight"));
+      weightSel.appendChild(new Option(T("weightNone"), ""));
+      for (const bracket of globalThis.MST_SHIPPING.brackets) {
+        weightSel.appendChild(
+          new Option(`≤ ${bracket.maxKg} kg — ${fmtMoney(bracket.costMXN)}`, String(bracket.maxKg))
+        );
+      }
+      weightSel.addEventListener("change", () => {
+        const kg = Number.parseFloat(weightSel.value);
+        const cost = globalThis.MST_SHIPPING.costForWeight(kg);
+        if (cost !== null) {
+          state.shippingCostMXN = cost;
+          refs.shippingInput.syncFromState();
+          persistInputs();
+          update();
+        }
+      });
+      weightRow.appendChild(weightSel);
+      body.appendChild(weightRow);
+    }
+
     // Shipping input. Label is price-dependent (what-if can cross $299).
     const shipRow = el("div", `${PREFIX}-row`);
     refs.shipLabel = el("span", `${PREFIX}-row__label`, T("rowShipping"));
@@ -506,24 +594,77 @@ globalThis.MST_CARD = (() => {
     refs.breakeven = buildRow(T("rowBreakeven"));
     body.appendChild(refs.breakeven.root);
 
-    // Reverse calculator: target margin % → required listing price.
-    const marginRow = el("div", `${PREFIX}-row`);
-    marginRow.appendChild(el("span", `${PREFIX}-row__label`, T("rowTargetMargin")));
-    refs.marginInput = moneyInput(
-      () => state.targetMarginPct,
-      (v) => {
-        state.targetMarginPct = Math.min(v, 99);
-        persistInputs();
-        update();
-      }
-    );
-    refs.marginInput.setAttribute("aria-label", T("inputMarginAria"));
-    marginRow.appendChild(refs.marginInput);
-    refs.targetMarginRow = marginRow;
-    body.appendChild(marginRow);
+    if (state.pro) {
+      // Ventas/mes → ganancia mensual (feeds the dashboard too).
+      const salesRow = el("div", `${PREFIX}-row`);
+      salesRow.appendChild(el("span", `${PREFIX}-row__label`, T("rowSales")));
+      refs.salesInput = moneyInput(
+        () => state.salesPerMonth,
+        (v) => {
+          state.salesPerMonth = Math.round(v);
+          persistInputs();
+          update();
+        }
+      );
+      refs.salesInput.setAttribute("aria-label", T("rowSales"));
+      salesRow.appendChild(refs.salesInput);
+      refs.salesRow = salesRow;
+      body.appendChild(salesRow);
 
-    refs.target = buildRow(T("rowTargetPrice"), "total");
-    body.appendChild(refs.target.root);
+      refs.monthly = buildRow(T("rowMonthlyProfit"), "profit");
+      body.appendChild(refs.monthly.root);
+
+      // Reverse calculator: target margin % → required listing price.
+      const marginRow = el("div", `${PREFIX}-row`);
+      marginRow.appendChild(el("span", `${PREFIX}-row__label`, T("rowTargetMargin")));
+      refs.marginInput = moneyInput(
+        () => state.targetMarginPct,
+        (v) => {
+          state.targetMarginPct = Math.min(v, 99);
+          persistInputs();
+          update();
+        }
+      );
+      refs.marginInput.setAttribute("aria-label", T("inputMarginAria"));
+      marginRow.appendChild(refs.marginInput);
+      refs.targetMarginRow = marginRow;
+      body.appendChild(marginRow);
+
+      refs.target = buildRow(T("rowTargetPrice"), "total");
+      body.appendChild(refs.target.root);
+
+      // Local price history sparkline (only from this user's own visits).
+      const histRow = el("div", `${PREFIX}-row ${PREFIX}-history`);
+      histRow.style.display = "none";
+      histRow.appendChild(el("span", `${PREFIX}-row__label`, T("rowHistory")));
+      body.appendChild(histRow);
+      globalThis.MST_HISTORY.get(state.itemId).then((points) => {
+        const svg = globalThis.MST_HISTORY.sparkline(points);
+        if (svg) {
+          histRow.appendChild(svg);
+          histRow.style.display = "";
+        }
+      });
+    } else {
+      // Locked Pro features: name + PRO chip, click opens the upsell.
+      body.appendChild(UPSELL.lockedRow(T("rowTargetPrice"), () => openUpsell()));
+      body.appendChild(UPSELL.lockedRow(T("proSweetSpotName"), () => openUpsell()));
+      body.appendChild(UPSELL.lockedRow(T("rowSales"), () => openUpsell()));
+      body.appendChild(UPSELL.lockedRow(T("rowHistory"), () => openUpsell()));
+    }
+
+    // Dashboard link (the dashboard itself is Pro).
+    const dashBtn = el("button", `${PREFIX}-dashlink`, T("linkDashboard"));
+    dashBtn.type = "button";
+    dashBtn.addEventListener("click", () => {
+      if (state.pro) {
+        globalThis.MST_GATE.openDashboard();
+      } else {
+        openUpsell();
+      }
+    });
+    if (!state.pro) dashBtn.appendChild(UPSELL.chip(() => openUpsell()));
+    body.appendChild(dashBtn);
 
     // Copy plain-text summary (WhatsApp/notes friendly).
     const copyBtn = el("button", `${PREFIX}-copy`, T("btnCopy"));
@@ -538,6 +679,12 @@ globalThis.MST_CARD = (() => {
       }, 2000);
     });
     body.appendChild(copyBtn);
+
+    // Upsell panel lives at the bottom of the card; never opens on load.
+    const upsell = UPSELL.attach(body);
+    openUpsell = () => {
+      upsell.panel.hidden = false;
+    };
   }
 
   function buildSummaryText() {
@@ -637,6 +784,7 @@ globalThis.MST_CARD = (() => {
       state.categoryAutoDetected = true;
     }
 
+    state.pro = globalThis.MST_GATE.isPro();
     refs.card = card;
     buildCalculator(body);
     refs.priceInput.syncFromState(); // pre-fill with the page price
@@ -645,7 +793,8 @@ globalThis.MST_CARD = (() => {
       refs.priceInput.syncFromState();
       refs.shippingInput.syncFromState();
       refs.costInput.syncFromState();
-      refs.marginInput.syncFromState();
+      refs.marginInput?.syncFromState();
+      refs.salesInput?.syncFromState();
       refs.categorySelect.value = state.categoryGroupId ?? "";
       update(false);
     });

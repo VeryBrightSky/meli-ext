@@ -11,7 +11,8 @@ const DEFAULT_SETTINGS = {
   cardEnabled: true,
   stripsEnabled: true,
   defaultShippingMXN: 0,
-  defaultListingType: "auto"
+  defaultListingType: "auto",
+  acquisitionPct: 0
 };
 
 // Branding + i18n strings.
@@ -25,6 +26,11 @@ document.getElementById("lbl-type").textContent = T("optDefaultType");
 document.getElementById("opt-auto").textContent = T("optTypeAuto");
 document.getElementById("reset-btn").textContent = T("optReset");
 document.getElementById("reset-hint").textContent = T("optResetHint");
+document.getElementById("lbl-acquisition").textContent = T("optAcquisition");
+document.getElementById("lbl-subscription").textContent = T("optSubscription");
+document.getElementById("manage-btn").textContent = T("optManage");
+document.getElementById("login-btn").textContent = T("optLogin");
+document.getElementById("dashboard-btn").textContent = T("optDashboard");
 
 const cardEnabled = document.getElementById("card-enabled");
 const stripsEnabled = document.getElementById("strips-enabled");
@@ -39,6 +45,8 @@ async function load() {
   stripsEnabled.checked = s.stripsEnabled;
   defaultShipping.value = s.defaultShippingMXN > 0 ? s.defaultShippingMXN.toFixed(2) : "";
   defaultType.value = s.defaultListingType;
+  const acq = document.getElementById("acquisition-pct");
+  acq.value = s.acquisitionPct > 0 ? String(s.acquisitionPct) : "";
 }
 
 cardEnabled.addEventListener("change", () =>
@@ -55,6 +63,31 @@ defaultShipping.addEventListener("change", () => {
 defaultType.addEventListener("change", () =>
   chrome.storage.sync.set({ defaultListingType: defaultType.value })
 );
+
+// Pro subscription status + actions (via the service worker / ExtPay).
+const acquisitionInput = document.getElementById("acquisition-pct");
+acquisitionInput.addEventListener("change", () => {
+  const v = Math.min(parseMoney(acquisitionInput.value), 99);
+  acquisitionInput.value = v > 0 ? String(v) : "";
+  chrome.storage.sync.set({ acquisitionPct: v });
+});
+
+const send = (type) => chrome.runtime.sendMessage({ type }).catch(() => null);
+document.getElementById("manage-btn").addEventListener("click", () => send("openPaymentPage"));
+document.getElementById("login-btn").addEventListener("click", () => send("openLoginPage"));
+document.getElementById("dashboard-btn").addEventListener("click", () => send("openDashboard"));
+
+async function loadSubscriptionStatus() {
+  const statusEl = document.getElementById("sub-status");
+  const res = await send("getProStatus");
+  if (res?.ok) {
+    const s = res.data;
+    statusEl.textContent = s.paid ? T("statusPro") : s.trialActive ? T("statusTrial") : T("statusFree");
+  } else {
+    statusEl.textContent = T("statusFree");
+  }
+}
+loadSubscriptionStatus();
 
 resetBtn.addEventListener("click", async () => {
   await chrome.storage.local.clear();

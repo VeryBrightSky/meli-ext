@@ -1,63 +1,281 @@
 {
-  "cardTitle": { "message": "Calculadora del vendedor" },
-  "badgeEstimate": { "message": "Estimado" },
-  "badgeTooltip": { "message": "Estimación basada en las tarifas publicadas por Mercado Libre (consultadas el $1). El porcentaje exacto depende de tu categoría y cuenta. No incluye retenciones fiscales (ISR/IVA) ni el costo real de Mercado Envíos." },
-  "rowPrice": { "message": "Precio de venta" },
-  "rowListingType": { "message": "Publicación" },
-  "typeClassic": { "message": "Clásica" },
-  "typePremium": { "message": "Premium" },
-  "rowCategory": { "message": "Categoría" },
-  "categoryPlaceholder": { "message": "Selecciona categoría…" },
-  "hintDetected": { "message": "Detectada de la página — corrígela si no coincide." },
-  "hintNoCategory": { "message": "Sin categoría, la comisión oficial va de $1." },
-  "rowCommission": { "message": "Comisión ($1)" },
-  "rowFixedCost": { "message": "Cargo fijo (precio < $299)" },
-  "rowShipping": { "message": "Tu costo de envío" },
-  "rowShippingFree": { "message": "Tu costo de envío (envío gratis ≥ $299)" },
-  "rowNet": { "message": "Recibirás aprox." },
-  "rowProductCost": { "message": "Costo de tu producto" },
-  "rowProfit": { "message": "Ganancia" },
-  "rowBreakeven": { "message": "Precio mínimo para no perder" },
-  "rowEffectiveRate": { "message": "Costo total MELI" },
-  "resetPrice": { "message": "Restaurar" },
-  "sweetSpot": { "message": "Si subes el precio a $1, tu neto sube $2 (menor cargo fijo)." },
-  "btnCompare": { "message": "Comparar" },
-  "compareDiff": { "message": "Diferencia (costo de MSI)" },
-  "btnExportCsv": { "message": "Exportar CSV" },
-  "csvHeaderTitle": { "message": "Título" },
-  "csvCommissionMin": { "message": "Comisión mín (MXN)" },
-  "csvCommissionMax": { "message": "Comisión máx (MXN)" },
-  "csvNetMin": { "message": "Neto mín (MXN)" },
-  "csvNetMax": { "message": "Neto máx (MXN)" },
-  "btnCopy": { "message": "Copiar resumen" },
-  "btnCopied": { "message": "¡Copiado!" },
-  "btnCopyError": { "message": "No se pudo copiar" },
-  "rowTargetMargin": { "message": "Margen deseado (%)" },
-  "rowTargetPrice": { "message": "Precio objetivo" },
-  "targetUnreachable": { "message": "Margen inalcanzable con estas tarifas" },
-  "footerRates": { "message": "$1 · tarifas al $2" },
-  "stripNet": { "message": "Neto aprox." },
-  "stripListingType": { "message": "Publicación (est.)" },
-  "stripCategory": { "message": "Categoría" },
-  "stripUnknownCategory": { "message": "Desconocida ($1)" },
-  "stripFreeShipping": { "message": "Envío gratis" },
-  "stripSeller": { "message": "Vendedor" },
-  "stripCommission": { "message": "Comisión ($1)" },
-  "stripFixedCost": { "message": "Cargo fijo" },
-  "stripNetBeforeShipping": { "message": "Neto antes de envío" },
-  "stripFooter": { "message": "$1 · estimado, tarifas al $2" },
-  "yes": { "message": "Sí" },
-  "no": { "message": "No" },
-  "optionsTitle": { "message": "Opciones" },
-  "optShowCard": { "message": "Mostrar calculadora en páginas de producto" },
-  "optShowStrips": { "message": "Mostrar resumen en resultados de búsqueda" },
-  "optDefaultShipping": { "message": "Costo de envío por defecto (MXN)" },
-  "optDefaultType": { "message": "Tipo de publicación por defecto" },
-  "optTypeAuto": { "message": "Detectar automáticamente" },
-  "optReset": { "message": "Borrar datos guardados" },
-  "optResetDone": { "message": "Datos borrados." },
-  "optResetHint": { "message": "Elimina costos guardados por producto y restaura los valores por defecto. Todo se guarda solo en tu navegador." },
-  "inputShippingAria": { "message": "Costo de envío en pesos" },
-  "inputProductCostAria": { "message": "Costo de tu producto en pesos" },
-  "inputMarginAria": { "message": "Margen deseado en porcentaje" }
+  "cardTitle": {
+    "message": "Calculadora del vendedor"
+  },
+  "badgeEstimate": {
+    "message": "Estimado"
+  },
+  "badgeTooltip": {
+    "message": "Estimación basada en las tarifas publicadas por Mercado Libre (consultadas el $1). El porcentaje exacto depende de tu categoría y cuenta. No incluye retenciones fiscales (ISR/IVA) ni el costo real de Mercado Envíos."
+  },
+  "rowPrice": {
+    "message": "Precio de venta"
+  },
+  "rowListingType": {
+    "message": "Publicación"
+  },
+  "typeClassic": {
+    "message": "Clásica"
+  },
+  "typePremium": {
+    "message": "Premium"
+  },
+  "rowCategory": {
+    "message": "Categoría"
+  },
+  "categoryPlaceholder": {
+    "message": "Selecciona categoría…"
+  },
+  "hintDetected": {
+    "message": "Detectada de la página — corrígela si no coincide."
+  },
+  "hintNoCategory": {
+    "message": "Sin categoría, la comisión oficial va de $1."
+  },
+  "rowCommission": {
+    "message": "Comisión ($1)"
+  },
+  "rowFixedCost": {
+    "message": "Cargo fijo (precio < $$299)"
+  },
+  "rowShipping": {
+    "message": "Tu costo de envío"
+  },
+  "rowShippingFree": {
+    "message": "Tu costo de envío (envío gratis ≥ $$299)"
+  },
+  "rowNet": {
+    "message": "Recibirás aprox."
+  },
+  "rowProductCost": {
+    "message": "Costo de tu producto"
+  },
+  "rowProfit": {
+    "message": "Ganancia"
+  },
+  "rowBreakeven": {
+    "message": "Precio mínimo para no perder"
+  },
+  "rowEffectiveRate": {
+    "message": "Costo total MELI"
+  },
+  "resetPrice": {
+    "message": "Restaurar"
+  },
+  "sweetSpot": {
+    "message": "Si subes el precio a $1, tu neto sube $2 (menor cargo fijo)."
+  },
+  "btnCompare": {
+    "message": "Comparar"
+  },
+  "compareDiff": {
+    "message": "Diferencia (costo de MSI)"
+  },
+  "btnExportCsv": {
+    "message": "Exportar CSV"
+  },
+  "csvHeaderTitle": {
+    "message": "Título"
+  },
+  "csvCommissionMin": {
+    "message": "Comisión mín (MXN)"
+  },
+  "csvCommissionMax": {
+    "message": "Comisión máx (MXN)"
+  },
+  "csvNetMin": {
+    "message": "Neto mín (MXN)"
+  },
+  "csvNetMax": {
+    "message": "Neto máx (MXN)"
+  },
+  "btnCopy": {
+    "message": "Copiar resumen"
+  },
+  "btnCopied": {
+    "message": "¡Copiado!"
+  },
+  "btnCopyError": {
+    "message": "No se pudo copiar"
+  },
+  "rowTargetMargin": {
+    "message": "Margen deseado (%)"
+  },
+  "rowTargetPrice": {
+    "message": "Precio objetivo"
+  },
+  "targetUnreachable": {
+    "message": "Margen inalcanzable con estas tarifas"
+  },
+  "footerRates": {
+    "message": "$1 · tarifas al $2"
+  },
+  "stripNet": {
+    "message": "Neto aprox."
+  },
+  "stripListingType": {
+    "message": "Publicación (est.)"
+  },
+  "stripCategory": {
+    "message": "Categoría"
+  },
+  "stripUnknownCategory": {
+    "message": "Desconocida ($1)"
+  },
+  "stripFreeShipping": {
+    "message": "Envío gratis"
+  },
+  "stripSeller": {
+    "message": "Vendedor"
+  },
+  "stripCommission": {
+    "message": "Comisión ($1)"
+  },
+  "stripFixedCost": {
+    "message": "Cargo fijo"
+  },
+  "stripNetBeforeShipping": {
+    "message": "Neto antes de envío"
+  },
+  "stripFooter": {
+    "message": "$1 · estimado, tarifas al $2"
+  },
+  "yes": {
+    "message": "Sí"
+  },
+  "no": {
+    "message": "No"
+  },
+  "optionsTitle": {
+    "message": "Opciones"
+  },
+  "optShowCard": {
+    "message": "Mostrar calculadora en páginas de producto"
+  },
+  "optShowStrips": {
+    "message": "Mostrar resumen en resultados de búsqueda"
+  },
+  "optDefaultShipping": {
+    "message": "Costo de envío por defecto (MXN)"
+  },
+  "optDefaultType": {
+    "message": "Tipo de publicación por defecto"
+  },
+  "optTypeAuto": {
+    "message": "Detectar automáticamente"
+  },
+  "optReset": {
+    "message": "Borrar datos guardados"
+  },
+  "optResetDone": {
+    "message": "Datos borrados."
+  },
+  "optResetHint": {
+    "message": "Elimina costos guardados por producto y restaura los valores por defecto. Todo se guarda solo en tu navegador."
+  },
+  "proTag": {
+    "message": "PRO"
+  },
+  "upsellTitle": {
+    "message": "Netio PRO"
+  },
+  "upsellBody": {
+    "message": "Desbloquea: precio editable (¿y si…?), precio objetivo por margen, aviso de precio óptimo, comparador Clásica vs Premium, exportar CSV, Tablero de Ganancias, ganancia mensual, envío estimado por peso, modo investigación e histórico de precios."
+  },
+  "upsellPricing": {
+    "message": "7 días de prueba gratis. Después $$4.99 USD/mes o $$39.99 USD/año (precio de fundador)."
+  },
+  "upsellTrial": {
+    "message": "Probar gratis 7 días"
+  },
+  "upsellPlans": {
+    "message": "Ver planes"
+  },
+  "proSweetSpotName": {
+    "message": "Aviso de precio óptimo"
+  },
+  "rowSales": {
+    "message": "Ventas por mes"
+  },
+  "rowMonthlyProfit": {
+    "message": "Ganancia mensual"
+  },
+  "rowHistory": {
+    "message": "Histórico de tus visitas"
+  },
+  "rowWeight": {
+    "message": "Peso (envío estimado)"
+  },
+  "weightNone": {
+    "message": "— elegir peso —"
+  },
+  "linkDashboard": {
+    "message": "Ver mi tablero"
+  },
+  "researchProfit": {
+    "message": "Ganancia est. (costo $1% del precio)"
+  },
+  "researchActive": {
+    "message": "Investigación: costo $1%"
+  },
+  "optAcquisition": {
+    "message": "Costo de adquisición (% del precio) — Modo investigación"
+  },
+  "optSubscription": {
+    "message": "Suscripción"
+  },
+  "statusPro": {
+    "message": "PRO activo"
+  },
+  "statusTrial": {
+    "message": "Prueba activa"
+  },
+  "statusFree": {
+    "message": "Plan gratuito"
+  },
+  "optManage": {
+    "message": "Administrar suscripción / pagar"
+  },
+  "optLogin": {
+    "message": "Ya pagué — iniciar sesión"
+  },
+  "optDashboard": {
+    "message": "Ver Tablero de Ganancias"
+  },
+  "dashTitle": {
+    "message": "Tablero de Ganancias"
+  },
+  "dashEmpty": {
+    "message": "Guarda el costo de un producto en su publicación para verlo aquí."
+  },
+  "dashCommission": {
+    "message": "Comisión"
+  },
+  "dashShipping": {
+    "message": "Envío"
+  },
+  "dashNet": {
+    "message": "Neto"
+  },
+  "dashCost": {
+    "message": "Costo"
+  },
+  "dashMargin": {
+    "message": "Margen"
+  },
+  "dashTotals": {
+    "message": "Totales"
+  },
+  "dashShippingNote": {
+    "message": "Envío usado: tu valor por defecto ($1). Cifras estimadas."
+  },
+  "inputShippingAria": {
+    "message": "Costo de envío en pesos"
+  },
+  "inputProductCostAria": {
+    "message": "Costo de tu producto en pesos"
+  },
+  "inputMarginAria": {
+    "message": "Margen deseado en porcentaje"
+  }
 }

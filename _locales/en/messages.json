@@ -1,63 +1,281 @@
 {
-  "cardTitle": { "message": "Seller calculator" },
-  "badgeEstimate": { "message": "Estimate" },
-  "badgeTooltip": { "message": "Estimate based on Mercado Libre's published rates (retrieved $1). The exact percentage depends on your category and account. Excludes tax withholdings (ISR/IVA) and actual Mercado Envíos costs." },
-  "rowPrice": { "message": "Sale price" },
-  "rowListingType": { "message": "Listing type" },
-  "typeClassic": { "message": "Clásica" },
-  "typePremium": { "message": "Premium" },
-  "rowCategory": { "message": "Category" },
-  "categoryPlaceholder": { "message": "Select a category…" },
-  "hintDetected": { "message": "Detected from the page — correct it if it doesn't match." },
-  "hintNoCategory": { "message": "Without a category, the official commission ranges from $1." },
-  "rowCommission": { "message": "Commission ($1)" },
-  "rowFixedCost": { "message": "Fixed charge (price < $299)" },
-  "rowShipping": { "message": "Your shipping cost" },
-  "rowShippingFree": { "message": "Your shipping cost (free shipping ≥ $299)" },
-  "rowNet": { "message": "You'll receive approx." },
-  "rowProductCost": { "message": "Your product cost" },
-  "rowProfit": { "message": "Profit" },
-  "rowBreakeven": { "message": "Minimum break-even price" },
-  "rowEffectiveRate": { "message": "Total MELI cost" },
-  "resetPrice": { "message": "Reset" },
-  "sweetSpot": { "message": "If you raise the price to $1, your net goes up $2 (lower fixed charge)." },
-  "btnCompare": { "message": "Compare" },
-  "compareDiff": { "message": "Difference (cost of MSI)" },
-  "btnExportCsv": { "message": "Export CSV" },
-  "csvHeaderTitle": { "message": "Title" },
-  "csvCommissionMin": { "message": "Commission min (MXN)" },
-  "csvCommissionMax": { "message": "Commission max (MXN)" },
-  "csvNetMin": { "message": "Net min (MXN)" },
-  "csvNetMax": { "message": "Net max (MXN)" },
-  "btnCopy": { "message": "Copy summary" },
-  "btnCopied": { "message": "Copied!" },
-  "btnCopyError": { "message": "Copy failed" },
-  "rowTargetMargin": { "message": "Target margin (%)" },
-  "rowTargetPrice": { "message": "Target price" },
-  "targetUnreachable": { "message": "Margin unreachable at these rates" },
-  "footerRates": { "message": "$1 · rates as of $2" },
-  "stripNet": { "message": "Net approx." },
-  "stripListingType": { "message": "Listing (est.)" },
-  "stripCategory": { "message": "Category" },
-  "stripUnknownCategory": { "message": "Unknown ($1)" },
-  "stripFreeShipping": { "message": "Free shipping" },
-  "stripSeller": { "message": "Seller" },
-  "stripCommission": { "message": "Commission ($1)" },
-  "stripFixedCost": { "message": "Fixed charge" },
-  "stripNetBeforeShipping": { "message": "Net before shipping" },
-  "stripFooter": { "message": "$1 · estimate, rates as of $2" },
-  "yes": { "message": "Yes" },
-  "no": { "message": "No" },
-  "optionsTitle": { "message": "Options" },
-  "optShowCard": { "message": "Show calculator on product pages" },
-  "optShowStrips": { "message": "Show summary on search results" },
-  "optDefaultShipping": { "message": "Default shipping cost (MXN)" },
-  "optDefaultType": { "message": "Default listing type" },
-  "optTypeAuto": { "message": "Detect automatically" },
-  "optReset": { "message": "Clear saved data" },
-  "optResetDone": { "message": "Data cleared." },
-  "optResetHint": { "message": "Removes per-product saved costs and restores defaults. Everything is stored only in your browser." },
-  "inputShippingAria": { "message": "Shipping cost in pesos" },
-  "inputProductCostAria": { "message": "Your product cost in pesos" },
-  "inputMarginAria": { "message": "Target margin in percent" }
+  "cardTitle": {
+    "message": "Seller calculator"
+  },
+  "badgeEstimate": {
+    "message": "Estimate"
+  },
+  "badgeTooltip": {
+    "message": "Estimate based on Mercado Libre's published rates (retrieved $1). The exact percentage depends on your category and account. Excludes tax withholdings (ISR/IVA) and actual Mercado Envíos costs."
+  },
+  "rowPrice": {
+    "message": "Sale price"
+  },
+  "rowListingType": {
+    "message": "Listing type"
+  },
+  "typeClassic": {
+    "message": "Clásica"
+  },
+  "typePremium": {
+    "message": "Premium"
+  },
+  "rowCategory": {
+    "message": "Category"
+  },
+  "categoryPlaceholder": {
+    "message": "Select a category…"
+  },
+  "hintDetected": {
+    "message": "Detected from the page — correct it if it doesn't match."
+  },
+  "hintNoCategory": {
+    "message": "Without a category, the official commission ranges from $1."
+  },
+  "rowCommission": {
+    "message": "Commission ($1)"
+  },
+  "rowFixedCost": {
+    "message": "Fixed charge (price < $$299)"
+  },
+  "rowShipping": {
+    "message": "Your shipping cost"
+  },
+  "rowShippingFree": {
+    "message": "Your shipping cost (free shipping ≥ $$299)"
+  },
+  "rowNet": {
+    "message": "You'll receive approx."
+  },
+  "rowProductCost": {
+    "message": "Your product cost"
+  },
+  "rowProfit": {
+    "message": "Profit"
+  },
+  "rowBreakeven": {
+    "message": "Minimum break-even price"
+  },
+  "rowEffectiveRate": {
+    "message": "Total MELI cost"
+  },
+  "resetPrice": {
+    "message": "Reset"
+  },
+  "sweetSpot": {
+    "message": "If you raise the price to $1, your net goes up $2 (lower fixed charge)."
+  },
+  "btnCompare": {
+    "message": "Compare"
+  },
+  "compareDiff": {
+    "message": "Difference (cost of MSI)"
+  },
+  "btnExportCsv": {
+    "message": "Export CSV"
+  },
+  "csvHeaderTitle": {
+    "message": "Title"
+  },
+  "csvCommissionMin": {
+    "message": "Commission min (MXN)"
+  },
+  "csvCommissionMax": {
+    "message": "Commission max (MXN)"
+  },
+  "csvNetMin": {
+    "message": "Net min (MXN)"
+  },
+  "csvNetMax": {
+    "message": "Net max (MXN)"
+  },
+  "btnCopy": {
+    "message": "Copy summary"
+  },
+  "btnCopied": {
+    "message": "Copied!"
+  },
+  "btnCopyError": {
+    "message": "Copy failed"
+  },
+  "rowTargetMargin": {
+    "message": "Target margin (%)"
+  },
+  "rowTargetPrice": {
+    "message": "Target price"
+  },
+  "targetUnreachable": {
+    "message": "Margin unreachable at these rates"
+  },
+  "footerRates": {
+    "message": "$1 · rates as of $2"
+  },
+  "stripNet": {
+    "message": "Net approx."
+  },
+  "stripListingType": {
+    "message": "Listing (est.)"
+  },
+  "stripCategory": {
+    "message": "Category"
+  },
+  "stripUnknownCategory": {
+    "message": "Unknown ($1)"
+  },
+  "stripFreeShipping": {
+    "message": "Free shipping"
+  },
+  "stripSeller": {
+    "message": "Seller"
+  },
+  "stripCommission": {
+    "message": "Commission ($1)"
+  },
+  "stripFixedCost": {
+    "message": "Fixed charge"
+  },
+  "stripNetBeforeShipping": {
+    "message": "Net before shipping"
+  },
+  "stripFooter": {
+    "message": "$1 · estimate, rates as of $2"
+  },
+  "yes": {
+    "message": "Yes"
+  },
+  "no": {
+    "message": "No"
+  },
+  "optionsTitle": {
+    "message": "Options"
+  },
+  "optShowCard": {
+    "message": "Show calculator on product pages"
+  },
+  "optShowStrips": {
+    "message": "Show summary on search results"
+  },
+  "optDefaultShipping": {
+    "message": "Default shipping cost (MXN)"
+  },
+  "optDefaultType": {
+    "message": "Default listing type"
+  },
+  "optTypeAuto": {
+    "message": "Detect automatically"
+  },
+  "optReset": {
+    "message": "Clear saved data"
+  },
+  "optResetDone": {
+    "message": "Data cleared."
+  },
+  "optResetHint": {
+    "message": "Removes per-product saved costs and restores defaults. Everything is stored only in your browser."
+  },
+  "proTag": {
+    "message": "PRO"
+  },
+  "upsellTitle": {
+    "message": "Netio PRO"
+  },
+  "upsellBody": {
+    "message": "Unlock: editable what-if price, target price by margin, optimal-price alerts, Clásica vs Premium comparison, CSV export, Profit Dashboard, monthly profit, weight-based shipping estimate, research mode and price history."
+  },
+  "upsellPricing": {
+    "message": "7-day free trial. Then $$4.99 USD/mo or $$39.99 USD/yr (founder price)."
+  },
+  "upsellTrial": {
+    "message": "Try free for 7 days"
+  },
+  "upsellPlans": {
+    "message": "See plans"
+  },
+  "proSweetSpotName": {
+    "message": "Optimal-price alert"
+  },
+  "rowSales": {
+    "message": "Sales per month"
+  },
+  "rowMonthlyProfit": {
+    "message": "Monthly profit"
+  },
+  "rowHistory": {
+    "message": "History of your visits"
+  },
+  "rowWeight": {
+    "message": "Weight (shipping estimate)"
+  },
+  "weightNone": {
+    "message": "— choose weight —"
+  },
+  "linkDashboard": {
+    "message": "View my dashboard"
+  },
+  "researchProfit": {
+    "message": "Est. profit (cost $1% of price)"
+  },
+  "researchActive": {
+    "message": "Research: cost $1%"
+  },
+  "optAcquisition": {
+    "message": "Acquisition cost (% of price) — Research mode"
+  },
+  "optSubscription": {
+    "message": "Subscription"
+  },
+  "statusPro": {
+    "message": "PRO active"
+  },
+  "statusTrial": {
+    "message": "Trial active"
+  },
+  "statusFree": {
+    "message": "Free plan"
+  },
+  "optManage": {
+    "message": "Manage subscription / pay"
+  },
+  "optLogin": {
+    "message": "Already paid — log in"
+  },
+  "optDashboard": {
+    "message": "Open Profit Dashboard"
+  },
+  "dashTitle": {
+    "message": "Profit Dashboard"
+  },
+  "dashEmpty": {
+    "message": "Save a product's cost on its listing page to see it here."
+  },
+  "dashCommission": {
+    "message": "Commission"
+  },
+  "dashShipping": {
+    "message": "Shipping"
+  },
+  "dashNet": {
+    "message": "Net"
+  },
+  "dashCost": {
+    "message": "Cost"
+  },
+  "dashMargin": {
+    "message": "Margin"
+  },
+  "dashTotals": {
+    "message": "Totals"
+  },
+  "dashShippingNote": {
+    "message": "Shipping used: your default value ($1). Estimated figures."
+  },
+  "inputShippingAria": {
+    "message": "Shipping cost in pesos"
+  },
+  "inputProductCostAria": {
+    "message": "Your product cost in pesos"
+  },
+  "inputMarginAria": {
+    "message": "Target margin in percent"
+  }
 }
