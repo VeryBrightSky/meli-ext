@@ -346,13 +346,17 @@ globalThis.MST_CARD = (() => {
     const hasProfit = b.profitMinMXN !== undefined;
     refs.profit.root.style.display = hasProfit ? "" : "none";
     if (hasProfit) {
-      patchRow(
-        refs.profit,
-        null,
-        `${fmtRange(b.profitMinMXN, b.profitMaxMXN)} (${fmtPctRange(b.marginMinPct, b.marginMaxPct)})`,
-        flash
-      );
-      refs.profit.root.classList.toggle(`${PREFIX}-row--loss`, b.profitMaxMXN < 0);
+      const losing = b.profitMaxMXN < 0; // even the best case loses money
+      const marginText = fmtPctRange(b.marginMinPct, b.marginMaxPct);
+      const value = losing
+        ? `${T("youLose")} ${fmtRange(-b.profitMaxMXN, -b.profitMinMXN)} (${marginText})`
+        : `${fmtRange(b.profitMinMXN, b.profitMaxMXN)} (${marginText})`;
+      patchRow(refs.profit, null, value, flash);
+      refs.profit.root.classList.toggle(`${PREFIX}-row--loss`, losing);
+      // Health dot: red loss, else by worst-case margin (<10/10-25/>25).
+      refs.profit.root.dataset.health = losing
+        ? "red"
+        : UI.marginHealth(b.marginMinPct);
     }
 
     // Breakeven + target price (reverse calculator). Range rates produce a

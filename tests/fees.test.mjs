@@ -13,7 +13,8 @@ for (const file of [
   "src/fees/calculator.js",
   "src/fees/fee-source.js",
   "src/content/format.js",
-  "src/pro/gate.js"
+  "src/pro/gate.js",
+  "src/dashboard/dashboard-model.js"
 ]) {
   new Function(readFileSync(join(root, file), "utf8"))();
 }
@@ -22,6 +23,7 @@ const CALC = globalThis.MST_CALC;
 const UI = globalThis.MST_UI;
 const GATE = globalThis.MST_GATE;
 const SHIPPING = globalThis.MST_SHIPPING;
+const DASH = globalThis.MST_DASH;
 
 test("tech category quote is exact and matches the table", () => {
   const q = SOURCE.getQuote({ priceMXN: 827, listingTypeId: "classic", categoryGroupId: "tech" });
@@ -475,6 +477,70 @@ test("shipping table meta carries source citation and date", () => {
   assert.equal(SHIPPING.meta.retrievedAt, "2026-06-12");
   assert.ok(SHIPPING.meta.sources.length >= 1);
   assert.equal(SHIPPING.brackets.length, 13);
+});
+
+test("dashboard recomputes rows LIVE from current default shipping (bug 1)", () => {
+  const all = {
+    "mst:cost:MLM1": 400,
+    "mst:meta:MLM1": {
+      title: "Tenis", priceMXN: 827, listingTypeId: "classic",
+      categoryGroupId: "tech", url: "u"
+    },
+    "mst:sales:MLM1": 10
+  };
+  const r0 = DASH.computeRows(all, "mst", 0)[0];
+  const r90 = DASH.computeRows(all, "mst", 90)[0];
+  // Shipping is taken from the passed value, never from saved meta.
+  assert.equal(r0.b.shippingCostMXN, 0);
+  assert.equal(r90.b.shippingCostMXN, 90);
+  // The only delta between the two is the shipping (everything else live-equal).
+  assert.equal(CALC.round2(r0.b.netMinMXN - r90.b.netMinMXN), 90);
+  assert.equal(CALC.round2(r0.b.profitMinMXN - r90.b.profitMinMXN), 90);
+});
+
+test("dashboard default shipping: options(sync) value wins, even 0 (bug 1)", () => {
+  // The repro: options set to 0 must override a stale local card value.
+  assert.equal(DASH.resolveDefaultShipping({ defaultShippingMXN: 0 }, { shippingCostMXN: 90 }), 0);
+  assert.equal(DASH.resolveDefaultShipping({ defaultShippingMXN: 55 }, { shippingCostMXN: 90 }), 55);
+  // Fallback to the card's last value only when no options value exists.
+  assert.equal(DASH.resolveDefaultShipping(undefined, { shippingCostMXN: 90 }), 90);
+  assert.equal(DASH.resolveDefaultShipping(undefined, undefined), 0);
+});
+
+test("dashboard skips listings without a cost or meta", () => {
+  const all = {
+    "mst:cost:A": 100,
+    "mst:meta:A": { title: "A", priceMXN: 500, listingTypeId: "classic", categoryGroupId: "tech", url: "u" },
+    "mst:cost:B": 0, // no cost → skipped
+    "mst:meta:B": { title: "B", priceMXN: 500, listingTypeId: "classic", categoryGroupId: "tech", url: "u" },
+    "mst:cost:C": 50 // no meta → skipped
+  };
+  const rows = DASH.computeRows(all, "mst", 0);
+  assert.deepEqual(rows.map((r) => r.itemId), ["A"]);
+});
+
+test("dashboard grand totals sum monthly profit across rows with sales", () => {
+  const all = {
+    "mst:cost:A": 400, "mst:meta:A": { title: "A", priceMXN: 827, listingTypeId: "classic", categoryGroupId: "tech", url: "u" }, "mst:sales:A": 10,
+    "mst:cost:B": 100, "mst:meta:B": { title: "B", priceMXN: 600, listingTypeId: "classic", categoryGroupId: "tech", url: "u" } // no sales
+  };
+  const rows = DASH.computeRows(all, "mst", 0);
+  const t = DASH.totals(rows);
+  assert.equal(t.count, 2);
+  assert.equal(t.withSales, 1);
+  // A: profit 827-82.70-400 = 344.30 ; ×10 = 3443.00
+  assert.equal(t.monthlyMinMXN, 3443);
+  assert.equal(t.monthlyMaxMXN, 3443);
+});
+
+test("marginHealth thresholds: <10 red, 10–25 yellow, ≥25 green", () => {
+  assert.equal(UI.marginHealth(5), "red");
+  assert.equal(UI.marginHealth(9.99), "red");
+  assert.equal(UI.marginHealth(-4), "red");
+  assert.equal(UI.marginHealth(10), "yellow");
+  assert.equal(UI.marginHealth(24.99), "yellow");
+  assert.equal(UI.marginHealth(25), "green");
+  assert.equal(UI.marginHealth(40), "green");
 });
 
 test("fee table meta carries source citations and retrieval date", () => {

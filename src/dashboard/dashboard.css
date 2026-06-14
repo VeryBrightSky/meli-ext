@@ -83,48 +83,102 @@ th {
   font-weight: 600;
   font-size: 12px;
   color: rgba(0, 0, 0, 0.55);
-  padding: 8px 6px;
+  padding: 9px 10px;
   border-bottom: 2px solid rgba(0, 0, 0, 0.1);
   cursor: pointer;
   user-select: none;
   white-space: nowrap;
 }
 
-td {
-  padding: 8px 6px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.07);
+th:hover {
+  color: #2d3277;
+}
+
+th.sorted {
+  color: #2d3277;
+}
+
+th.num,
+td.num {
+  text-align: right;
   font-variant-numeric: tabular-nums;
+}
+
+td {
+  padding: 9px 10px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
   white-space: nowrap;
+  color: rgba(0, 0, 0, 0.85);
+}
+
+/* Zebra striping + hover highlight. */
+tbody tr:nth-child(even) {
+  background: rgba(45, 50, 119, 0.025);
+}
+
+tbody tr:hover {
+  background: rgba(52, 131, 250, 0.07);
+}
+
+td.pos {
+  color: #00a650;
+  font-weight: 600;
+}
+
+td.neg {
+  color: #f23d4f;
+  font-weight: 600;
 }
 
 td a {
   color: #3483fa;
   text-decoration: none;
   display: inline-block;
-  max-width: 260px;
+  max-width: 280px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   vertical-align: bottom;
 }
 
+td a:hover {
+  text-decoration: underline;
+}
+
 td input {
   font-family: inherit;
   font-size: 13px;
-  width: 56px;
-  padding: 3px 6px;
+  width: 60px;
+  padding: 4px 7px;
   text-align: right;
   border: 1px solid rgba(0, 0, 0, 0.17);
   border-radius: 6px;
 }
 
+td input:focus {
+  outline: none;
+  border-color: #3483fa;
+  box-shadow: 0 0 0 2px rgba(52, 131, 250, 0.2);
+}
+
 tfoot td {
-  font-weight: 600;
-  border-top: 2px solid rgba(0, 0, 0, 0.1);
+  font-weight: 700;
+  font-size: 14px;
+  border-top: 2px solid rgba(0, 0, 0, 0.12);
   border-bottom: none;
+  padding-top: 12px;
 }
 
 tfoot td:first-child {
   text-align: right;
   color: rgba(0, 0, 0, 0.55);
+  font-weight: 600;
+}
+
+/* Empty state. */
+#empty-note {
+  text-align: center;
+  font-size: 14px;
+  color: rgba(0, 0, 0, 0.55);
+  padding: 48px 16px;
 }

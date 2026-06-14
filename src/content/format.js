@@ -40,5 +40,20 @@ globalThis.MST_UI = (() => {
     );
   }
 
-  return Object.freeze({ fmtMoney, fmtRange, fmtCharge, fmtPctRange, isVisible });
+  // Margin health bucket for the card's status dot: <10% red, 10–25% yellow,
+  // >25% green. Negative margins are red.
+  function marginHealth(pct) {
+    if (!(pct >= 10)) return "red";
+    if (pct < 25) return "yellow";
+    return "green";
+  }
+
+  return Object.freeze({
+    fmtMoney,
+    fmtRange,
+    fmtCharge,
+    fmtPctRange,
+    marginHealth,
+    isVisible
+  });
 })();

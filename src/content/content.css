@@ -69,22 +69,31 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 10px;
   font-size: 14px;
-  line-height: 1.3;
+  line-height: 1.35;
+  min-height: 22px;
 }
 
 .mst-row__label {
   color: rgba(0, 0, 0, 0.55);
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .mst-row__value {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+  flex: 0 0 auto;
+  text-align: right;
 }
 
 .mst-row--total {
   border-top: 1px solid rgba(0, 0, 0, 0.1);
+  margin-top: 2px;
   padding-top: 10px;
   font-weight: 600;
 }
@@ -97,27 +106,46 @@
 
 .mst-row--profit .mst-row__value {
   color: #00a650;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .mst-row--loss .mst-row__value {
   color: #f23d4f;
+  font-weight: 700;
 }
+
+/* Margin-health dot before the profit value (only the row with data-health,
+   i.e. the Ganancia row — not Ganancia mensual). */
+.mst-row[data-health] .mst-row__value::before {
+  content: "●";
+  margin-right: 6px;
+  font-size: 11px;
+  vertical-align: 1px;
+}
+.mst-row[data-health="green"] .mst-row__value::before { color: #00a650; }
+.mst-row[data-health="yellow"] .mst-row__value::before { color: #f5a623; }
+.mst-row[data-health="red"] .mst-row__value::before { color: #f23d4f; }
 
 /* --- Pro gating / upsell ----------------------------------------------------- */
 
 .mst-prochip {
   font-family: inherit;
-  font-size: 10px;
+  font-size: 9.5px;
   font-weight: 700;
-  letter-spacing: 0.4px;
-  padding: 2px 6px;
+  letter-spacing: 0.6px;
+  padding: 2px 7px;
   border: none;
-  border-radius: 8px;
-  background: #ffe600;
-  color: rgba(0, 0, 0, 0.85);
+  border-radius: 9px;
+  background: linear-gradient(135deg, #ffe600, #f9c200);
+  color: rgba(0, 0, 0, 0.82);
   cursor: pointer;
   margin-left: 6px;
+  flex: 0 0 auto;
+  transition: filter 0.12s ease;
+}
+
+.mst-prochip:hover {
+  filter: brightness(1.06);
 }
 
 .mst-row--locked {

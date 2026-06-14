@@ -204,14 +204,14 @@ try {
   assert.equal(await dash.$eval("#content", (e) => e.hidden), true);
   pass("dashboard shows upsell when not Pro");
 
-  // QA override + sales seed + research-mode setting (meta/cost were already
+  // QA override + sales seed; options default shipping = 0 (meta/cost were
   // written by the real card in phase 1).
   await dash.evaluate(async () => {
     await chrome.storage.local.set({
       "mst:proOverride": true,
       "mst:sales:MLM12345678": 10
     });
-    await chrome.storage.sync.set({ acquisitionPct: 60 });
+    await chrome.storage.sync.set({ acquisitionPct: 60, defaultShippingMXN: 0 });
   });
   await dash.reload({ waitUntil: "load" });
   await dash.waitForFunction(() => !document.getElementById("content")?.hidden, {
@@ -221,9 +221,48 @@ try {
   assert.equal(dashRows, 1);
   const dashText = await dash.$eval("#rows", (e) => e.textContent);
   assert.ok(dashText.includes("Celular Test Pro 128 GB"), `dashboard missing title: ${dashText}`);
-  const totals = await dash.$eval("#totals-row", (e) => e.textContent);
-  assert.ok(totals.includes("$2,943.00"), `totals wrong: ${totals}`); // 294.30 × 10
-  pass("dashboard (Pro): 1 listing from real card data, monthly total $2,943.00");
+  // Shipping 0 → profit 344.30 × 10 = 3443.00.
+  assert.ok(
+    (await dash.$eval("#shipping-note", (e) => e.textContent)).includes("$0.00"),
+    "shipping note should reflect options default $0.00"
+  );
+  let totals = await dash.$eval("#totals-row", (e) => e.textContent);
+  assert.ok(totals.includes("$3,443.00"), `totals wrong: ${totals}`);
+  pass("dashboard (Pro): live recompute at options shipping $0 → monthly $3,443.00");
+
+  // BUG 1: change the OPTIONS default shipping → dashboard must propagate it.
+  await dash.evaluate(async () => {
+    await chrome.storage.sync.set({ defaultShippingMXN: 50 });
+  });
+  await dash.reload({ waitUntil: "load" });
+  await dash.waitForFunction(() => !document.getElementById("content")?.hidden, {
+    timeout: 10000
+  });
+  assert.ok(
+    (await dash.$eval("#shipping-note", (e) => e.textContent)).includes("$50.00"),
+    "shipping note should update to $50.00 from options"
+  );
+  totals = await dash.$eval("#totals-row", (e) => e.textContent);
+  assert.ok(totals.includes("$2,943.00"), `totals after shipping change wrong: ${totals}`);
+  assert.ok(totals.includes("1 productos"), `totals label/count wrong: ${totals}`);
+  pass("dashboard reflects changed options shipping $50 → monthly $2,943.00 (bug 1 fixed)");
+
+  // Empty state when nothing is saved (snapshot + restore so later phases keep
+  // the seeded product).
+  const SEED_KEYS = ["mst:cost:MLM12345678", "mst:meta:MLM12345678", "mst:sales:MLM12345678"];
+  const saved = await dash.evaluate(async (keys) => {
+    const snap = await chrome.storage.local.get(keys);
+    for (const k of keys) await chrome.storage.local.remove(k);
+    return snap;
+  }, SEED_KEYS);
+  await dash.reload({ waitUntil: "load" });
+  await dash.waitForFunction(
+    () => !document.getElementById("empty-note")?.hidden,
+    { timeout: 10000 }
+  );
+  assert.equal(await dash.$eval("#table", (e) => e.hidden), true);
+  pass("dashboard empty-state shows when no products saved");
+  await dash.evaluate(async (snap) => chrome.storage.local.set(snap), saved);
 
   // ====================== PHASE 3: product page, Pro ========================
   console.log("\nPHASE 3 — PRODUCT, PRO");
@@ -293,6 +332,25 @@ try {
   await typeInto(page, 3, "10");
   assert.equal(await page.evaluate(rowValue("Ganancia mensual")), "$2,943.00");
   pass("Pro solver $642.86 + ventas 10 → ganancia mensual $2,943.00");
+
+  // Margin-health dot: 35.59% margin → green.
+  assert.equal(
+    await page.$eval(".mst-row--profit", (e) => e.dataset.health),
+    "green"
+  );
+  pass("margin-health dot is green at 35.59% margin");
+
+  // Negative profit → clear "Pierdes" framing + red health (feature 5/7).
+  await typeInto(page, 2, "900"); // cost above net → loss
+  const lossText = await page.evaluate(rowValue("Ganancia"));
+  assert.ok(lossText.startsWith("Pierdes"), `expected loss framing, got: ${lossText}`);
+  assert.equal(await page.$eval(".mst-row--profit", (e) => e.dataset.health), "red");
+  assert.equal(
+    await page.$eval(".mst-row--profit", (e) => e.classList.contains("mst-row--loss")),
+    true
+  );
+  pass('negative profit shows red "Pierdes …" framing');
+  await typeInto(page, 2, "400"); // restore
 
   // ====================== PHASE 4: search page, Pro =========================
   console.log("\nPHASE 4 — SEARCH, PRO");

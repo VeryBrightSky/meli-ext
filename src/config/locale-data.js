@@ -102,7 +102,9 @@ globalThis.MST_MESSAGES = Object.freeze({
     "rowNetAfterWithholdings": "Neto después de retenciones",
     "withholdingsHint": "Retenciones vigentes desde el 01/01/2026. Asume RFC registrado ante Mercado Libre.",
     "upsellMonthly": "$$89 MXN/mes",
-    "upsellYearly": "$$699 MXN/año (ahorra 35%)"
+    "upsellYearly": "$$699 MXN/año (ahorra 35%)",
+    "dashTotalsLabel": "Totales ($1 productos)",
+    "youLose": "Pierdes"
   },
   "en": {
     "cardTitle": "Seller calculator",
@@ -205,6 +207,8 @@ globalThis.MST_MESSAGES = Object.freeze({
     "rowNetAfterWithholdings": "Net after withholdings",
     "withholdingsHint": "Withholdings in force since 2026-01-01. Assumes your RFC is registered with Mercado Libre.",
     "upsellMonthly": "$$89 MXN/mo",
-    "upsellYearly": "$$699 MXN/yr (save 35%)"
+    "upsellYearly": "$$699 MXN/yr (save 35%)",
+    "dashTotalsLabel": "Totals ($1 products)",
+    "youLose": "You lose"
   }
 });

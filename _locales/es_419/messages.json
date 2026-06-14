@@ -301,5 +301,11 @@
   },
   "upsellYearly": {
     "message": "$$699 MXN/año (ahorra 35%)"
+  },
+  "dashTotalsLabel": {
+    "message": "Totales ($1 productos)"
+  },
+  "youLose": {
+    "message": "Pierdes"
   }
 }
