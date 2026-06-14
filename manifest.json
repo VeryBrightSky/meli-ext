@@ -30,6 +30,7 @@
       ],
       "js": [
         "src/config/branding.js",
+        "src/config/locale-data.js",
         "src/config/i18n.js",
         "src/fees/fee-table.js",
         "src/fees/shipping-table.js",

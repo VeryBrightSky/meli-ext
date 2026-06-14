@@ -132,6 +132,10 @@ try {
   await page.waitForSelector("#mst-card-root", { visible: true, timeout: 20000 });
   pass("card injects and is visible");
 
+  // Spanish UI must render Spanish (regression: chrome.i18n served English).
+  assert.equal(await page.$eval(".mst-title", (e) => e.textContent), "Calculadora del vendedor");
+  pass("Spanish locale renders Spanish UI (Calculadora del vendedor)");
+
   assert.equal(await page.$eval(".mst-card input.mst-input", (i) => i.value), "827.00");
   assert.equal(await page.$eval(".mst-card input.mst-input", (i) => i.disabled), true);
   pass("price pre-filled 827.00 and read-only (what-if locked)");
