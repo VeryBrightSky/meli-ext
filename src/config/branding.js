@@ -18,7 +18,15 @@ globalThis.EXT_BRAND = Object.freeze({
   plans: Object.freeze({ monthly: "pro-monthly", yearly: "pro-yearly" }),
   // Path relative to the extension root; resolve with chrome.runtime.getURL().
   logoPath: "src/assets/icons/icon16.png",
-  // Andes design tokens — keep in sync with src/content/content.css.
+  // Brand palette for the LOGO and store assets ONLY (scripts/gen-icons.py,
+  // promo tile). The in-page card deliberately does NOT use these — it keeps
+  // the Andes tokens below so it looks native on Mercado Libre.
+  logo: Object.freeze({
+    primary: "#2D3277",  // deep blue — icon/tile background
+    accent: "#00A650"    // profit green — upward arrow / tagline
+  }),
+  // Andes design tokens for the in-page UI — keep in sync with content.css.
+  // Do NOT swap these for the logo palette; the card must match MELI.
   colors: Object.freeze({
     actionBlue: "#3483FA",
     accentYellow: "#FFE600",
