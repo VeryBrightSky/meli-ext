@@ -1,6 +1,6 @@
 {
   "name": "meli-ext",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "private": true,
   "description": "Netio — Chrome extension (MV3) for Mercado Libre Mexico sellers: fees, net payout, listing insights.",
   "type": "module",
