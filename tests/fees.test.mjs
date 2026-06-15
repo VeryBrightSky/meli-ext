@@ -41,14 +41,14 @@ test("unknown category falls back to official ranges", () => {
   assert.equal(p.pctMax, 20.5);
 });
 
-test("fixed cost tiers and boundaries (Apr 2026: 99/199/299)", () => {
+test("fixed cost tiers and boundaries (official MX bands: 99/149/299)", () => {
   const fc = (price) =>
     SOURCE.getQuote({ priceMXN: price, listingTypeId: "classic", categoryGroupId: "tech" }).fixedCostMXN;
   assert.equal(fc(35), 25);
   assert.equal(fc(98.99), 25);
   assert.equal(fc(99), 30);
-  assert.equal(fc(198.99), 30);
-  assert.equal(fc(199), 37);
+  assert.equal(fc(148.99), 30);
+  assert.equal(fc(149), 37);
   assert.equal(fc(298.99), 37);
   assert.equal(fc(299), 0);
   assert.equal(fc(300), 0);
@@ -279,21 +279,21 @@ test("sweet spot: worst-case 16% rate at $280 still gains $52.96", () => {
 
 test("sweet spot: losing or out-of-window tier crossings do not nudge", () => {
   const args = { ratePct: 10, fixedCostFn: SOURCE.getFixedCost, thresholds: SOURCE.getFixedCostThresholds() };
-  // net(95)=60.50 vs net(99)=59.10 → −1.40; $199/$299 outside +20%
+  // net(95)=60.50 vs net(99)=59.10 → −1.40; $149/$299 outside +20%
   assert.equal(CALC.findSweetSpot({ ...args, priceMXN: 95 }), null);
-  // $150: no threshold within +20% (limit 180 < 199)
+  // $150: next threshold is $299, beyond +20% (limit 180 < 299)
   assert.equal(CALC.findSweetSpot({ ...args, priceMXN: 150 }), null);
 });
 
-test("sweet spot: $190 → $199 marginally wins (+$1.10 despite higher tier)", () => {
-  // (199−190)·0.9 − (37−30) = 8.10 − 7 = 1.10
+test("sweet spot: $140 → $149 marginally wins (+$1.10 despite higher tier)", () => {
+  // crossing the $30→$37 step at $149: (149−140)·0.9 − (37−30) = 8.10 − 7 = 1.10
   const spot = CALC.findSweetSpot({
-    priceMXN: 190,
+    priceMXN: 140,
     ratePct: 10,
     fixedCostFn: SOURCE.getFixedCost,
     thresholds: SOURCE.getFixedCostThresholds()
   });
-  assert.deepEqual(spot, { targetPriceMXN: 199, netGainMXN: 1.1 });
+  assert.deepEqual(spot, { targetPriceMXN: 149, netGainMXN: 1.1 });
 });
 
 test("sweet spot: Full mode uses the service-cost discontinuities", () => {
@@ -327,7 +327,7 @@ test("sweet spot: $260 still reaches $299 within +20% window", () => {
 });
 
 test("fixed-cost thresholds come from the table", () => {
-  assert.deepEqual(SOURCE.getFixedCostThresholds(), [99, 199, 299]);
+  assert.deepEqual(SOURCE.getFixedCostThresholds(), [99, 149, 299]);
 });
 
 test("Full service cost: weight × price-tier matrix lookups", () => {

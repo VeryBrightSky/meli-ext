@@ -133,16 +133,16 @@ try {
   pass("card injects and is visible");
 
   // Spanish UI must render Spanish (regression: chrome.i18n served English).
-  assert.equal(await page.$eval(".mst-title", (e) => e.textContent), "Calculadora del vendedor");
-  pass("Spanish locale renders Spanish UI (Calculadora del vendedor)");
+  assert.equal(await page.$eval(".mst-title", (e) => e.textContent), "Calculadora de ganancias");
+  pass("Spanish locale renders Spanish UI (Calculadora de ganancias)");
 
   assert.equal(await page.$eval(".mst-card input.mst-input", (i) => i.value), "827.00");
   assert.equal(await page.$eval(".mst-card input.mst-input", (i) => i.disabled), true);
   pass("price pre-filled 827.00 and read-only (what-if locked)");
 
   assert.equal(await page.evaluate(rowValue("Comisión")), "−$82.70");
-  assert.equal(await page.evaluate(rowValue("Costo total MELI")), "10%");
-  assert.equal(await page.evaluate(rowValue("Recibirás aprox.")), "$744.30");
+  assert.equal(await page.evaluate(rowValue("Costo total")), "10%");
+  assert.equal(await page.evaluate(rowValue("Recibes aprox.")), "$744.30");
   pass("free fee card intact: 10% category via structured data, net $744.30");
 
   // Retenciones is FREE (accuracy feature), default off (row hidden/empty).
@@ -186,7 +186,7 @@ try {
   await page.click(".mst-copy");
   await sleep(300);
   const clip = await page.evaluate(() => navigator.clipboard.readText());
-  assert.ok(clip.includes("Recibirás aprox.: $694.30"), `clipboard wrong:\n${clip}`);
+  assert.ok(clip.includes("Recibes aprox.: $694.30"), `clipboard wrong:\n${clip}`);
   pass("copy summary stays FREE");
 
   // ====================== PHASE 2: dashboard locked =========================
@@ -290,8 +290,8 @@ try {
 
   await typeInto(page, 0, "280");
   assert.equal(await page.evaluate(rowValue("Comisión")), "−$28.00");
-  assert.equal(await page.evaluate(rowValue("Cargo fijo")), "−$37.00");
-  assert.equal(await page.evaluate(rowValue("Recibirás aprox.")), "$165.00");
+  assert.equal(await page.evaluate(rowValue("Costo fijo")), "−$37.00");
+  assert.equal(await page.evaluate(rowValue("Recibes aprox.")), "$165.00");
   const spotText = await page.$eval(".mst-sweetspot", (e) => e.textContent);
   assert.ok(spotText.includes("$299.00") && spotText.includes("$54.10"), spotText);
   pass("what-if 280 + sweet spot $299.00 / +$54.10");
@@ -301,18 +301,18 @@ try {
   // sweet spot recomputes against the Full discontinuity.
   await page.click(".mst-full-toggle");
   await sleep(300);
-  assert.equal(await page.evaluate(rowValue("Costo de servicio Full")), "−$35.00");
+  assert.equal(await page.evaluate(rowValue("Costo del servicio Full")), "−$35.00");
   const fullSpot = await page.$eval(".mst-sweetspot", (e) => e.textContent);
   assert.ok(fullSpot.includes("$52.10"), `Full sweet spot wrong: ${fullSpot}`); // 19·0.9 + 35
   await page.click(".mst-full-toggle");
   await sleep(300);
-  assert.equal(await page.evaluate(rowValue("Cargo fijo")), "−$37.00");
+  assert.equal(await page.evaluate(rowValue("Costo fijo")), "−$37.00");
   pass("Full toggle swaps fijo −$37.00 ↔ servicio −$35.00, sweet spot follows ($52.10)");
 
   await page.click(".mst-sweetspot");
   await sleep(300);
   assert.equal(await page.$eval(".mst-card input", (i) => i.value), "299.00");
-  assert.equal(await page.evaluate(rowValue("Recibirás aprox.")), "$219.10");
+  assert.equal(await page.evaluate(rowValue("Recibes aprox.")), "$219.10");
   await page.click(".mst-reset");
   await sleep(300);
   assert.equal(await page.$eval(".mst-card input", (i) => i.value), "827.00");

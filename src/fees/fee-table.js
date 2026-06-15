@@ -10,7 +10,7 @@
 
 globalThis.MST_FEE_TABLE = Object.freeze({
   meta: {
-    version: "2026-06-12.1",
+    version: "2026-06-12.2",
     site: "MLM",
     currency: "MXN",
     retrievedAt: "2026-06-12",
@@ -32,15 +32,20 @@ globalThis.MST_FEE_TABLE = Object.freeze({
       },
       {
         url: "https://www.tiendanube.com/blog/comision-mercado-libre-mexico/",
-        note: "Secondary: confirma tramos $25 (<$99), $30 ($99–$149), $37 ($150–$299). Indica que ambos tipos pagan cargo fijo.",
+        note: "Secondary: confirma tramos $25 (<$99), $30 ($99–$149), $37 ($149–$299) y que el costo fijo es SOLO de Clásica (Premium exento).",
+        confidence: "secondary"
+      },
+      {
+        url: "https://www.upseller.com/es/blog-article-513",
+        note: "Secondary: corrobora $25/<$99, $30/$99–$149, $37/$149–$299, sin costo fijo ≥$299, solo Clásica (verificado jun 2026).",
         confidence: "secondary"
       }
     ],
     caveats: [
       "MELI ya no publica el porcentaje exacto por categoría; los valores por grupo son de fuentes secundarias.",
-      "Cargo fijo: SOLO Clásica (verificado abr 2026; Premium exento a cualquier precio).",
-      "Tramos del cargo fijo: MELI no publica los límites exactos; se adoptó el consenso multi-fuente de abr 2026 ($0–98.99→$25, $99–198.99→$30, $199–298.99→$37), que supersede el límite $149/$150 reportado antes por Tiendanube.",
-      "Vendedores Full: desde el 6 abr 2026, los productos < $299 pagan un costo de servicio variable por peso y tramo de precio en lugar del cargo fijo (ver shipping-table.js fullServiceCost)."
+      "Costo fijo por unidad: SOLO Clásica (verificado jun 2026; Premium exento a cualquier precio).",
+      "Tramos del costo fijo (consenso multi-fuente jun 2026, MELI no publica los límites exactos): $0–98.99→$25, $99–148.99→$30, $149–298.99→$37, $0 desde $299.",
+      "Vendedores Full: desde el 6 abr 2026, los productos < $299 pagan un costo de servicio variable por peso y tramo de precio en lugar del costo fijo (ver shipping-table.js fullServiceCost)."
     ]
   },
 
@@ -54,14 +59,15 @@ globalThis.MST_FEE_TABLE = Object.freeze({
   freeShippingThresholdMXN: 299,
 
   // Per-unit fixed cost for low-price items. CLÁSICA ONLY (Premium exempt at
-  // any price — verified Apr 2026). Tiers: price < maxPriceExclusive.
+  // any price — verified Jun 2026). Tiers: price < maxPriceExclusive.
+  // Official MX bands: <$99→$25, $99–$148.99→$30, $149–$298.99→$37, $0 ≥$299.
   fixedCost: {
     thresholdMXN: 299,
     appliesTo: ["classic"],
     confidence: "secondary",
     tiers: [
       { maxPriceExclusive: 99, amountMXN: 25 },
-      { maxPriceExclusive: 199, amountMXN: 30 },
+      { maxPriceExclusive: 149, amountMXN: 30 },
       { maxPriceExclusive: 299, amountMXN: 37 }
     ]
   },

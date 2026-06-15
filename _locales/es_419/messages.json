@@ -1,18 +1,18 @@
 {
   "cardTitle": {
-    "message": "Calculadora del vendedor"
+    "message": "Calculadora de ganancias"
   },
   "badgeEstimate": {
     "message": "Estimado"
   },
   "badgeTooltip": {
-    "message": "Estimación basada en las tarifas publicadas por Mercado Libre (consultadas el $1). El porcentaje exacto depende de tu categoría y cuenta. No incluye retenciones fiscales (ISR/IVA) ni el costo real de Mercado Envíos."
+    "message": "Estimación basada en las tarifas publicadas por Mercado Libre (consultadas el $1). El porcentaje exacto depende de tu categoría y cuenta. No incluye las retenciones de IVA e ISR ni el costo real de Mercado Envíos, que varía según tu reputación."
   },
   "rowPrice": {
     "message": "Precio de venta"
   },
   "rowListingType": {
-    "message": "Publicación"
+    "message": "Tipo de publicación"
   },
   "typeClassic": {
     "message": "Clásica"
@@ -24,19 +24,19 @@
     "message": "Categoría"
   },
   "categoryPlaceholder": {
-    "message": "Selecciona categoría…"
+    "message": "Selecciona una categoría…"
   },
   "hintDetected": {
-    "message": "Detectada de la página — corrígela si no coincide."
+    "message": "La detectamos de la publicación; corrígela si no coincide."
   },
   "hintNoCategory": {
-    "message": "Sin categoría, la comisión oficial va de $1."
+    "message": "Sin categoría detectada, la comisión por venta va de $1."
   },
   "rowCommission": {
-    "message": "Comisión ($1)"
+    "message": "Comisión por venta ($1)"
   },
   "rowFixedCost": {
-    "message": "Cargo fijo (precio < $$299)"
+    "message": "Costo fijo por unidad (precio < $$299)"
   },
   "rowShipping": {
     "message": "Tu costo de envío"
@@ -45,10 +45,10 @@
     "message": "Tu costo de envío (envío gratis ≥ $$299)"
   },
   "rowNet": {
-    "message": "Recibirás aprox."
+    "message": "Recibes aprox."
   },
   "rowProductCost": {
-    "message": "Costo de tu producto"
+    "message": "Costo del producto"
   },
   "rowProfit": {
     "message": "Ganancia"
@@ -57,37 +57,37 @@
     "message": "Precio mínimo para no perder"
   },
   "rowEffectiveRate": {
-    "message": "Costo total MELI"
+    "message": "Costo total de Mercado Libre"
   },
   "resetPrice": {
     "message": "Restaurar"
   },
   "sweetSpot": {
-    "message": "Si subes el precio a $1, tu neto sube $2 (menor cargo fijo)."
+    "message": "Si subes el precio a $1, recibes $2 más (pagas menos costo fijo)."
   },
   "btnCompare": {
     "message": "Comparar"
   },
   "compareDiff": {
-    "message": "Diferencia (costo de MSI)"
+    "message": "Diferencia (costo de meses sin intereses)"
   },
   "btnExportCsv": {
-    "message": "Exportar CSV"
+    "message": "Exportar a CSV"
   },
   "csvHeaderTitle": {
     "message": "Título"
   },
   "csvCommissionMin": {
-    "message": "Comisión mín (MXN)"
+    "message": "Comisión mín. (MXN)"
   },
   "csvCommissionMax": {
-    "message": "Comisión máx (MXN)"
+    "message": "Comisión máx. (MXN)"
   },
   "csvNetMin": {
-    "message": "Neto mín (MXN)"
+    "message": "Neto mín. (MXN)"
   },
   "csvNetMax": {
-    "message": "Neto máx (MXN)"
+    "message": "Neto máx. (MXN)"
   },
   "btnCopy": {
     "message": "Copiar resumen"
@@ -105,7 +105,7 @@
     "message": "Precio objetivo"
   },
   "targetUnreachable": {
-    "message": "Margen inalcanzable con estas tarifas"
+    "message": "No se alcanza ese margen con estas tarifas"
   },
   "footerRates": {
     "message": "$1 · tarifas al $2"
@@ -120,7 +120,7 @@
     "message": "Categoría"
   },
   "stripUnknownCategory": {
-    "message": "Desconocida ($1)"
+    "message": "Sin detectar ($1)"
   },
   "stripFreeShipping": {
     "message": "Envío gratis"
@@ -132,7 +132,7 @@
     "message": "Comisión ($1)"
   },
   "stripFixedCost": {
-    "message": "Cargo fijo"
+    "message": "Costo fijo"
   },
   "stripNetBeforeShipping": {
     "message": "Neto antes de envío"
@@ -150,16 +150,16 @@
     "message": "Opciones"
   },
   "optShowCard": {
-    "message": "Mostrar calculadora en páginas de producto"
+    "message": "Mostrar la calculadora en las publicaciones"
   },
   "optShowStrips": {
-    "message": "Mostrar resumen en resultados de búsqueda"
+    "message": "Mostrar el resumen en los resultados de búsqueda"
   },
   "optDefaultShipping": {
-    "message": "Costo de envío por defecto (MXN)"
+    "message": "Costo de envío predeterminado (MXN)"
   },
   "optDefaultType": {
-    "message": "Tipo de publicación por defecto"
+    "message": "Tipo de publicación predeterminado"
   },
   "optTypeAuto": {
     "message": "Detectar automáticamente"
@@ -171,7 +171,7 @@
     "message": "Datos borrados."
   },
   "optResetHint": {
-    "message": "Elimina costos guardados por producto y restaura los valores por defecto. Todo se guarda solo en tu navegador."
+    "message": "Elimina los costos que guardaste por producto y restablece los valores predeterminados. Todo se guarda solo en tu navegador."
   },
   "proTag": {
     "message": "PRO"
@@ -180,37 +180,37 @@
     "message": "Netio PRO"
   },
   "upsellBody": {
-    "message": "Desbloquea: precio editable (¿y si…?), precio objetivo por margen, aviso de precio óptimo, comparador Clásica vs Premium, exportar CSV, Tablero de Ganancias, ganancia mensual, modo investigación e histórico de precios."
+    "message": "Desbloquea: precio editable (¿y si…?), precio objetivo por margen, aviso de precio óptimo, comparación Clásica vs Premium, exportar a CSV, Tablero de Ganancias, ganancia mensual, modo investigación e historial de precios."
   },
   "upsellPricing": {
-    "message": "7 días de prueba gratis. Después $$89 MXN/mes o $$699 MXN/año (ahorra 35%) — precio de fundador."
+    "message": "Prueba gratis 7 días. Después, $$89 MXN/mes o $$699 MXN/año (ahorra 35%) — precio de fundador."
   },
   "upsellTrial": {
-    "message": "Probar gratis 7 días"
+    "message": "Pruébalo gratis 7 días"
   },
   "proSweetSpotName": {
     "message": "Aviso de precio óptimo"
   },
   "rowSales": {
-    "message": "Ventas por mes"
+    "message": "Ventas al mes"
   },
   "rowMonthlyProfit": {
     "message": "Ganancia mensual"
   },
   "rowHistory": {
-    "message": "Histórico de tus visitas"
+    "message": "Historial de tus visitas"
   },
   "rowWeight": {
-    "message": "Peso (envío estimado)"
+    "message": "Peso (para estimar el envío)"
   },
   "weightNone": {
-    "message": "— elegir peso —"
+    "message": "— elige el peso —"
   },
   "linkDashboard": {
     "message": "Ver mi tablero"
   },
   "researchProfit": {
-    "message": "Ganancia est. (costo $1% del precio)"
+    "message": "Ganancia est. (costo: $1% del precio)"
   },
   "researchActive": {
     "message": "Investigación: costo $1%"
@@ -237,7 +237,7 @@
     "message": "Ya pagué — iniciar sesión"
   },
   "optDashboard": {
-    "message": "Ver Tablero de Ganancias"
+    "message": "Abrir Tablero de Ganancias"
   },
   "dashTitle": {
     "message": "Tablero de Ganancias"
@@ -264,13 +264,13 @@
     "message": "Totales"
   },
   "dashShippingNote": {
-    "message": "Envío usado: tu valor por defecto ($1). Cifras estimadas."
+    "message": "Envío aplicado: tu valor predeterminado ($1). Cifras estimadas."
   },
   "inputShippingAria": {
     "message": "Costo de envío en pesos"
   },
   "inputProductCostAria": {
-    "message": "Costo de tu producto en pesos"
+    "message": "Costo del producto en pesos"
   },
   "inputMarginAria": {
     "message": "Margen deseado en porcentaje"
@@ -279,10 +279,10 @@
     "message": "¿Usas Mercado Envíos Full?"
   },
   "rowServiceCost": {
-    "message": "Costo de servicio Full"
+    "message": "Costo del servicio Full"
   },
   "rowWithholdings": {
-    "message": "Mostrar retenciones (IVA/ISR)"
+    "message": "Mostrar retenciones de IVA e ISR"
   },
   "rowIvaWithheld": {
     "message": "IVA retenido (8%)"
@@ -294,7 +294,7 @@
     "message": "Neto después de retenciones"
   },
   "withholdingsHint": {
-    "message": "Retenciones vigentes desde el 01/01/2026. Asume RFC registrado ante Mercado Libre."
+    "message": "Retenciones vigentes desde el 01/01/2026. Aplican si tienes tu RFC registrado en Mercado Libre."
   },
   "upsellMonthly": {
     "message": "$$89 MXN/mes"

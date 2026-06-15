@@ -6,7 +6,7 @@
     "message": "Estimate"
   },
   "badgeTooltip": {
-    "message": "Estimate based on Mercado Libre's published rates (retrieved $1). The exact percentage depends on your category and account. Excludes tax withholdings (ISR/IVA) and actual Mercado Envíos costs."
+    "message": "Estimate based on Mercado Libre's published rates (retrieved $1). The exact percentage depends on your category and account. Excludes IVA and ISR withholdings and actual Mercado Envíos costs, which vary with your reputation."
   },
   "rowPrice": {
     "message": "Sale price"

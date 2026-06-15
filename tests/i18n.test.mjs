@@ -40,7 +40,7 @@ test("i18n is Spanish-first: only English UI gets English", () => {
 test("i18n returns the localized string for the active locale", () => {
   const es = loadI18n("es-419");
   assert.equal(es.t("rowPrice"), "Precio de venta");
-  assert.equal(es.t("rowNet"), "Recibirás aprox.");
+  assert.equal(es.t("rowNet"), "Recibes aprox.");
   assert.equal(es.t("rowCategory"), "Categoría");
   assert.equal(es.t("rowTargetPrice"), "Precio objetivo");
   const en = loadI18n("en");
@@ -51,7 +51,7 @@ test("i18n substitutes $1/$2 and unescapes $$", () => {
   const es = loadI18n("es-419");
   assert.equal(es.applySubs("a $1 b $2", ["X", "Y"]), "a X b Y");
   assert.equal(es.applySubs("precio < $$299", []), "precio < $299");
-  assert.equal(es.t("rowCommission", ["10%"]), "Comisión (10%)");
+  assert.equal(es.t("rowCommission", ["10%"]), "Comisión por venta (10%)");
   assert.equal(es.t("upsellMonthly"), "$89 MXN/mes"); // $$89 → $89
   assert.equal(es.applySubs("$1 missing", []), " missing"); // absent sub → empty
 });
@@ -70,6 +70,30 @@ test("es_419 values are real Spanish, not English copies", () => {
     (k) => !SAME_OK.has(k) && es[k].message === en[k].message
   );
   assert.deepEqual(copies, [], `es_419 values identical to English: ${copies.join(", ")}`);
+});
+
+test("es_419 has no empty, untranslated, or English-leaking values", () => {
+  const es = JSON.parse(read("_locales/es_419/messages.json"));
+  const en = JSON.parse(read("_locales/en/messages.json"));
+  // Brand names / loanwords intentionally identical across locales.
+  const SAME_OK = new Set(["typeClassic", "typePremium", "no", "proTag", "upsellTitle"]);
+  // Common English words that must never appear in Mexican-Spanish copy.
+  // Word-boundary, case-insensitive. Deliberately excludes words spelled the
+  // same in Spanish ("total") and Spanish homographs ("sale"), and matches as
+  // whole words so loanwords inside Spanish ("Neto", "costo") don't trip it.
+  const ENGLISH =
+    /\b(price|profit|fee|fees|shipping|cost|costs|search|seller|margin|net|free|discount|weight|summary|category|commission|listing|withholding|withholdings|monthly|dashboard|settings|save|default|receive|unlock|target|compare|difference|history|estimate|percent)\b/i;
+  const problems = [];
+  for (const key of Object.keys(es)) {
+    const v = es[key]?.message ?? "";
+    if (v.trim() === "") problems.push(`${key}: empty`);
+    if (!SAME_OK.has(key) && v === en[key]?.message) {
+      problems.push(`${key}: byte-identical to English ("${v}")`);
+    }
+    const hit = ENGLISH.exec(v);
+    if (hit) problems.push(`${key}: English word "${hit[0]}" in "${v}"`);
+  }
+  assert.deepEqual(problems, [], "es_419 problems found:\n" + problems.join("\n"));
 });
 
 // ---- anti-regression lint: no hardcoded user-facing strings in render code ----

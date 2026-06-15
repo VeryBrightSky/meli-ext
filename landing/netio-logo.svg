@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Netio">
+  <rect x="2" y="2" width="96" height="96" rx="22" fill="#2D3277"/>
+  <!-- white N monogram -->
+  <g stroke="#ffffff" stroke-width="13.2" stroke-linecap="round" fill="none">
+    <line x1="33" y1="28.5" x2="33" y2="71.5"/>
+    <line x1="67" y1="28.5" x2="67" y2="71.5"/>
+    <line x1="33" y1="28.5" x2="67" y2="71.5"/>
+  </g>
+  <!-- blue knockout halo so the green arrow stays separated from the white N -->
+  <line x1="28.5" y1="70.5" x2="59.93" y2="42.82" stroke="#2D3277" stroke-width="14" stroke-linecap="round"/>
+  <polygon points="74.5,30 68.79,52.88 51.07,32.76" fill="#2D3277"/>
+  <!-- green profit arrow -->
+  <line x1="28.5" y1="70.5" x2="61.74" y2="41.24" stroke="#00A650" stroke-width="9.2" stroke-linecap="round"/>
+  <polygon points="74.5,30 69.01,49.5 54.47,32.98" fill="#00A650"/>
+</svg>
