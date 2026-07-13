@@ -10,9 +10,12 @@ const DEFAULT_SETTINGS = {
   enabled: true,
   cardEnabled: true,
   stripsEnabled: true,
-  defaultShippingMXN: 0,
+  // null = "unset" (fall back to the card's last-used shipping); a saved number
+  // — including an explicit 0 for genuinely free shipping — is authoritative.
+  defaultShippingMXN: null,
   defaultListingType: "auto",
-  acquisitionPct: 0
+  acquisitionPct: 0,
+  radarTargetPct: 30
 };
 
 // Branding + i18n strings.
@@ -43,7 +46,12 @@ async function load() {
   const s = await chrome.storage.sync.get(DEFAULT_SETTINGS);
   cardEnabled.checked = s.cardEnabled;
   stripsEnabled.checked = s.stripsEnabled;
-  defaultShipping.value = s.defaultShippingMXN > 0 ? s.defaultShippingMXN.toFixed(2) : "";
+  // Show an explicit saved value (incl. "0.00"); leave the field empty only
+  // when truly unset (null/absent) so 0 and unset stay distinguishable.
+  defaultShipping.value =
+    s.defaultShippingMXN === null || s.defaultShippingMXN === undefined
+      ? ""
+      : parseMoney(s.defaultShippingMXN).toFixed(2);
   defaultType.value = s.defaultListingType;
   const acq = document.getElementById("acquisition-pct");
   acq.value = s.acquisitionPct > 0 ? String(s.acquisitionPct) : "";
@@ -56,8 +64,11 @@ stripsEnabled.addEventListener("change", () =>
   chrome.storage.sync.set({ stripsEnabled: stripsEnabled.checked })
 );
 defaultShipping.addEventListener("change", () => {
-  const v = parseMoney(defaultShipping.value);
-  defaultShipping.value = v > 0 ? v.toFixed(2) : "";
+  // Empty field → null (unset). A typed value, including "0", is saved as a
+  // number so a deliberate 0 (no shipping) is honored and never read as unset.
+  const raw = defaultShipping.value.trim();
+  const v = raw === "" ? null : parseMoney(raw);
+  defaultShipping.value = v === null ? "" : v.toFixed(2);
   chrome.storage.sync.set({ defaultShippingMXN: v });
 });
 defaultType.addEventListener("change", () =>

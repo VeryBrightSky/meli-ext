@@ -47,11 +47,20 @@ const fixtures = {
   product: readFileSync(join(root, "tests/fixtures/product.html"), "utf8"),
   search: readFileSync(join(root, "tests/fixtures/search.html"), "utf8")
 };
+// A product page whose price is unreadable (itemprop meta + andes money nodes
+// neutralized). The extension must render NOTHING rather than a wrong number.
+fixtures.productNoPrice = fixtures.product
+  .replace(/<[^>]*itemprop=["']price["'][^>]*>/gi, "")
+  .replace(/andes-money-amount/g, "andes-money-x");
 const server = createServer(
   { key: readFileSync(join(certDir, "key.pem")), cert: readFileSync(join(certDir, "cert.pem")) },
   (req, res) => {
     const host = req.headers.host ?? "";
-    const body = host.startsWith("listado.") ? fixtures.search : fixtures.product;
+    const body = host.startsWith("listado.")
+      ? fixtures.search
+      : (req.url ?? "").includes("noprice")
+        ? fixtures.productNoPrice
+        : fixtures.product;
     res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
     res.end(body);
   }
@@ -163,7 +172,7 @@ try {
     rows.map((r) => r.textContent)
   );
   assert.ok(lockedRows.some((t) => t.includes("Precio objetivo")), "target price not locked");
-  assert.ok(lockedRows.some((t) => t.includes("Ventas por mes")), "sales not locked");
+  assert.ok(lockedRows.some((t) => t.includes("Ventas al mes")), "sales not locked");
   const chips = await page.$$eval(".mst-prochip", (els) => els.length);
   assert.ok(chips >= 4, `expected ≥4 PRO chips, got ${chips}`);
   pass(`locked rows render with PRO chips (${chips} chips)`);
@@ -377,7 +386,7 @@ try {
 
   assert.equal(
     await search.$eval(".mst-export__btn", (b) => b.textContent),
-    "Exportar CSV (3)"
+    "Exportar a CSV (3)"
   );
   const research = await search.$eval(".mst-export__research", (e) => e.textContent);
   assert.ok(research.includes("60"), research);
@@ -399,6 +408,83 @@ try {
   assert.ok(lines[1].includes("827.00") && lines[1].includes("Clásica"), lines[1]);
   assert.ok(lines[2].includes("120.00") && lines[2].includes("Premium"), lines[2]);
   pass("CSV export (Pro): real download, header + 3 rows");
+
+  // ---- Profitability Radar (Pro flagship) --------------------------------
+  // Verdicts at 60% acquisition cost, 30% target: tech-classic items ≥$299
+  // net exactly 30% margin (827 and 2,499 → green); the $120 premium item
+  // nets thinner → 25.5% (yellow). None at a loss.
+  const buckets = await search.$$eval(".mst-strip", (els) =>
+    els.map((e) => e.dataset.bucket)
+  );
+  assert.equal(buckets.filter((b) => b === "profit").length, 2, `buckets: ${buckets}`);
+  assert.equal(buckets.filter((b) => b === "thin").length, 1, `buckets: ${buckets}`);
+  assert.equal(buckets.filter((b) => b === "loss").length, 0, `buckets: ${buckets}`);
+  pass("radar verdicts: 2 profitable, 1 thin, 0 loss at 30% target");
+
+  const verdict = await search.$eval(".mst-strip__verdict b", (e) => e.textContent);
+  assert.ok(verdict.includes("248.10"), `verdict pill: ${verdict}`);
+  pass("radar verdict pill shows conservative est. profit $248.10");
+
+  const summary = await search.$eval(".mst-radar__summary", (e) => e.textContent);
+  assert.ok(
+    summary.includes("3 productos") &&
+      summary.includes("2 rentables") &&
+      summary.includes("0 en pérdida"),
+    `summary: ${summary}`
+  );
+  pass(`radar summary bar: "${summary.trim()}"`);
+
+  // Lower the target → the thin item clears it → 3 profitable (reactivity).
+  await search.$eval(".mst-radar__target", (el) => {
+    el.value = "25";
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await sleep(150);
+  const lowered = await search.$$eval(".mst-strip", (els) =>
+    els.map((e) => e.dataset.bucket)
+  );
+  assert.equal(
+    lowered.filter((b) => b === "profit").length,
+    3,
+    `after target 25%: ${lowered}`
+  );
+  pass("radar target 25% → 3 profitable (threshold reactivity)");
+
+  // Back to 30%, then "only profitable" dims the one thin result and the
+  // export button becomes the ranked shortlist.
+  await search.$eval(".mst-radar__target", (el) => {
+    el.value = "30";
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await sleep(100);
+  await search.click(".mst-radar__only");
+  await sleep(150);
+  assert.equal(
+    await search.$$eval(".mst-dimmed", (els) => els.length),
+    1,
+    "only-profitable should dim the single thin result"
+  );
+  const shortlistLabel = await search.$eval(".mst-export__btn", (e) => e.textContent);
+  assert.ok(
+    shortlistLabel.includes("Exportar rentables (2)"),
+    `export label: ${shortlistLabel}`
+  );
+  pass('radar "solo rentables" dims 1 loser → "Exportar rentables (2)"');
+
+  // ================= PHASE 5: resilience (render nothing safely) =============
+  console.log("\nPHASE 5 — RESILIENCE (unreadable page renders nothing, host intact)");
+  let noPriceFatal = false;
+  const noprice = tap(await browser.newPage(), "noprice");
+  noprice.on("console", (m) => { if (/fatal/i.test(m.text())) noPriceFatal = true; });
+  noprice.on("pageerror", () => { noPriceFatal = true; });
+  await noprice.goto(`${PRODUCT_URL}?e2e=noprice`, { waitUntil: "load" });
+  await sleep(2500); // give detection + injection every chance to (not) fire
+  assert.equal(await noprice.$("#mst-card-root"), null, "no card should inject without a readable price");
+  pass("no readable price → no card injected (renders nothing)");
+  assert.equal(await noprice.$eval("body", (b) => b.isConnected), true);
+  assert.equal(noPriceFatal, false, "unreadable page must not raise a fatal/uncaught error");
+  pass("unreadable page: no fatal error, host page intact");
+  await noprice.close();
 
   console.log(`\nE2E: ${passed.length}/${passed.length} checks passed`);
 } finally {

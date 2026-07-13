@@ -461,6 +461,19 @@ test("gate: unreachable ExtPay fails OPEN for cached-entitled, CLOSED otherwise"
   assert.equal(closed.source, "default");
 });
 
+test("gate: offline Pro cache expires past the TTL (bounded staleness)", () => {
+  const now = 1_700_000_000_000;
+  const DAY = 24 * 60 * 60 * 1000;
+  // fresh cache within the window → usable (payer stays Pro offline)
+  assert.equal(GATE.isCacheUsable({ pro: true, fetchedAt: now - DAY }, now), true);
+  // stale cache past the window → not usable (no unbounded entitlement)
+  assert.equal(GATE.isCacheUsable({ pro: true, fetchedAt: now - 31 * DAY }, now), false);
+  // legacy cache with no timestamp → usable (write must not self-revoke)
+  assert.equal(GATE.isCacheUsable({ pro: true }, now), true);
+  // no cache → not usable
+  assert.equal(GATE.isCacheUsable(null, now), false);
+});
+
 test("shipping table: bracket lookup boundaries", () => {
   assert.equal(SHIPPING.costForWeight(0.2), 52.4);
   assert.equal(SHIPPING.costForWeight(0.3), 52.4); // inclusive upper bound
@@ -498,12 +511,18 @@ test("dashboard recomputes rows LIVE from current default shipping (bug 1)", () 
   assert.equal(CALC.round2(r0.b.profitMinMXN - r90.b.profitMinMXN), 90);
 });
 
-test("dashboard default shipping: options(sync) value wins, even 0 (bug 1)", () => {
-  // The repro: options set to 0 must override a stale local card value.
+test("dashboard default shipping: explicit value (incl. 0) wins, null/absent falls back", () => {
+  // A deliberately saved 0 (seller genuinely pays no shipping) is authoritative
+  // and overrides the card's last-used local value — the same source of truth
+  // the card uses, so the two surfaces never disagree.
   assert.equal(DASH.resolveDefaultShipping({ defaultShippingMXN: 0 }, { shippingCostMXN: 90 }), 0);
   assert.equal(DASH.resolveDefaultShipping({ defaultShippingMXN: 55 }, { shippingCostMXN: 90 }), 55);
-  // Fallback to the card's last value only when no options value exists.
+  // "Unset" is null or an ABSENT key (NOT 0) — fall back to the card's last value.
+  assert.equal(DASH.resolveDefaultShipping({ defaultShippingMXN: null }, { shippingCostMXN: 90 }), 90);
+  assert.equal(DASH.resolveDefaultShipping({}, { shippingCostMXN: 90 }), 90);
   assert.equal(DASH.resolveDefaultShipping(undefined, { shippingCostMXN: 90 }), 90);
+  // Unset with no card value either → 0.
+  assert.equal(DASH.resolveDefaultShipping({ defaultShippingMXN: null }, undefined), 0);
   assert.equal(DASH.resolveDefaultShipping(undefined, undefined), 0);
 });
 

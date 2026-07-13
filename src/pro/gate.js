@@ -30,6 +30,17 @@ globalThis.MST_GATE = (() => {
     return { pro: false, paid: false, trialActive: false, source: "default" };
   }
 
+  // An offline Pro cache is honored only within this window; past it a fresh
+  // check is required, so a lapsed-then-permanently-offline user can't hold Pro
+  // forever. A legacy cache with no timestamp is treated as usable — the write
+  // that first stamps fetchedAt must never revoke an entitlement mid-session.
+  const CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+  function isCacheUsable(cached, nowMs) {
+    if (!cached) return false;
+    if (typeof cached.fetchedAt !== "number") return true;
+    return nowMs - cached.fetchedAt <= CACHE_TTL_MS;
+  }
+
   // --- runtime (requires chrome.*) -------------------------------------------
 
   let current = { pro: false, paid: false, trialActive: false, source: "init" };
@@ -55,6 +66,9 @@ globalThis.MST_GATE = (() => {
     } catch {
       // storage unavailable — resolveStatus handles nulls
     }
+    // Bound offline staleness: drop a cache older than the TTL so it can't
+    // grant Pro indefinitely without ExtPay ever confirming again.
+    if (!isCacheUsable(cached, Date.now())) cached = null;
 
     current = override
       ? { pro: true, paid: true, trialActive: false, source: "override" }
@@ -80,6 +94,7 @@ globalThis.MST_GATE = (() => {
     TRIAL_MS,
     computeProStatus,
     resolveStatus,
+    isCacheUsable,
     refresh,
     isPro,
     status,

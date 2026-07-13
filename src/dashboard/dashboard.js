@@ -41,7 +41,10 @@
   // --- Data (recomputed live; see dashboard-model.js) ---------------------------
   const DASH = globalThis.MST_DASH;
   const all = await chrome.storage.local.get(null);
-  const sync = await chrome.storage.sync.get({ defaultShippingMXN: 0 });
+  // null default so an unset options value stays distinguishable from an
+  // explicit 0 (resolveDefaultShipping falls back to the card's last-used value
+  // only when unset).
+  const sync = await chrome.storage.sync.get({ defaultShippingMXN: null });
   const defaultShipping = DASH.resolveDefaultShipping(sync, all[`${PREFIX}:defaults`]);
 
   let rows = DASH.computeRows(all, PREFIX, defaultShipping);

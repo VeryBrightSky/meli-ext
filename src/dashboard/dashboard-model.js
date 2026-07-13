@@ -6,9 +6,11 @@
 
 globalThis.MST_DASH = (() => {
   // The default shipping shown in the dashboard is the OPTIONS-configured value
-  // (storage.sync.defaultShippingMXN) — the global knob the user expects to
-  // drive it. The card's last-used local value is only a fallback when no
-  // options value exists. Sync value wins even when it is 0.
+  // (storage.sync.defaultShippingMXN) — the global knob the user expects, and
+  // the SAME source of truth the card uses, so the two never disagree. An
+  // explicit value, including a deliberate 0 (genuinely free shipping), wins.
+  // "Unset" is null or an ABSENT key (NOT 0); only then do we fall back to the
+  // card's last-used local value.
   function resolveDefaultShipping(syncSettings, localDefaults) {
     const CALC = globalThis.MST_CALC;
     const s = syncSettings ? syncSettings.defaultShippingMXN : undefined;
