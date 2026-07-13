@@ -176,6 +176,14 @@
   color: rgba(0, 0, 0, 0.9);
 }
 
+.mst-upsell__lead {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: rgba(0, 0, 0, 0.9);
+  margin: 0 0 6px;
+}
+
 .mst-upsell__body,
 .mst-upsell__price {
   font-size: 12px;
@@ -242,6 +250,115 @@
   font-size: 11px;
   color: rgba(0, 0, 0, 0.55);
 }
+
+/* --- Profitability Radar (Pro, search pages) -------------------------------- */
+
+.mst-export--radar {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.mst-radar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(0, 0, 0, 0.07);
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.7);
+}
+
+.mst-radar__summary {
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.82);
+}
+
+.mst-radar__field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.mst-radar__target {
+  width: 54px;
+  font-family: inherit;
+  font-size: 12px;
+  text-align: right;
+  padding: 3px 6px;
+  border: 1px solid rgba(0, 0, 0, 0.17);
+  border-radius: 6px;
+  background: #fff;
+}
+
+.mst-radar__target:focus {
+  outline: none;
+  border-color: #3483fa;
+  box-shadow: 0 0 0 2px rgba(52, 131, 250, 0.2);
+}
+
+.mst-radar__only {
+  font-family: inherit;
+  font-size: 12px;
+  padding: 4px 10px;
+  border: 1px solid #3483fa;
+  border-radius: 6px;
+  background: #fff;
+  color: #3483fa;
+  cursor: pointer;
+}
+
+.mst-radar__only--active {
+  background: #3483fa;
+  color: #fff;
+}
+
+.mst-radar__hint {
+  padding-top: 8px;
+  border-top: 1px solid rgba(0, 0, 0, 0.07);
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.55);
+}
+
+/* Dimmed results when "only profitable" is on. */
+.mst-dimmed {
+  opacity: 0.34;
+  transition: opacity 0.15s ease;
+}
+
+/* Per-result verdict pill on the strip bar (replaces the plain net). */
+.mst-strip__verdict {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mst-strip__verdict b {
+  color: rgba(0, 0, 0, 0.9);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.mst-strip__margin {
+  color: rgba(0, 0, 0, 0.5);
+  font-variant-numeric: tabular-nums;
+}
+
+.mst-strip__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  background: #9aa0a6;
+}
+
+.mst-strip__verdict[data-bucket="profit"] .mst-strip__dot { background: #00a650; }
+.mst-strip__verdict[data-bucket="thin"] .mst-strip__dot { background: #f5a623; }
+.mst-strip__verdict[data-bucket="loss"] .mst-strip__dot { background: #f23d4f; }
+.mst-strip__verdict[data-bucket="profit"] b { color: #00a650; }
+.mst-strip__verdict[data-bucket="loss"] b { color: #f23d4f; }
 
 /* Toggle rows (Full, retenciones) */
 .mst-toggle-row {

@@ -1,6 +1,11 @@
 // Content script entry point. Detects the page type, finds a VISIBLE anchor
-// under the price block, and injects the (skeleton-state) card shell that
-// Phase 1 will populate with fee/payout data.
+// under the price block, and injects the card / search strips.
+//
+// MELI is a SPA: it navigates client-side (search → product, related-product
+// clicks, variant changes). Every route change tears the previous surface
+// down completely (card, strips, observers) and re-runs detection, so stale
+// state from a previous product is impossible. A generation counter cancels
+// in-flight async work the moment a newer navigation starts.
 //
 // MELI renders .ui-pdp-price in multiple subtrees (sticky header, hidden
 // variants), so anchor selection filters by actual visibility, not DOM order.
@@ -11,6 +16,7 @@
 
 (() => {
   const BRAND = globalThis.EXT_BRAND;
+  const SAFE = globalThis.MST_SAFE;
   const PREFIX = BRAND.cssPrefix;
   const CARD_ID = `${PREFIX}-card-root`;
   const TAG = `[${BRAND.name}]`;
@@ -20,6 +26,29 @@
 
   const describe = (el) =>
     `<${el.tagName.toLowerCase()}${el.id ? ` id="${el.id}"` : ""} class="${el.className}">`;
+
+  // --- Route lifecycle --------------------------------------------------------
+
+  // Bumped on every navigation; async flows re-check it after each await and
+  // abandon themselves when stale. cleanups run before the next route starts.
+  let generation = 0;
+  let cleanups = [];
+  const onCleanup = (fn) => cleanups.push(fn);
+  const isStale = (gen) => gen !== generation;
+
+  function runCleanups() {
+    const fns = cleanups;
+    cleanups = [];
+    for (const fn of fns) SAFE.run("cleanup", fn);
+  }
+
+  // Observe with automatic route-scoped disconnect and a SAFE-wrapped callback.
+  function observeUntilCleanup(label, callback, target, options) {
+    const observer = new MutationObserver(SAFE.wrap(label, callback));
+    observer.observe(target, options);
+    onCleanup(() => observer.disconnect());
+    return observer;
+  }
 
   // --- Page detection -------------------------------------------------------
 
@@ -40,6 +69,10 @@
     if (hostname === "www.mercadolibre.com.mx") {
       if (/\/p\/MLM\d+/.test(pathname)) return PageType.PRODUCT;
       if (/^\/MLM-\d+/.test(pathname)) return PageType.PRODUCT;
+      // Client-side search results can render under www. (SPA nav from a PDP).
+      if (document.querySelector(".ui-search-layout, .ui-search-results")) {
+        return PageType.SEARCH;
+      }
     }
     return null;
   }
@@ -202,18 +235,20 @@
         subtree: true,
         attributes: true
       });
+      onCleanup(done);
     });
   }
 
-  async function waitForPageSettled() {
+  async function waitForPageSettled({ quietMs = 600 } = {}) {
     await waitForLoad();
     log("page loaded, waiting for hydration to settle…");
-    const waitedMs = await waitForDomQuiet();
+    const waitedMs = await waitForDomQuiet(quietMs);
     log(`DOM settled after ${waitedMs}ms`);
   }
 
   // Wait for a visible anchor with an observer instead of polling. Gives up
-  // after 15s — we must never break the host page.
+  // after 15s — we must never break the host page. (Every SPA navigation
+  // retries from scratch, so a one-off miss is not permanent.)
   function waitForAnchor(timeoutMs = 15000) {
     return new Promise((resolve) => {
       const existing = findProductAnchor();
@@ -222,32 +257,39 @@
         return;
       }
       log("no visible price block yet, watching for it…");
-      const observer = new MutationObserver(() => {
-        const found = findProductAnchor();
-        if (found) {
-          observer.disconnect();
-          clearTimeout(timer);
-          log("visible price block appeared after initial load");
-          resolve(found);
-        }
-      });
-      const timer = setTimeout(() => {
+      const stop = () => {
         observer.disconnect();
+        clearTimeout(timer);
         resolve(null);
-      }, timeoutMs);
-      observer.observe(document.documentElement, {
-        childList: true,
-        subtree: true,
-        attributes: true,
-        attributeFilter: ["class", "style", "hidden"]
-      });
+      };
+      const observer = observeUntilCleanup(
+        "anchor-wait",
+        () => {
+          const found = findProductAnchor();
+          if (found) {
+            observer.disconnect();
+            clearTimeout(timer);
+            log("visible price block appeared after initial load");
+            resolve(found);
+          }
+        },
+        document.documentElement,
+        {
+          childList: true,
+          subtree: true,
+          attributes: true,
+          attributeFilter: ["class", "style", "hidden"]
+        }
+      );
+      const timer = setTimeout(stop, timeoutMs);
+      onCleanup(stop);
     });
   }
 
   // --- Card -------------------------------------------------------------------
 
-  // Page data is collected once on first successful anchor; re-injections
-  // reuse it (card state itself lives in MST_CARD and survives re-renders).
+  // Page data is collected per navigation on first successful anchor;
+  // re-injections within the same route reuse it.
   let pageData = null;
 
   function buildCard() {
@@ -302,7 +344,9 @@
   function insertCard() {
     const found = findProductAnchor();
     if (!found) return null;
-    found.el.insertAdjacentElement("afterend", buildCard());
+    const card = SAFE.run("card-build", buildCard, null);
+    if (!card) return null;
+    found.el.insertAdjacentElement("afterend", card);
     return found;
   }
 
@@ -310,18 +354,31 @@
 
   // The page's React app can re-render the price section and drop the card,
   // or toggle our anchor's subtree hidden. Watch for both and re-inject at a
-  // currently-visible anchor — capped so we never loop-fight the page.
+  // currently-visible anchor — capped per route so we never loop-fight the
+  // page (every SPA navigation gets a fresh budget).
+  // Re-injection is capped as a rolling BURST budget, not a permanent count:
+  // MAX_REINJECTS within REINJECT_WINDOW_MS throttles a page that loop-fights
+  // us, but once the page settles for a full window the budget resets — so an
+  // occasional re-render minutes apart is always served and the card can never
+  // "vanish forever" for the route (we keep observing rather than disconnect).
   const MAX_REINJECTS = 5;
+  const REINJECT_WINDOW_MS = 15000;
 
   function watchCardPersistence() {
     let reinjects = 0;
+    let windowStart = 0;
     let pending = false;
+    let pendingTimer = null;
 
     const recover = (reason) => {
+      const now = Date.now();
+      if (now - windowStart > REINJECT_WINDOW_MS) {
+        reinjects = 0;
+        windowStart = now;
+      }
       if (reinjects >= MAX_REINJECTS) {
-        warn(`${reason}, but re-inject cap (${MAX_REINJECTS}) reached, giving up`);
-        observer.disconnect();
-        return;
+        warn(`${reason}, but re-inject budget (${MAX_REINJECTS}/${REINJECT_WINDOW_MS / 1000}s) is spent; will retry once the page settles`);
+        return; // keep observing — a mutation past the window resets the budget
       }
       reinjects++;
       log(`${reason}, re-anchoring (${reinjects}/${MAX_REINJECTS})`);
@@ -335,51 +392,63 @@
       }
     };
 
-    const observer = new MutationObserver((mutations) => {
-      // Ignore mutations we caused ourselves (recalc patches, input edits):
-      // reacting to them would loop. Card removal is still caught because the
-      // removal record's target is the card's PARENT, outside the card.
-      const card = document.getElementById(CARD_ID);
-      if (card && mutations.every((m) => card.contains(m.target))) return;
-      if (pending) return;
-      pending = true;
-      // Debounce: let the page's render batch finish, and rate-limit the
-      // visibility checks (rect + computed style) to one per 200ms.
-      setTimeout(() => {
-        pending = false;
+    const observer = observeUntilCleanup(
+      "card-persistence",
+      (mutations) => {
+        // Ignore mutations we caused ourselves (recalc patches, input edits):
+        // reacting to them would loop. Card removal is still caught because the
+        // removal record's target is the card's PARENT, outside the card.
         const card = document.getElementById(CARD_ID);
-        if (card && isVisible(card)) return;
-        if (!card) {
-          recover("card removed by page re-render");
-        } else {
-          recover("card's subtree went hidden");
-        }
-      }, 200);
-    });
-    observer.observe(document.documentElement, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ["class", "style", "hidden"]
-    });
+        if (card && mutations.every((m) => card.contains(m.target))) return;
+        if (pending) return;
+        pending = true;
+        // Debounce: let the page's render batch finish, and rate-limit the
+        // visibility checks (rect + computed style) to one per 200ms.
+        pendingTimer = setTimeout(
+          SAFE.wrap("card-recover", () => {
+            pending = false;
+            const card = document.getElementById(CARD_ID);
+            if (card && isVisible(card)) return;
+            // Never yank the card out from under a user mid-edit; defer until
+            // focus leaves (a later mutation retriggers recovery).
+            if (card && card.contains(document.activeElement)) return;
+            if (!card) {
+              recover("card removed by page re-render");
+            } else {
+              recover("card's subtree went hidden");
+            }
+          }),
+          200
+        );
+      },
+      document.documentElement,
+      {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ["class", "style", "hidden"]
+      }
+    );
+    onCleanup(() => clearTimeout(pendingTimer));
   }
 
-  async function injectProductCard() {
+  async function injectProductCard(gen, { settle }) {
     if (document.getElementById(CARD_ID)) {
       log("card already injected, skipping");
       return;
     }
-    await waitForPageSettled();
+    if (settle) await waitForPageSettled();
+    if (isStale(gen)) return;
     const found = await waitForAnchor();
-    if (!found) {
-      logAnchorDiagnostics();
+    if (isStale(gen) || !found) {
+      if (!found && !isStale(gen)) logAnchorDiagnostics();
       return;
     }
     if (document.getElementById(CARD_ID)) return;
     logAnchorChoice(found);
 
-    pageData = globalThis.MST_PAGE.collect(found.el);
-    if (!pageData.price) {
+    pageData = SAFE.run("page-data", () => globalThis.MST_PAGE.collect(found.el), null);
+    if (!pageData?.price) {
       warn("price not found on page (itemprop meta + andes-money-amount both missed) — not injecting");
       pageData = null;
       return;
@@ -388,10 +457,102 @@
     // Local price history snapshot for this visit (capped, storage.local).
     globalThis.MST_HISTORY.record(pageData.itemId, pageData.price.value).catch(() => {});
 
-    found.el.insertAdjacentElement("afterend", buildCard());
+    const card = SAFE.run("card-build", buildCard, null);
+    if (!card) return;
+    found.el.insertAdjacentElement("afterend", card);
     log("card injected ✔");
     logCardVisibilityReport(document.getElementById(CARD_ID));
     watchCardPersistence();
+  }
+
+  function removeInjectedUi() {
+    document.getElementById(CARD_ID)?.remove();
+    SAFE.run("quickview-destroy", () => globalThis.MST_QUICKVIEW.destroy());
+  }
+
+  // --- Routing -----------------------------------------------------------------
+
+  async function route({ initial }) {
+    const gen = generation;
+
+    const settings = await chrome.storage.sync
+      .get({ enabled: true, cardEnabled: true, stripsEnabled: true })
+      .catch(() => ({ enabled: true, cardEnabled: true, stripsEnabled: true }));
+    if (isStale(gen)) return;
+    if (!settings.enabled) {
+      log("disabled in options, exiting");
+      return;
+    }
+
+    // Resolve Pro entitlement per navigation before any UI builds. A failure
+    // here must never abort injection — fall back to the free tier.
+    const proStatus = await globalThis.MST_GATE.refresh().catch(() => ({ pro: false }));
+    if (isStale(gen)) return;
+    log("pro status:", proStatus);
+
+    let pageType = detectPageType();
+    if (!pageType && sniffProductDom()) {
+      log("URL not recognized but product DOM detected, treating as product");
+      pageType = PageType.PRODUCT;
+    }
+    log("page type:", pageType ?? "(not a product/search page)");
+
+    switch (pageType) {
+      case PageType.PRODUCT:
+        if (!settings.cardEnabled) {
+          log("product card disabled in settings");
+          break;
+        }
+        await injectProductCard(gen, { settle: initial });
+        break;
+      case PageType.SEARCH:
+        if (!settings.stripsEnabled) {
+          log("search strips disabled in settings");
+          break;
+        }
+        if (initial) await waitForPageSettled();
+        if (isStale(gen)) return;
+        globalThis.MST_QUICKVIEW.init();
+        onCleanup(() => globalThis.MST_QUICKVIEW.destroy());
+        break;
+      default:
+        break;
+    }
+  }
+
+  // --- SPA navigation ----------------------------------------------------------
+
+  // Content scripts can't intercept the page's history.pushState (isolated
+  // world), so detect URL changes with a cheap 1s href poll + popstate.
+  // On change: tear everything down, wait for the new view to render, re-route.
+  function startUrlWatcher() {
+    let lastHref = location.href;
+    let renavTimer = null;
+
+    const onNavigated = SAFE.wrap("spa-nav", () => {
+      if (location.href === lastHref) return;
+      lastHref = location.href;
+      const gen = ++generation;
+      log("SPA navigation detected →", location.href);
+      runCleanups();
+      removeInjectedUi();
+      pageData = null;
+      // Give the SPA a beat to swap views, then wait for the new view's DOM
+      // to go quiet before re-routing (page is already loaded — short settle).
+      clearTimeout(renavTimer);
+      renavTimer = setTimeout(
+        SAFE.wrap("spa-reroute", () => {
+          waitForDomQuiet(400, 4000).then(() => {
+            if (isStale(gen)) return; // navigated again already
+            route({ initial: false }).catch((err) => warn("route failed:", err));
+          });
+        }),
+        250
+      );
+    });
+
+    setInterval(onNavigated, 1000);
+    window.addEventListener("popstate", () => setTimeout(onNavigated, 50));
   }
 
   // --- Entry -----------------------------------------------------------------
@@ -401,47 +562,8 @@
       `v${chrome.runtime.getManifest().version} loaded on`,
       window.location.href
     );
-
-    const settings = await chrome.storage.sync.get({
-      enabled: true,
-      cardEnabled: true,
-      stripsEnabled: true
-    });
-    if (!settings.enabled) {
-      log("disabled in options, exiting");
-      return;
-    }
-
-    // Resolve Pro entitlement once per page load before any UI builds.
-    const proStatus = await globalThis.MST_GATE.refresh();
-    log("pro status:", proStatus);
-
-    let pageType = detectPageType();
-    if (!pageType && sniffProductDom()) {
-      log("URL not recognized but product DOM detected, treating as product");
-      pageType = PageType.PRODUCT;
-    }
-    log("page type:", pageType ?? "(not a product/search page, exiting)");
-
-    switch (pageType) {
-      case PageType.PRODUCT:
-        if (!settings.cardEnabled) {
-          log("product card disabled in settings");
-          break;
-        }
-        await injectProductCard();
-        break;
-      case PageType.SEARCH:
-        if (!settings.stripsEnabled) {
-          log("search strips disabled in settings");
-          break;
-        }
-        await waitForPageSettled();
-        globalThis.MST_QUICKVIEW.init();
-        break;
-      default:
-        break;
-    }
+    startUrlWatcher();
+    await route({ initial: true }).catch((err) => warn("initial route failed:", err));
   }
 
   main().catch((err) => console.error(TAG, "fatal:", err));

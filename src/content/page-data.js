@@ -15,30 +15,55 @@ globalThis.MST_PAGE = (() => {
     return null;
   }
 
-  // Strategy 1: structured data. Strategy 2: visible Andes money component
-  // near the given anchor (fraction + optional cents spans).
+  // Parse one Andes money component (fraction + optional cents spans).
+  function parseMoneyAmount(money) {
+    const fraction = money.querySelector(".andes-money-amount__fraction");
+    if (!fraction) return null;
+    const whole = Number.parseInt(fraction.textContent.replace(/[^\d]/g, ""), 10);
+    if (!Number.isFinite(whole) || whole <= 0) return null;
+    const centsEl = money.querySelector(".andes-money-amount__cents");
+    const cents = centsEl
+      ? Number.parseInt(centsEl.textContent.replace(/[^\d]/g, ""), 10) || 0
+      : 0;
+    return whole + cents / 100;
+  }
+
+  // The price the buyer would actually pay, read from the DOM near the anchor.
+  // Crossed-out "precio anterior" amounts (promos) are skipped — taking the
+  // first .andes-money-amount blindly would grab the OLD price on discounted
+  // listings.
+  function extractDomPrice(anchorEl) {
+    const scope = anchorEl ?? document;
+    for (const money of scope.querySelectorAll(".andes-money-amount")) {
+      if (/previous/.test(money.className) || money.closest("s, del")) continue;
+      const value = parseMoneyAmount(money);
+      if (value !== null) return value;
+    }
+    return null;
+  }
+
+  // Strategy 1: structured data (meta[itemprop=price] — exact, has cents).
+  // Strategy 2: visible Andes money component near the anchor.
+  // When BOTH exist but disagree, the DOM wins: the meta can be stale after
+  // client-side navigation or variant changes, while the rendered price is
+  // what the buyer actually sees. (Sub-peso drift is meta rounding — keep meta.)
   function extractPrice(anchorEl) {
+    let metaValue = null;
     const meta = document.querySelector('meta[itemprop="price"]');
     if (meta?.content) {
       const value = Number.parseFloat(meta.content);
-      if (Number.isFinite(value) && value > 0) {
-        return { value, via: "itemprop-meta" };
-      }
+      if (Number.isFinite(value) && value > 0) metaValue = value;
     }
 
-    const scope = anchorEl ?? document;
-    const money = scope.querySelector(".andes-money-amount");
-    if (money) {
-      const fraction = money.querySelector(".andes-money-amount__fraction");
-      if (fraction) {
-        const whole = Number.parseInt(fraction.textContent.replace(/[^\d]/g, ""), 10);
-        const centsEl = money.querySelector(".andes-money-amount__cents");
-        const cents = centsEl ? Number.parseInt(centsEl.textContent.replace(/[^\d]/g, ""), 10) || 0 : 0;
-        if (Number.isFinite(whole) && whole > 0) {
-          return { value: whole + cents / 100, via: "andes-money-amount" };
-        }
-      }
+    const domValue = extractDomPrice(anchorEl);
+
+    if (metaValue !== null && domValue !== null) {
+      return Math.abs(metaValue - domValue) < 1
+        ? { value: metaValue, via: "itemprop-meta" }
+        : { value: domValue, via: "andes-money-amount (meta stale/mismatched)" };
     }
+    if (metaValue !== null) return { value: metaValue, via: "itemprop-meta" };
+    if (domValue !== null) return { value: domValue, via: "andes-money-amount" };
     return null;
   }
 

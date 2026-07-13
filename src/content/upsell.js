@@ -21,6 +21,7 @@ globalThis.MST_UPSELL = (() => {
     const panel = el("div", `${PREFIX}-upsell`);
     panel.hidden = true;
     panel.appendChild(el("h3", `${PREFIX}-upsell__title`, T("upsellTitle")));
+    panel.appendChild(el("p", `${PREFIX}-upsell__lead`, T("upsellHeadline")));
     panel.appendChild(el("p", `${PREFIX}-upsell__body`, T("upsellBody")));
     panel.appendChild(el("p", `${PREFIX}-upsell__price`, T("upsellPricing")));
     const actions = el("div", `${PREFIX}-upsell__actions`);

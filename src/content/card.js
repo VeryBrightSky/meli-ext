@@ -165,7 +165,7 @@ globalThis.MST_CARD = (() => {
     const [stored, settings] = await Promise.all([
       chrome.storage.local.get(keys),
       chrome.storage.sync.get({
-        defaultShippingMXN: 0,
+        defaultShippingMXN: null,
         defaultListingType: "auto",
         usesFull: false,
         showWithholdings: false
@@ -175,11 +175,16 @@ globalThis.MST_CARD = (() => {
     state.showWithholdings = settings.showWithholdings === true;
     state.weightKg = CALC.parseMoney(stored[`${PREFIX}:weight:${state.itemId}`] ?? 0);
     const defaults = stored[`${PREFIX}:defaults`];
-    // Sanitize: storage may hold junk from previous buggy sessions. Card-level
-    // saved values win over the options-page default.
-    state.shippingCostMXN = CALC.parseMoney(
-      defaults?.shippingCostMXN ?? settings.defaultShippingMXN ?? 0
-    );
+    // Single default-shipping source of truth, shared with the dashboard
+    // (MST_DASH.resolveDefaultShipping): an explicit options value — including a
+    // deliberate 0 — is authoritative; only a null/absent (unset) options value
+    // falls back to the card's last-used local value. Keeps the card and the
+    // dashboard from ever showing different profit for the same listing.
+    const optShip = settings.defaultShippingMXN;
+    state.shippingCostMXN =
+      optShip === null || optShip === undefined
+        ? CALC.parseMoney(defaults?.shippingCostMXN ?? 0)
+        : CALC.parseMoney(optShip);
     state.targetMarginPct = CALC.parseMoney(defaults?.targetMarginPct ?? 0);
     state.productCostMXN = CALC.parseMoney(stored[`${PREFIX}:cost:${state.itemId}`] ?? 0);
     state.salesPerMonth = CALC.parseMoney(stored[`${PREFIX}:sales:${state.itemId}`] ?? 0);
@@ -213,6 +218,16 @@ globalThis.MST_CARD = (() => {
 
   function update(flash = true) {
     if (!refs.card) return;
+    try {
+      updateUnsafe(flash);
+    } catch (err) {
+      // A render failure must never leave inputs dead mid-typing; log once
+      // and keep the last consistent view.
+      console.warn(`[${BRAND.name}] card update failed (keeping last view):`, err);
+    }
+  }
+
+  function updateUnsafe(flash) {
     const { quote, b } = computeCurrent();
 
     const pro = state.pro;
@@ -840,9 +855,31 @@ globalThis.MST_CARD = (() => {
     }
   }
 
+  // Reset everything tied to a specific product. Called when the card is
+  // built for a DIFFERENT item than the current state (SPA navigation) —
+  // without this, product B would inherit A's category/cost/what-if price and
+  // persistInputs() would write B's numbers under A's storage keys.
+  function resetForNewItem() {
+    state.priceMXN = 0;
+    state.pagePriceMXN = 0;
+    state.itemId = null;
+    state.listingTypeId = "classic";
+    state.categoryGroupId = null;
+    state.categoryAutoDetected = false;
+    state.productCostMXN = 0;
+    state.salesPerMonth = 0;
+    state.compareOpen = false;
+    state.weightKg = 0;
+  }
+
   // Builds the card element. With pageData it renders the live calculator;
   // without (price missing) it stays in skeleton state and the caller logs why.
   function build(pageData) {
+    // No itemId (unrecognized URL shape) → always reset: we can't prove it's
+    // the same product, and carrying state across products is the worse bug.
+    if (pageData && (pageData.itemId === null || pageData.itemId !== state.itemId)) {
+      resetForNewItem();
+    }
     const card = el("section", `${PREFIX}-card`);
     card.id = CARD_ID;
     const body = el("div", `${PREFIX}-card__body`);

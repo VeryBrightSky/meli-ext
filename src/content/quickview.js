@@ -10,6 +10,8 @@ globalThis.MST_QUICKVIEW = (() => {
   const PREFIX = BRAND.cssPrefix;
   const SOURCE = globalThis.MST_FEE_SOURCE;
   const CALC = globalThis.MST_CALC;
+  const RADAR = globalThis.MST_RADAR;
+  const GATE = globalThis.MST_GATE;
   const UI = globalThis.MST_UI;
   const T = globalThis.MST_I18N.t;
   const TAG = `[${BRAND.name}]`;
@@ -17,8 +19,23 @@ globalThis.MST_QUICKVIEW = (() => {
 
   const log = (...args) => console.log(TAG, ...args);
   const warn = (...args) => console.warn(TAG, ...args);
+  const SAFE = globalThis.MST_SAFE;
 
   let pageCategoryGroupId = null;
+
+  // Per-init lifecycle state (torn down by destroy() on SPA navigation).
+  let observer = null;
+  let observerTimer = null;
+  let scanTimer = null;
+  // Cap strip builds per scan pass so a 50+ result page can't block the main
+  // thread in one long task; the remainder is picked up on the next macrotask
+  // (and by the scroll observer). The processed WeakSet keeps this idempotent.
+  const MAX_STRIPS_PER_SCAN = 30;
+  // Items already handled this session — skips both re-extraction AND the
+  // per-item layout reads (isVisible/innerText) on every observer pass, which
+  // is what keeps 50+ result pages from janking during infinite scroll.
+  let processed = new WeakSet();
+  let itemSelector = null; // resolved once per page, reused by later scans
 
   // --- Result discovery -------------------------------------------------------
 
@@ -31,9 +48,16 @@ globalThis.MST_QUICKVIEW = (() => {
   ];
 
   function findItems() {
+    // Once a selector matched this page, stick to it (cheap re-query).
+    if (itemSelector) {
+      return { items: [...document.querySelectorAll(itemSelector)], selector: itemSelector };
+    }
     for (const selector of ITEM_SELECTORS) {
       const items = [...document.querySelectorAll(selector)].filter(UI.isVisible);
-      if (items.length > 0) return { items, selector };
+      if (items.length > 0) {
+        itemSelector = selector;
+        return { items, selector };
+      }
     }
     return { items: [], selector: null };
   }
@@ -89,6 +113,34 @@ globalThis.MST_QUICKVIEW = (() => {
   // options; strips then show an estimated profit per result.
   let acquisitionPct = 0;
 
+  // Profitability Radar (Pro): once an acquisition cost is set, strips become
+  // green/yellow/red verdicts, the bar summarizes the page, and the seller can
+  // raise the target margin or filter to winners only. Free = plain net strips.
+  let radarTargetPct = RADAR.DEFAULT_TARGET_PCT;
+  let onlyProfitable = false;
+  const radarActive = () => GATE.isPro() && acquisitionPct > 0;
+
+  // Worst-case verdict for one result: classify by netMin (higher commission
+  // bound) so "profitable" survives the conservative case.
+  function evaluateStrip(data, b) {
+    return RADAR.evaluate({
+      priceMXN: data.priceMXN,
+      netMXN: b.netMinMXN,
+      acquisitionPct,
+      targetMarginPct: radarTargetPct
+    });
+  }
+
+  // Colored profit pill shown on the strip bar in place of the plain net.
+  function buildVerdict(evaln) {
+    const pill = el("span", `${PREFIX}-strip__verdict`);
+    pill.dataset.bucket = evaln.bucket;
+    pill.appendChild(el("span", `${PREFIX}-strip__dot`));
+    pill.appendChild(el("b", null, UI.fmtMoney(evaln.profitMXN)));
+    pill.appendChild(el("span", `${PREFIX}-strip__margin`, `${evaln.marginPct}%`));
+    return pill;
+  }
+
   function buildStrip(data) {
     const quote = SOURCE.getQuote({
       priceMXN: data.priceMXN,
@@ -105,6 +157,14 @@ globalThis.MST_QUICKVIEW = (() => {
 
     const strip = el("div", STRIP_CLASS);
 
+    // Radar verdict (Pro): stamp the strip so the summary bar, target control,
+    // and "only profitable" filter can read it without recomputing.
+    const evaln = radarActive() ? evaluateStrip(data, b) : null;
+    if (evaln) {
+      strip.dataset.bucket = evaln.bucket;
+      strip.dataset.margin = String(evaln.marginPct);
+    }
+
     const bar = el("button", `${PREFIX}-strip__bar`);
     bar.type = "button";
     bar.setAttribute("aria-expanded", "false");
@@ -114,8 +174,12 @@ globalThis.MST_QUICKVIEW = (() => {
     logo.width = 10;
     logo.height = 10;
     bar.appendChild(logo);
-    bar.appendChild(el("span", null, T("stripNet")));
-    bar.appendChild(el("b", null, UI.fmtRange(b.netMinMXN, b.netMaxMXN)));
+    if (evaln) {
+      bar.appendChild(buildVerdict(evaln));
+    } else {
+      bar.appendChild(el("span", null, T("stripNet")));
+      bar.appendChild(el("b", null, UI.fmtRange(b.netMinMXN, b.netMaxMXN)));
+    }
     const chevron = el("span", `${PREFIX}-strip__chevron`, "▾");
     bar.appendChild(chevron);
     strip.appendChild(bar);
@@ -183,6 +247,7 @@ globalThis.MST_QUICKVIEW = (() => {
   }
 
   function buildCsv() {
+    const active = radarActive();
     const header = [
       T("csvHeaderTitle"),
       T("rowPrice"),
@@ -194,10 +259,12 @@ globalThis.MST_QUICKVIEW = (() => {
       T("csvNetMin"),
       T("csvNetMax")
     ];
+    if (active) header.push(T("csvProfit"), T("csvMargin"));
     const groupLabel =
       SOURCE.listCategoryGroups().find((g) => g.id === pageCategoryGroupId)?.label ?? "";
-    const lines = [header.map(csvEscape).join(",")];
 
+    // Collect rows as objects so the profitable shortlist can be ranked.
+    const rows = [];
     const { items } = findItems();
     for (const item of items) {
       if (!item.querySelector(`.${STRIP_CLASS}`)) continue; // export what's shown
@@ -215,22 +282,32 @@ globalThis.MST_QUICKVIEW = (() => {
       });
       const title =
         item.querySelector("h2, .poly-component__title")?.textContent.trim() ?? "";
-      lines.push(
-        [
-          title,
-          b.priceMXN.toFixed(2),
-          data.listingTypeGuess === "premium" ? T("typePremium") : T("typeClassic"),
-          groupLabel,
-          data.freeShipping ? T("yes") : T("no"),
-          b.commissionMinMXN.toFixed(2),
-          b.commissionMaxMXN.toFixed(2),
-          b.netMinMXN.toFixed(2),
-          b.netMaxMXN.toFixed(2)
-        ]
-          .map(csvEscape)
-          .join(",")
-      );
+      const cells = [
+        title,
+        b.priceMXN.toFixed(2),
+        data.listingTypeGuess === "premium" ? T("typePremium") : T("typeClassic"),
+        groupLabel,
+        data.freeShipping ? T("yes") : T("no"),
+        b.commissionMinMXN.toFixed(2),
+        b.commissionMaxMXN.toFixed(2),
+        b.netMinMXN.toFixed(2),
+        b.netMaxMXN.toFixed(2)
+      ];
+      let marginPct = 0;
+      if (active) {
+        const evaln = evaluateStrip(data, b);
+        if (onlyProfitable && evaln.bucket !== "profit") continue; // shortlist
+        cells.push(evaln.profitMXN.toFixed(2), evaln.marginPct.toFixed(1));
+        marginPct = evaln.marginPct;
+      }
+      rows.push({ cells, marginPct });
     }
+    // Winners first when exporting the shortlist (stable on ties via the
+    // shared, tested radar helper).
+    const ordered = active && onlyProfitable ? RADAR.rankByMargin(rows) : rows;
+
+    const lines = [header.map(csvEscape).join(",")];
+    for (const r of ordered) lines.push(r.cells.map(csvEscape).join(","));
     return "﻿" + lines.join("\r\n"); // BOM so Excel opens UTF-8 correctly
   }
 
@@ -246,9 +323,95 @@ globalThis.MST_QUICKVIEW = (() => {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
-  // Inject (or refresh) the export bar above the results list. Idempotent.
-  // CSV export is Pro: locked state shows a PRO chip and opens the upsell.
-  function ensureExportBar(firstItem, stripCount) {
+  // --- Radar controls (Pro) -------------------------------------------------
+
+  // All strips carrying a radar verdict.
+  function radarStrips() {
+    return [...document.querySelectorAll(`.${STRIP_CLASS}`)].filter(
+      (s) => s.dataset.margin !== undefined
+    );
+  }
+
+  // Re-bucket every strip against the current target (margin is target-
+  // independent, so no recompute), refresh the summary, and dim non-winners
+  // when "only profitable" is on.
+  function reapplyRadar() {
+    const strips = radarStrips();
+    for (const s of strips) {
+      const bucket = RADAR.bucketFor(Number(s.dataset.margin), radarTargetPct);
+      s.dataset.bucket = bucket;
+      const pill = s.querySelector(`.${PREFIX}-strip__verdict`);
+      if (pill) pill.dataset.bucket = bucket;
+      const item = s.closest(ITEM_SELECTORS.join(",")) ?? s.parentElement;
+      if (item) {
+        item.classList.toggle(`${PREFIX}-dimmed`, onlyProfitable && bucket !== "profit");
+      }
+    }
+    const summaryEl = document.querySelector(`.${PREFIX}-radar__summary`);
+    if (summaryEl) {
+      const c = RADAR.summarize(strips.map((s) => ({ bucket: s.dataset.bucket })));
+      summaryEl.textContent = T("radarSummary", [
+        String(c.total),
+        String(c.profit),
+        String(c.thin),
+        String(c.loss)
+      ]);
+    }
+  }
+
+  // Export button label tracks the active mode (all vs profitable shortlist).
+  function refreshExportBtn() {
+    const btn = document.querySelector(`.${PREFIX}-export__btn`);
+    if (!btn) return;
+    if (radarActive() && onlyProfitable) {
+      const n = document.querySelectorAll(`.${STRIP_CLASS}[data-bucket="profit"]`).length;
+      btn.textContent = T("btnExportProfitable", [String(n)]);
+    } else {
+      btn.textContent = `${T("btnExportCsv")} (${document.querySelectorAll(`.${STRIP_CLASS}`).length})`;
+    }
+  }
+
+  function buildRadarRow() {
+    const row = el("div", `${PREFIX}-radar`);
+    row.appendChild(el("span", `${PREFIX}-radar__summary`));
+
+    const field = el("label", `${PREFIX}-radar__field`);
+    field.appendChild(el("span", null, T("radarTarget")));
+    const input = el("input", `${PREFIX}-radar__target`);
+    input.type = "number";
+    input.min = "0";
+    input.max = "90";
+    input.step = "5";
+    input.value = String(radarTargetPct);
+    input.setAttribute("aria-label", T("radarTarget"));
+    input.addEventListener("input", () => {
+      radarTargetPct = Math.max(0, Math.min(90, Math.round(Number(input.value) || 0)));
+      chrome.storage.sync.set({ radarTargetPct });
+      reapplyRadar();
+      refreshExportBtn();
+    });
+    field.append(input, el("span", null, "%"));
+    row.appendChild(field);
+
+    const only = el("button", `${PREFIX}-radar__only`, T("radarOnly"));
+    only.type = "button";
+    only.setAttribute("aria-pressed", "false");
+    only.addEventListener("click", () => {
+      onlyProfitable = !onlyProfitable;
+      only.classList.toggle(`${PREFIX}-radar__only--active`, onlyProfitable);
+      only.setAttribute("aria-pressed", String(onlyProfitable));
+      reapplyRadar();
+      refreshExportBtn();
+    });
+    row.appendChild(only);
+    return row;
+  }
+
+  // Inject (or refresh) the bar above the results list. Idempotent.
+  //   Free:  PRO chip + locked CSV that opens the upsell.
+  //   Pro:   real CSV export. With an acquisition cost set, the Radar row
+  //          (page summary + target margin + "only profitable") is added.
+  function ensureExportBar(firstItem) {
     const ID = `${PREFIX}-export`;
     let bar = document.getElementById(ID);
     if (!bar) {
@@ -265,7 +428,7 @@ globalThis.MST_QUICKVIEW = (() => {
       btn.type = "button";
       const wrap = el("div", `${PREFIX}-export__main`);
       wrap.append(logo, btn);
-      if (globalThis.MST_GATE.isPro()) {
+      if (GATE.isPro()) {
         btn.addEventListener("click", downloadCsv);
         if (acquisitionPct > 0) {
           wrap.appendChild(
@@ -285,10 +448,18 @@ globalThis.MST_QUICKVIEW = (() => {
       bar.querySelector(`.${PREFIX}-export__main`).appendChild(
         el("span", `${PREFIX}-export__brand`, BRAND.name)
       );
+
+      if (radarActive()) {
+        bar.classList.add(`${PREFIX}-export--radar`);
+        bar.appendChild(buildRadarRow());
+      } else if (GATE.isPro()) {
+        bar.classList.add(`${PREFIX}-export--radar`);
+        bar.appendChild(el("div", `${PREFIX}-radar__hint`, T("radarSetCost")));
+      }
       list.parentElement.insertBefore(bar, list);
     }
-    bar.querySelector(`.${PREFIX}-export__btn`).textContent =
-      `${T("btnExportCsv")} (${stripCount})`;
+    if (radarActive()) reapplyRadar();
+    refreshExportBtn();
   }
 
   // --- Scan & observe -----------------------------------------------------------
@@ -299,31 +470,102 @@ globalThis.MST_QUICKVIEW = (() => {
 
     let injected = 0;
     let skippedNoPrice = 0;
+    let failed = 0;
+    let capped = false;
     for (const item of items) {
-      if (item.querySelector(`.${STRIP_CLASS}`)) continue; // already done
-      const data = extractItemData(item);
-      if (!data.priceMXN) {
-        skippedNoPrice++;
+      if (processed.has(item)) continue; // no repeat layout reads
+      if (item.querySelector(`.${STRIP_CLASS}`)) {
+        processed.add(item);
         continue;
       }
-      const host = item.querySelector(".poly-card__content") ?? item;
-      host.appendChild(buildStrip(data));
-      injected++;
+      // Yield after a batch so a big page doesn't build every strip in one
+      // long task; the rest is caught on the scheduled follow-up pass below.
+      if (injected >= MAX_STRIPS_PER_SCAN) {
+        capped = true;
+        break;
+      }
+      // One broken result (unexpected markup) must not kill the other strips.
+      try {
+        if (!UI.isVisible(item)) continue; // lazy placeholder — retry next pass
+        const data = extractItemData(item);
+        if (!data.priceMXN) {
+          skippedNoPrice++;
+          processed.add(item);
+          continue;
+        }
+        const host = item.querySelector(".poly-card__content") ?? item;
+        host.appendChild(buildStrip(data));
+        processed.add(item);
+        injected++;
+      } catch (err) {
+        failed++;
+        processed.add(item); // don't retry a poisoned item every pass
+        warn("strip failed for one result (skipped):", err);
+      }
     }
-    if (injected > 0 || skippedNoPrice > 0) {
+    if (injected > 0 || skippedNoPrice > 0 || failed > 0) {
       log(
         `quick view: ${items.length} result(s) via "${selector}", ` +
-          `+${injected} strip(s) injected, ${skippedNoPrice} skipped (no price)`
+          `+${injected} strip(s) injected, ${skippedNoPrice} skipped (no price)` +
+          (failed > 0 ? `, ${failed} failed` : "")
       );
     }
-    const stripCount = items.filter((i) => i.querySelector(`.${STRIP_CLASS}`)).length;
-    if (stripCount > 0) ensureExportBar(items[0], stripCount);
+    const first = items.find((i) => i.querySelector(`.${STRIP_CLASS}`));
+    if (first) SAFE.run("export-bar", () => ensureExportBar(first));
+    // More results than this pass built: continue on the next macrotask so the
+    // browser can paint between batches.
+    if (capped) {
+      clearTimeout(scanTimer);
+      scanTimer = setTimeout(() => SAFE.run("quickview-scan-more", scan), 0);
+    }
     return { injected, total: items.length, selector };
   }
 
+  // Full teardown for SPA navigation: stop observing, remove every injected
+  // node, reset per-page state. Idempotent — safe to call twice.
+  function destroy() {
+    observer?.disconnect();
+    observer = null;
+    clearTimeout(observerTimer);
+    observerTimer = null;
+    clearTimeout(scanTimer);
+    scanTimer = null;
+    processed = new WeakSet();
+    itemSelector = null;
+    pageCategoryGroupId = null;
+    onlyProfitable = false;
+    for (const node of document.querySelectorAll(`.${STRIP_CLASS}, #${PREFIX}-export`)) {
+      node.remove();
+    }
+    for (const dimmed of document.querySelectorAll(`.${PREFIX}-dimmed`)) {
+      dimmed.classList.remove(`${PREFIX}-dimmed`);
+    }
+  }
+
+  // A mutation batch caused entirely by our own strip/bar injections must not
+  // schedule another scan — that would be a self-feeding loop.
+  function isOurMutation(m) {
+    const t = m.target;
+    if (!(t instanceof Element)) return false;
+    if (t.closest(`.${STRIP_CLASS}, #${PREFIX}-export`)) return true;
+    return (
+      m.addedNodes.length > 0 &&
+      [...m.addedNodes].every(
+        (n) =>
+          n instanceof Element &&
+          (n.classList?.contains(STRIP_CLASS) || n.id === `${PREFIX}-export`)
+      )
+    );
+  }
+
   async function init() {
-    const settings = await chrome.storage.sync.get({ acquisitionPct: 0 });
+    destroy(); // re-init after SPA navigation starts clean
+    const settings = await chrome.storage.sync.get({
+      acquisitionPct: 0,
+      radarTargetPct: RADAR.DEFAULT_TARGET_PCT
+    });
     acquisitionPct = CALC.parseMoney(settings.acquisitionPct);
+    radarTargetPct = Math.max(0, Math.min(90, Math.round(Number(settings.radarTargetPct) || 0)));
     // Category browse pages have a breadcrumb; keyword searches usually don't.
     const crumbs = [
       ...document.querySelectorAll(".andes-breadcrumb a, .andes-breadcrumb__link")
@@ -336,7 +578,7 @@ globalThis.MST_QUICKVIEW = (() => {
       pageCategoryGroupId ?? "(unknown, using official range)"
     );
 
-    const first = scan();
+    const first = SAFE.run("quickview-scan", scan, { injected: 0, total: 0 });
     if (first.total === 0) {
       warn(
         "no search result items found. Probes: " +
@@ -347,19 +589,25 @@ globalThis.MST_QUICKVIEW = (() => {
     }
 
     // Infinite scroll / pagination: re-scan when results change. scan() is
-    // idempotent (skips items that already have a strip), and strips injected
-    // by the scan re-trigger the observer exactly once into a no-op pass.
+    // idempotent (processed WeakSet + strip check), and our own injections
+    // are filtered out so they never re-trigger a pass.
     let pending = false;
-    const observer = new MutationObserver(() => {
-      if (pending) return;
-      pending = true;
-      setTimeout(() => {
-        pending = false;
-        scan();
-      }, 400);
-    });
+    observer = new MutationObserver(
+      SAFE.wrap("quickview-observer", (mutations) => {
+        if (pending) return;
+        if (mutations.every(isOurMutation)) return;
+        pending = true;
+        observerTimer = setTimeout(
+          SAFE.wrap("quickview-rescan", () => {
+            pending = false;
+            scan();
+          }),
+          400
+        );
+      })
+    );
     observer.observe(document.documentElement, { childList: true, subtree: true });
   }
 
-  return Object.freeze({ init });
+  return Object.freeze({ init, destroy });
 })();

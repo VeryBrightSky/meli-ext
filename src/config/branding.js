@@ -9,7 +9,7 @@ globalThis.EXT_BRAND = Object.freeze({
   name: "Netio",
   // Name used in manifest.json. "(dev)" suffix is stripped by the release build.
   manifestName: "Netio (dev)",
-  version: "1.2.2",
+  version: "1.3.0",
   description:
     "Calculadora de comisiones, ganancias y precios para vendedores de Mercado Libre México.",
   // ExtensionPay id (registered at extensionpay.com). Plans configured there:
