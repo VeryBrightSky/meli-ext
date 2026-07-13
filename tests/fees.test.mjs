@@ -474,6 +474,34 @@ test("gate: offline Pro cache expires past the TTL (bounded staleness)", () => {
   assert.equal(GATE.isCacheUsable(null, now), false);
 });
 
+test("shipping subsidy: reputation reduces free-shipping cost at/above threshold", () => {
+  const S = CALC.subsidizedShipping;
+  // Below the threshold → seller pays all, regardless of reputation.
+  assert.equal(S({ fullShippingMXN: 100, priceMXN: 250, freeShipping: true, subsidyPct: 50, thresholdMXN: 299 }), 100);
+  // Not free shipping → seller pays all.
+  assert.equal(S({ fullShippingMXN: 100, priceMXN: 500, freeShipping: false, subsidyPct: 50, thresholdMXN: 299 }), 100);
+  // Free shipping AT the threshold → subsidy applies.
+  assert.equal(S({ fullShippingMXN: 100, priceMXN: 299, freeShipping: true, subsidyPct: 50, thresholdMXN: 299 }), 50);
+  // Free shipping above threshold, 40% (amarillo) → pays 60%.
+  assert.equal(S({ fullShippingMXN: 120, priceMXN: 500, freeShipping: true, subsidyPct: 40, thresholdMXN: 299 }), 72);
+  // 0% subsidy (naranja/roja) → pays full even when eligible.
+  assert.equal(S({ fullShippingMXN: 100, priceMXN: 500, freeShipping: true, subsidyPct: 0, thresholdMXN: 299 }), 100);
+  // Guards: zero full cost stays 0; subsidy clamps to [0,100].
+  assert.equal(S({ fullShippingMXN: 0, priceMXN: 500, freeShipping: true, subsidyPct: 50, thresholdMXN: 299 }), 0);
+  assert.equal(S({ fullShippingMXN: 100, priceMXN: 500, freeShipping: true, subsidyPct: 150, thresholdMXN: 299 }), 0);
+});
+
+test("shipping subsidy table: conservative estimate values are wired + labeled", () => {
+  const sub = SOURCE.shippingSubsidy;
+  assert.equal(sub.confidence, "estimate");
+  assert.equal(sub.thresholdMXN, 299);
+  const byId = Object.fromEntries(sub.levels.map((l) => [l.id, l.subsidyPct]));
+  assert.equal(byId.verde, 50); // conservative low end of the 50–60% range
+  assert.equal(byId.amarillo, 40);
+  assert.equal(byId.naranja, 0);
+  assert.equal(byId.none, 0);
+});
+
 test("shipping table: bracket lookup boundaries", () => {
   assert.equal(SHIPPING.costForWeight(0.2), 52.4);
   assert.equal(SHIPPING.costForWeight(0.3), 52.4); // inclusive upper bound

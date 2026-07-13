@@ -135,11 +135,24 @@ globalThis.MST_CALC = (() => {
     };
   }
 
+  // Seller's effective Mercado Envíos cost after the reputation-based free-
+  // shipping subsidy. Only free-shipping items at/above the threshold are
+  // subsidized; below it (or when shipping isn't free) the seller pays the full
+  // cost. LABELED ESTIMATE — the subsidy percentage is approximate.
+  function subsidizedShipping({ fullShippingMXN, priceMXN, freeShipping, subsidyPct, thresholdMXN = 299 }) {
+    const full = fullShippingMXN > 0 ? fullShippingMXN : 0;
+    if (full === 0) return 0;
+    if (!freeShipping || !(priceMXN >= thresholdMXN)) return full;
+    const pct = Math.max(0, Math.min(100, subsidyPct || 0));
+    return round2(full * (1 - pct / 100));
+  }
+
   return Object.freeze({
     computeBreakdown,
     solveTargetPrice,
     findSweetSpot,
     computeWithholdings,
+    subsidizedShipping,
     round2,
     parseMoney
   });

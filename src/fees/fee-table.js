@@ -83,6 +83,29 @@ globalThis.MST_FEE_TABLE = Object.freeze({
     confidence: "secondary"
   },
 
+  // Mercado Envíos free-shipping subsidy by seller reputation. On free-shipping
+  // items at/above freeShippingThresholdMXN, MELI covers part of the shipping
+  // cost by reputation; below the threshold the seller pays it all.
+  // ESTIMATE — MELI does not publish exact percentages and they vary by period
+  // and program; ranges are approximate and are labeled as an estimate in the
+  // UI. Point values use the CONSERVATIVE (low) end of each range so the net
+  // payout stays worst-case (never overstates the subsidy / understates cost).
+  shippingSubsidy: {
+    thresholdMXN: 299,
+    confidence: "estimate",
+    note: "Aproximado; MELI no publica el porcentaje exacto y varía por periodo/programa.",
+    levels: [
+      // MercadoLíder / reputación Verde: ~50–60% → conservative 50.
+      { id: "verde", subsidyPct: 50, rangePct: [50, 60] },
+      // Reputación Amarilla: ~40%.
+      { id: "amarillo", subsidyPct: 40, rangePct: [40, 40] },
+      // Naranja / Roja: sin bonificación.
+      { id: "naranja", subsidyPct: 0, rangePct: [0, 0] },
+      // Sin reputación registrada / no aplica.
+      { id: "none", subsidyPct: 0, rangePct: [0, 0] }
+    ]
+  },
+
   // Category groups per ProfitOS (02/02/2026). aliases are accent-stripped
   // lowercase fragments matched against the PDP breadcrumb.
   categoryGroups: [
