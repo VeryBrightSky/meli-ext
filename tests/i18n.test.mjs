@@ -96,6 +96,49 @@ test("es_419 has no empty, untranslated, or English-leaking values", () => {
   assert.deepEqual(problems, [], "es_419 problems found:\n" + problems.join("\n"));
 });
 
+test("en and es_419 have full key parity", () => {
+  const en = JSON.parse(read("_locales/en/messages.json"));
+  const es = JSON.parse(read("_locales/es_419/messages.json"));
+  const enKeys = Object.keys(en).sort();
+  const esKeys = Object.keys(es).sort();
+  assert.deepEqual(
+    enKeys.filter((k) => !esKeys.includes(k)),
+    [],
+    "keys in en missing from es_419"
+  );
+  assert.deepEqual(
+    esKeys.filter((k) => !enKeys.includes(k)),
+    [],
+    "keys in es_419 missing from en"
+  );
+});
+
+test("en has no empty, untranslated, or Spanish-leaking values", () => {
+  const en = JSON.parse(read("_locales/en/messages.json"));
+  const es = JSON.parse(read("_locales/es_419/messages.json"));
+  // Brand names / loanwords intentionally identical across locales.
+  const SAME_OK = new Set(["typeClassic", "typePremium", "no", "proTag", "upsellTitle"]);
+  // Proper nouns that legitimately appear verbatim in English copy — stripped
+  // before scanning so "Mercado Envíos", "Clásica" etc. don't read as leaks.
+  const PROPER = /Mercado Libre|Mercado Env[íi]os(?: Full)?|Cl[áa]sica|Premium|Netio/gi;
+  // Spanish words that must never appear in English copy. Whole-word,
+  // case-insensitive. Excludes loanwords legitimately used in English copy
+  // ("pesos") and cross-language identicals ("no", "total", "premium").
+  const SPANISH =
+    /\b(comisi[óo]n|ganancias?|precios?|costos?|env[íi]os?|publicaci[óo]n|categor[íi]a|vendedor|gratis|resumen|retenci[óo]n|retenciones|mensual|tablero|predeterminad[oa]|desbloquea|comparar|diferencia|historial|hist[óo]rico|estimad[oa]|estimaci[óo]n|recibes?|ventas|selecciona|elige)\b/i;
+  const problems = [];
+  for (const key of Object.keys(en)) {
+    const v = en[key]?.message ?? "";
+    if (v.trim() === "") problems.push(`${key}: empty`);
+    if (!SAME_OK.has(key) && v === es[key]?.message) {
+      problems.push(`${key}: byte-identical to Spanish ("${v}")`);
+    }
+    const hit = SPANISH.exec(v.replace(PROPER, ""));
+    if (hit) problems.push(`${key}: Spanish word "${hit[0]}" in "${v}"`);
+  }
+  assert.deepEqual(problems, [], "en problems found:\n" + problems.join("\n"));
+});
+
 // ---- anti-regression lint: no hardcoded user-facing strings in render code ----
 
 function stripComments(src) {

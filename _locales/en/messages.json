@@ -1,6 +1,6 @@
 {
   "cardTitle": {
-    "message": "Seller calculator"
+    "message": "Profit calculator"
   },
   "badgeEstimate": {
     "message": "Estimate"
@@ -27,16 +27,16 @@
     "message": "Select a category…"
   },
   "hintDetected": {
-    "message": "Detected from the page — correct it if it doesn't match."
+    "message": "We detected this from the listing — fix it if it's wrong."
   },
   "hintNoCategory": {
-    "message": "Without a category, the official commission ranges from $1."
+    "message": "No category detected — the sale commission ranges from $1."
   },
   "rowCommission": {
-    "message": "Commission ($1)"
+    "message": "Sale commission ($1)"
   },
   "rowFixedCost": {
-    "message": "Fixed charge (price < $$299)"
+    "message": "Fixed fee per unit (price < $$299)"
   },
   "rowShipping": {
     "message": "Your shipping cost"
@@ -45,49 +45,49 @@
     "message": "Your shipping cost (free shipping ≥ $$299)"
   },
   "rowNet": {
-    "message": "You'll receive approx."
+    "message": "You receive approx."
   },
   "rowProductCost": {
-    "message": "Your product cost"
+    "message": "Product cost"
   },
   "rowProfit": {
     "message": "Profit"
   },
   "rowBreakeven": {
-    "message": "Minimum break-even price"
+    "message": "Break-even price"
   },
   "rowEffectiveRate": {
-    "message": "Total MELI cost"
+    "message": "Total Mercado Libre cost"
   },
   "resetPrice": {
     "message": "Reset"
   },
   "sweetSpot": {
-    "message": "If you raise the price to $1, your net goes up $2 (lower fixed charge)."
+    "message": "Raise the price to $1 and you keep $2 more (lower fixed fee)."
   },
   "btnCompare": {
     "message": "Compare"
   },
   "compareDiff": {
-    "message": "Difference (cost of MSI)"
+    "message": "Difference (cost of installments)"
   },
   "btnExportCsv": {
-    "message": "Export CSV"
+    "message": "Export to CSV"
   },
   "csvHeaderTitle": {
     "message": "Title"
   },
   "csvCommissionMin": {
-    "message": "Commission min (MXN)"
+    "message": "Min commission (MXN)"
   },
   "csvCommissionMax": {
-    "message": "Commission max (MXN)"
+    "message": "Max commission (MXN)"
   },
   "csvNetMin": {
-    "message": "Net min (MXN)"
+    "message": "Min net (MXN)"
   },
   "csvNetMax": {
-    "message": "Net max (MXN)"
+    "message": "Max net (MXN)"
   },
   "btnCopy": {
     "message": "Copy summary"
@@ -105,7 +105,7 @@
     "message": "Target price"
   },
   "targetUnreachable": {
-    "message": "Margin unreachable at these rates"
+    "message": "That margin isn't reachable at these rates"
   },
   "footerRates": {
     "message": "$1 · rates as of $2"
@@ -120,7 +120,7 @@
     "message": "Category"
   },
   "stripUnknownCategory": {
-    "message": "Unknown ($1)"
+    "message": "Not detected ($1)"
   },
   "stripFreeShipping": {
     "message": "Free shipping"
@@ -132,7 +132,7 @@
     "message": "Commission ($1)"
   },
   "stripFixedCost": {
-    "message": "Fixed charge"
+    "message": "Fixed fee"
   },
   "stripNetBeforeShipping": {
     "message": "Net before shipping"
@@ -150,10 +150,10 @@
     "message": "Options"
   },
   "optShowCard": {
-    "message": "Show calculator on product pages"
+    "message": "Show the calculator on listings"
   },
   "optShowStrips": {
-    "message": "Show summary on search results"
+    "message": "Show the summary on search results"
   },
   "optDefaultShipping": {
     "message": "Default shipping cost (MXN)"
@@ -171,7 +171,7 @@
     "message": "Data cleared."
   },
   "optResetHint": {
-    "message": "Removes per-product saved costs and restores defaults. Everything is stored only in your browser."
+    "message": "Removes the per-product costs you saved and restores the defaults. Everything stays on your browser."
   },
   "proTag": {
     "message": "PRO"
@@ -179,14 +179,17 @@
   "upsellTitle": {
     "message": "Netio PRO"
   },
+  "upsellHeadline": {
+    "message": "Find products that actually make money"
+  },
   "upsellBody": {
-    "message": "Unlock: editable what-if price, target price by margin, optimal-price alerts, Clásica vs Premium comparison, CSV export, Profit Dashboard, monthly profit, research mode and price history."
+    "message": "The Profitability Radar scans the whole search and shows only the products that actually make money. Plus: target price by margin, optimal-price alerts, Clásica vs Premium comparison, CSV export, Profit Dashboard, monthly profit, research mode, and price history."
   },
   "upsellPricing": {
-    "message": "7-day free trial. Then $$89 MXN/mo or $$699 MXN/yr (save 35%) — founder price."
+    "message": "7-day free trial. Then $$89 MXN/mo or $$699 MXN/yr (save 35%) — founder pricing."
   },
   "upsellTrial": {
-    "message": "Try free for 7 days"
+    "message": "Start your free 7-day trial"
   },
   "proSweetSpotName": {
     "message": "Optimal-price alert"
@@ -198,19 +201,19 @@
     "message": "Monthly profit"
   },
   "rowHistory": {
-    "message": "History of your visits"
+    "message": "Your visit history"
   },
   "rowWeight": {
-    "message": "Weight (shipping estimate)"
+    "message": "Weight (to estimate shipping)"
   },
   "weightNone": {
-    "message": "— choose weight —"
+    "message": "— choose a weight —"
   },
   "linkDashboard": {
     "message": "View my dashboard"
   },
   "researchProfit": {
-    "message": "Est. profit (cost $1% of price)"
+    "message": "Est. profit (cost: $1% of price)"
   },
   "researchActive": {
     "message": "Research: cost $1%"
@@ -243,7 +246,7 @@
     "message": "Profit Dashboard"
   },
   "dashEmpty": {
-    "message": "Save a product's cost on its listing page to see it here."
+    "message": "Save a product's cost on its listing to see it here."
   },
   "dashCommission": {
     "message": "Commission"
@@ -264,13 +267,13 @@
     "message": "Totals"
   },
   "dashShippingNote": {
-    "message": "Shipping used: your default value ($1). Estimated figures."
+    "message": "Shipping applied: your default ($1). Figures are estimates."
   },
   "inputShippingAria": {
     "message": "Shipping cost in pesos"
   },
   "inputProductCostAria": {
-    "message": "Your product cost in pesos"
+    "message": "Product cost in pesos"
   },
   "inputMarginAria": {
     "message": "Target margin in percent"
@@ -279,10 +282,10 @@
     "message": "Do you use Mercado Envíos Full?"
   },
   "rowServiceCost": {
-    "message": "Full service cost"
+    "message": "Full service fee"
   },
   "rowWithholdings": {
-    "message": "Show withholdings (IVA/ISR)"
+    "message": "Show withholdings (IVA & ISR)"
   },
   "rowIvaWithheld": {
     "message": "IVA withheld (8%)"
@@ -294,7 +297,7 @@
     "message": "Net after withholdings"
   },
   "withholdingsHint": {
-    "message": "Withholdings in force since 2026-01-01. Assumes your RFC is registered with Mercado Libre."
+    "message": "Withholdings in effect since Jan 1, 2026. Apply if your RFC is registered with Mercado Libre."
   },
   "upsellMonthly": {
     "message": "$$89 MXN/mo"
@@ -307,5 +310,29 @@
   },
   "youLose": {
     "message": "You lose"
+  },
+  "radarTitle": {
+    "message": "Profitability Radar"
+  },
+  "radarSummary": {
+    "message": "$1 products: $2 profitable · $3 thin · $4 at a loss"
+  },
+  "radarTarget": {
+    "message": "Target margin"
+  },
+  "radarOnly": {
+    "message": "Only profitable"
+  },
+  "radarSetCost": {
+    "message": "Set your acquisition cost in options to activate the Radar."
+  },
+  "btnExportProfitable": {
+    "message": "Export profitable ($1)"
+  },
+  "csvProfit": {
+    "message": "Est. profit (MXN)"
+  },
+  "csvMargin": {
+    "message": "Est. margin (%)"
   }
 }

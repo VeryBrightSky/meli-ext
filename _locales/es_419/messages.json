@@ -179,8 +179,11 @@
   "upsellTitle": {
     "message": "Netio PRO"
   },
+  "upsellHeadline": {
+    "message": "Encuentra productos que SÍ dejan ganancia"
+  },
   "upsellBody": {
-    "message": "Desbloquea: precio editable (¿y si…?), precio objetivo por margen, aviso de precio óptimo, comparación Clásica vs Premium, exportar a CSV, Tablero de Ganancias, ganancia mensual, modo investigación e historial de precios."
+    "message": "El Radar de Rentabilidad analiza toda la búsqueda y te muestra solo los productos que dejan ganancia. Además: precio objetivo por margen, aviso de precio óptimo, comparación Clásica vs Premium, exportar a CSV, Tablero de Ganancias, ganancia mensual, modo investigación e historial de precios."
   },
   "upsellPricing": {
     "message": "Prueba gratis 7 días. Después, $$89 MXN/mes o $$699 MXN/año (ahorra 35%) — precio de fundador."
@@ -307,5 +310,29 @@
   },
   "youLose": {
     "message": "Pierdes"
+  },
+  "radarTitle": {
+    "message": "Radar de Rentabilidad"
+  },
+  "radarSummary": {
+    "message": "$1 productos: $2 rentables · $3 marginales · $4 en pérdida"
+  },
+  "radarTarget": {
+    "message": "Margen objetivo"
+  },
+  "radarOnly": {
+    "message": "Solo rentables"
+  },
+  "radarSetCost": {
+    "message": "Define tu costo de adquisición en opciones para activar el Radar."
+  },
+  "btnExportProfitable": {
+    "message": "Exportar rentables ($1)"
+  },
+  "csvProfit": {
+    "message": "Ganancia est. (MXN)"
+  },
+  "csvMargin": {
+    "message": "Margen est. (%)"
   }
 }
