@@ -285,7 +285,7 @@
     "message": "Full service fee"
   },
   "rowWithholdings": {
-    "message": "Show withholdings (IVA & ISR)"
+    "message": "I have a registered RFC (IVA & ISR withholding)"
   },
   "rowIvaWithheld": {
     "message": "IVA withheld (8%)"
@@ -297,7 +297,7 @@
     "message": "Net after withholdings"
   },
   "withholdingsHint": {
-    "message": "Withholdings in effect since Jan 1, 2026. Apply if your RFC is registered with Mercado Libre."
+    "message": "Withholdings in effect since Jan 1, 2026. Apply if your RFC is registered with Mercado Libre. They are creditable against your taxes, not a loss."
   },
   "upsellMonthly": {
     "message": "$$89 MXN/mo"
