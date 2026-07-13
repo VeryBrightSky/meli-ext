@@ -329,6 +329,24 @@
   "dashTotalsLabel": {
     "message": "Totales ($1 productos)"
   },
+  "dashPortfolio": {
+    "message": "Resumen de tu portafolio"
+  },
+  "dashProfitableCount": {
+    "message": "$1 con ganancia"
+  },
+  "dashLossCount": {
+    "message": "$1 en pérdida"
+  },
+  "dashAvgMargin": {
+    "message": "Margen promedio: $1%"
+  },
+  "dashBest": {
+    "message": "Mejor: $1 ($2%)"
+  },
+  "dashWorst": {
+    "message": "Peor: $1 ($2%)"
+  },
   "youLose": {
     "message": "Pierdes"
   },

@@ -580,6 +580,67 @@ test("dashboard grand totals sum monthly profit across rows with sales", () => {
   assert.equal(t.monthlyMaxMXN, 3443);
 });
 
+test("portfolioSummary: empty rows → all zero, no best/worst", () => {
+  const s = DASH.portfolioSummary([]);
+  assert.deepEqual(s, {
+    count: 0,
+    profitable: 0,
+    lossMakers: 0,
+    breakeven: 0,
+    bestMargin: null,
+    worstMargin: null,
+    avgMarginPct: 0
+  });
+});
+
+test("portfolioSummary: buckets profitable/loss/breakeven off the worst-case bound", () => {
+  const rows = [
+    { itemId: "P", meta: { title: "Winner" }, b: { profitMinMXN: 120, marginMinPct: 30 } },
+    { itemId: "L", meta: { title: "Loser" }, b: { profitMinMXN: -50, marginMinPct: -10 } },
+    { itemId: "B", meta: { title: "Even" }, b: { profitMinMXN: 0, marginMinPct: 0 } },
+    { itemId: "P2", meta: { title: "Runner-up" }, b: { profitMinMXN: 40, marginMinPct: 8 } }
+  ];
+  const s = DASH.portfolioSummary(rows);
+  assert.equal(s.count, 4);
+  assert.equal(s.profitable, 2);
+  assert.equal(s.lossMakers, 1);
+  assert.equal(s.breakeven, 1);
+  // best = max marginMinPct, worst = min marginMinPct
+  assert.deepEqual(s.bestMargin, { itemId: "P", title: "Winner", marginPct: 30 });
+  assert.deepEqual(s.worstMargin, { itemId: "L", title: "Loser", marginPct: -10 });
+  // avg = mean of margins, round2: (30 - 10 + 0 + 8) / 4 = 7
+  assert.equal(s.avgMarginPct, 7);
+});
+
+test("portfolioSummary: single row is both best and worst; avg rounds to 2dp", () => {
+  const rows = [
+    { itemId: "X", meta: { title: "Only" }, b: { profitMinMXN: 10, marginMinPct: 33.335 } }
+  ];
+  const s = DASH.portfolioSummary(rows);
+  assert.equal(s.count, 1);
+  assert.equal(s.profitable, 1);
+  assert.equal(s.lossMakers, 0);
+  assert.equal(s.breakeven, 0);
+  assert.equal(s.bestMargin.itemId, "X");
+  assert.equal(s.worstMargin.itemId, "X");
+  assert.equal(s.avgMarginPct, 33.34);
+});
+
+test("portfolioSummary: derives from live computeRows (worst-case margin/profit)", () => {
+  const all = {
+    "mst:cost:A": 400, "mst:meta:A": { title: "A", priceMXN: 827, listingTypeId: "classic", categoryGroupId: "tech", url: "u" },
+    "mst:cost:B": 900, "mst:meta:B": { title: "B", priceMXN: 827, listingTypeId: "classic", categoryGroupId: "tech", url: "u" }
+  };
+  const rows = DASH.computeRows(all, "mst", 0);
+  const s = DASH.portfolioSummary(rows);
+  assert.equal(s.count, 2);
+  // A: profit 827-82.70-400 = 344.30 (profitable); B: cost 900 > net → loss.
+  assert.equal(s.profitable, 1);
+  assert.equal(s.lossMakers, 1);
+  assert.equal(s.bestMargin.itemId, "A");
+  assert.equal(s.worstMargin.itemId, "B");
+});
+
 test("marginHealth thresholds: <10 red, 10–25 yellow, ≥25 green", () => {
   assert.equal(UI.marginHealth(5), "red");
   assert.equal(UI.marginHealth(9.99), "red");

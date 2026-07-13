@@ -175,6 +175,57 @@ tfoot td:first-child {
   font-weight: 600;
 }
 
+/* Portfolio summary — per-SKU intelligence above the table. */
+.portfolio {
+  margin: 4px 0 16px;
+  padding: 12px 14px;
+  background: rgba(45, 50, 119, 0.04);
+  border: 1px solid rgba(45, 50, 119, 0.1);
+  border-radius: 6px;
+}
+
+.portfolio-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 8px;
+  color: #2d3277;
+}
+
+.portfolio-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.portfolio-chip {
+  font-size: 13px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  color: rgba(0, 0, 0, 0.8);
+  white-space: nowrap;
+}
+
+.portfolio-chip.pos {
+  color: #00a650;
+  border-color: rgba(0, 166, 80, 0.35);
+}
+
+.portfolio-chip.neg {
+  color: #f23d4f;
+  border-color: rgba(242, 61, 79, 0.35);
+}
+
+/* Loss-maker rows: tinted so they read as a call-out even after zebra/hover. */
+tbody tr.mst-row--loss {
+  background: rgba(242, 61, 79, 0.07);
+}
+
+tbody tr.mst-row--loss:hover {
+  background: rgba(242, 61, 79, 0.12);
+}
+
 /* Empty state. */
 #empty-note {
   text-align: center;

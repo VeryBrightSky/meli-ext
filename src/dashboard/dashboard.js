@@ -71,8 +71,9 @@
     { key: "monthly", label: T("rowMonthlyProfit"), num: true, value: (r) => (r.sales > 0 ? UI.fmtRange(CALC.round2(r.b.profitMinMXN * r.sales), CALC.round2(r.b.profitMaxMXN * r.sales)) : "—"), tone: (r) => (r.sales > 0 ? toneBy(r.b.profitMinMXN) : null), sort: (r) => r.b.profitMinMXN * r.sales }
   ];
 
-  let sortKey = "monthly";
-  let sortDir = -1;
+  // Default sort: worst margin first, so loss-makers surface at the top.
+  let sortKey = "margin";
+  let sortDir = 1;
 
   function renderHead() {
     const tr = document.getElementById("head-row");
@@ -92,16 +93,65 @@
     }
   }
 
+  // Portfolio summary: per-SKU intelligence over the already-computed rows.
+  function renderPortfolio() {
+    const box = document.getElementById("portfolio");
+    const s = DASH.portfolioSummary(rows);
+    box.replaceChildren();
+
+    const h = document.createElement("h2");
+    h.className = "portfolio-title";
+    h.textContent = T("dashPortfolio");
+    box.appendChild(h);
+
+    const stats = document.createElement("div");
+    stats.className = "portfolio-stats";
+
+    const chip = (text, tone) => {
+      const span = document.createElement("span");
+      span.className = "portfolio-chip";
+      if (tone) span.classList.add(tone);
+      span.textContent = text;
+      return span;
+    };
+
+    stats.appendChild(chip(T("dashTotalsLabel", [String(s.count)])));
+    stats.appendChild(chip(T("dashProfitableCount", [String(s.profitable)]), "pos"));
+    if (s.lossMakers > 0) {
+      stats.appendChild(chip(T("dashLossCount", [String(s.lossMakers)]), "neg"));
+    } else {
+      stats.appendChild(chip(T("dashLossCount", [String(s.lossMakers)])));
+    }
+    stats.appendChild(chip(T("dashAvgMargin", [String(s.avgMarginPct)])));
+    if (s.bestMargin) {
+      stats.appendChild(
+        chip(T("dashBest", [s.bestMargin.title || s.bestMargin.itemId, String(s.bestMargin.marginPct)]), "pos")
+      );
+    }
+    if (s.worstMargin) {
+      stats.appendChild(
+        chip(
+          T("dashWorst", [s.worstMargin.title || s.worstMargin.itemId, String(s.worstMargin.marginPct)]),
+          s.worstMargin.marginPct < 0 ? "neg" : null
+        )
+      );
+    }
+    box.appendChild(stats);
+  }
+
   function render() {
     // Empty state: hide the table, show a friendly message.
     const empty = rows.length === 0;
     document.getElementById("table").hidden = empty;
     document.getElementById("shipping-note").hidden = empty;
+    document.getElementById("portfolio").hidden = empty;
     const note = document.getElementById("empty-note");
     note.hidden = !empty;
     note.textContent = T("dashEmpty");
     document.getElementById("export-btn").hidden = empty;
     if (empty) return;
+
+    renderPortfolio();
 
     renderHead();
     const col = COLS.find((c) => c.key === sortKey);
@@ -116,6 +166,8 @@
 
     for (const row of rows) {
       const tr = document.createElement("tr");
+      // Flag loss-makers (worst-case profit below zero) for visual call-out.
+      if (row.b.profitMinMXN < 0) tr.classList.add(`${PREFIX}-row--loss`);
       for (const colDef of COLS) {
         const td = document.createElement("td");
         if (colDef.num) td.className = "num";

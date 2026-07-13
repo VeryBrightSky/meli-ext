@@ -62,5 +62,50 @@ globalThis.MST_DASH = (() => {
     };
   }
 
-  return Object.freeze({ resolveDefaultShipping, computeRows, totals });
+  // Per-SKU intelligence over already-computed rows. Everything keys off the
+  // WORST-CASE bound (marginMinPct / profitMinMXN) — the conservative number
+  // this tool always acts on, so a "profitable" SKU is profitable even at the
+  // worst end of its fee range. Pure: no DOM, no chrome, no fee math.
+  function portfolioSummary(rows) {
+    const round2 = globalThis.MST_CALC.round2;
+    const count = rows.length;
+    if (count === 0) {
+      return {
+        count: 0,
+        profitable: 0,
+        lossMakers: 0,
+        breakeven: 0,
+        bestMargin: null,
+        worstMargin: null,
+        avgMarginPct: 0
+      };
+    }
+    let profitable = 0;
+    let lossMakers = 0;
+    let breakeven = 0;
+    let marginSum = 0;
+    let best = rows[0];
+    let worst = rows[0];
+    for (const r of rows) {
+      const profit = r.b.profitMinMXN;
+      if (profit > 0) profitable++;
+      else if (profit < 0) lossMakers++;
+      else breakeven++;
+      marginSum += r.b.marginMinPct;
+      if (r.b.marginMinPct > best.b.marginMinPct) best = r;
+      if (r.b.marginMinPct < worst.b.marginMinPct) worst = r;
+    }
+    const brief = (r) => ({ itemId: r.itemId, title: r.meta.title, marginPct: r.b.marginMinPct });
+    return {
+      count,
+      profitable,
+      lossMakers,
+      breakeven,
+      bestMargin: brief(best),
+      worstMargin: brief(worst),
+      avgMarginPct: round2(marginSum / count)
+    };
+  }
+
+  return Object.freeze({ resolveDefaultShipping, computeRows, totals, portfolioSummary });
 })();
