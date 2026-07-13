@@ -373,5 +373,47 @@
   },
   "csvMargin": {
     "message": "Margen est. (%)"
+  },
+  "btnMsi": {
+    "message": "Meses sin intereses"
+  },
+  "proMsiName": {
+    "message": "Calculadora de meses sin intereses"
+  },
+  "msiTermLabel": {
+    "message": "Número de cuotas"
+  },
+  "msiTermOption": {
+    "message": "$1 cuotas"
+  },
+  "msiRateLabel": {
+    "message": "% de cargo por financiación"
+  },
+  "msiRateAria": {
+    "message": "Porcentaje de cargo por financiación de tu cuenta"
+  },
+  "msiHint": {
+    "message": "Encuentra tu porcentaje exacto en Mercado Pago → Configuración → Comisiones y MSI"
+  },
+  "msiReferenceNote": {
+    "message": "referencia aproximada, varía por cuenta"
+  },
+  "msiWhatIfNote": {
+    "message": "Tu publicación es Clásica y no ofrece meses sin intereses. Esto es solo una simulación."
+  },
+  "msiCostLabel": {
+    "message": "Cargo por cuotas (estimado)"
+  },
+  "msiColWithout": {
+    "message": "Sin cuotas"
+  },
+  "msiColWith": {
+    "message": "Con cuotas"
+  },
+  "msiNetLabel": {
+    "message": "Recibes aprox."
+  },
+  "msiMarginLabel": {
+    "message": "Margen"
   }
 }

@@ -502,6 +502,22 @@ test("shipping subsidy table: conservative estimate values are wired + labeled",
   assert.equal(byId.none, 0);
 });
 
+test("MSI cost: seller financing charge is a % of price, guarded", () => {
+  const m = CALC.msiCost;
+  assert.equal(m(1000, 13), 130);
+  assert.equal(m(827, 7.5), 62.03); // 62.025 → round2
+  assert.equal(m(1000, 0), 0); // no rate → no cost
+  assert.equal(m(0, 13), 0); // no price → no cost
+  assert.equal(m(1000, -5), 0); // negative rate clamped
+});
+
+test("MSI reference defaults are wired and clearly a reference (not authoritative)", () => {
+  const msi = SOURCE.msiReference;
+  assert.equal(msi.confidence, "reference");
+  const byMonths = Object.fromEntries(msi.terms.map((t) => [t.months, t.chargePct]));
+  assert.deepEqual(byMonths, { 3: 5, 6: 7.5, 9: 10, 12: 13 });
+});
+
 test("shipping table: bracket lookup boundaries", () => {
   assert.equal(SHIPPING.costForWeight(0.2), 52.4);
   assert.equal(SHIPPING.costForWeight(0.3), 52.4); // inclusive upper bound

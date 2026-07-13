@@ -84,6 +84,7 @@ globalThis.MST_FEE_SOURCE = (() => {
     fixedCostFnFor,
     withholdings: table.withholdings,
     shippingSubsidy: table.shippingSubsidy,
+    msiReference: table.msiReference,
     // Prices where the fixed charge steps (sweet-spot candidates).
     getFixedCostThresholds: () => table.fixedCost.tiers.map((t) => t.maxPriceExclusive),
     listCategoryGroups,

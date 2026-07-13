@@ -373,5 +373,47 @@
   },
   "csvMargin": {
     "message": "Est. margin (%)"
+  },
+  "btnMsi": {
+    "message": "Installments (MSI)"
+  },
+  "proMsiName": {
+    "message": "Installments (MSI) calculator"
+  },
+  "msiTermLabel": {
+    "message": "Number of installments"
+  },
+  "msiTermOption": {
+    "message": "$1 installments"
+  },
+  "msiRateLabel": {
+    "message": "Financing charge (%)"
+  },
+  "msiRateAria": {
+    "message": "Your account's financing charge percentage"
+  },
+  "msiHint": {
+    "message": "Find your exact rate in Mercado Pago → Settings → Fees and installments."
+  },
+  "msiReferenceNote": {
+    "message": "approximate reference, varies by account"
+  },
+  "msiWhatIfNote": {
+    "message": "Your listing is Clásica and doesn't offer installments. This is a what-if only."
+  },
+  "msiCostLabel": {
+    "message": "Installments charge (estimate)"
+  },
+  "msiColWithout": {
+    "message": "Without installments"
+  },
+  "msiColWith": {
+    "message": "With installments"
+  },
+  "msiNetLabel": {
+    "message": "You receive approx."
+  },
+  "msiMarginLabel": {
+    "message": "Margin"
   }
 }

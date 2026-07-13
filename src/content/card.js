@@ -32,8 +32,29 @@ globalThis.MST_CARD = (() => {
     reputationId: "none",
     freeShipping: false,
     weightKg: 0,
-    pro: false
+    pro: false,
+    // MSI (meses sin intereses): selected term and the seller's OWN per-term
+    // financing rate. The seller's entered value always wins over the
+    // reference default and persists per term in chrome.storage.sync.
+    msiOpen: false,
+    msiTerm: 3,
+    msiRates: {} // { "3": pct, "6": pct, ... } — sparse; unset falls to reference
   };
+
+  // Reference default charge % for a term (rough, account-specific in reality).
+  const msiReferencePct = (months) =>
+    SOURCE.msiReference.terms.find((t) => t.months === months)?.chargePct ?? 0;
+
+  // The rate in effect for the selected term: the seller's saved value wins,
+  // else the reference default. Whether the current value is the seller's own
+  // (vs the reference) drives the "referencia aproximada" note.
+  const msiTermMonths = [3, 6, 9, 12];
+  const msiCurrentIsOwn = () =>
+    Object.prototype.hasOwnProperty.call(state.msiRates, String(state.msiTerm));
+  const msiCurrentRate = () =>
+    msiCurrentIsOwn()
+      ? state.msiRates[String(state.msiTerm)]
+      : msiReferencePct(state.msiTerm);
 
   // Full mode needs a weight; default to the smallest bracket when unset.
   const fullWeightKg = () =>
@@ -154,6 +175,13 @@ globalThis.MST_CARD = (() => {
     }
   }
 
+  // MSI settings are account-wide (a seller's Mercado Pago rates), so they
+  // persist in sync storage alongside the other global preferences — not per
+  // item like product cost.
+  function persistMsi() {
+    chrome.storage.sync.set({ msiRates: state.msiRates, msiTerm: state.msiTerm });
+  }
+
   async function restoreInputs() {
     const keys = [`${PREFIX}:defaults`];
     if (state.itemId) {
@@ -172,9 +200,15 @@ globalThis.MST_CARD = (() => {
         usesFull: false,
         showWithholdings: false,
         reputationId: "none",
-        freeShipping: false
+        freeShipping: false,
+        msiRates: {},
+        msiTerm: 3
       })
     ]);
+    // MSI: restore the seller's own per-term rates and last-picked term.
+    state.msiRates =
+      settings.msiRates && typeof settings.msiRates === "object" ? settings.msiRates : {};
+    state.msiTerm = msiTermMonths.includes(settings.msiTerm) ? settings.msiTerm : 3;
     state.usesFull = settings.usesFull === true;
     state.showWithholdings = settings.showWithholdings === true;
     state.reputationId =
@@ -327,6 +361,55 @@ globalThis.MST_CARD = (() => {
         ),
         flash
       );
+    }
+
+    // Meses sin intereses (MSI). Pro. WITHOUT = the card's own net/margin (b);
+    // WITH = subtract the estimated financing cost from net (and from profit,
+    // when a product cost is set), then recompute the margin the SAME way the
+    // card does elsewhere: profit-based with a cost, net-based without.
+    refs.msiBtn.setAttribute("aria-pressed", String(pro && state.msiOpen));
+    refs.msiBtn.classList.toggle(`${PREFIX}-msi-toggle--active`, pro && state.msiOpen);
+    refs.msiBox.style.display = pro && state.msiOpen ? "" : "none";
+    if (pro && state.msiOpen) {
+      // Never fight the user while they type their own rate.
+      if (document.activeElement !== refs.msiRateInput) {
+        refs.msiRateInput.value = String(msiCurrentRate());
+      }
+      refs.msiTermSelect.value = String(state.msiTerm);
+      refs.msiRefNote.style.display = msiCurrentIsOwn() ? "none" : "";
+      // Classic listings don't offer MSI — mark the section informational.
+      refs.msiWhatIf.style.display = state.listingTypeId === "classic" ? "" : "none";
+
+      const msiCost = CALC.msiCost(state.priceMXN, msiCurrentRate());
+      patchRow(refs.msiCost, null, fmtCharge(msiCost), flash);
+
+      const netWithMin = CALC.round2(b.netMinMXN - msiCost);
+      const netWithMax = CALC.round2(b.netMaxMXN - msiCost);
+      refs.msiWithout.net.textContent = `${T("msiNetLabel")} ${fmtRange(b.netMinMXN, b.netMaxMXN)}`;
+      refs.msiWith.net.textContent = `${T("msiNetLabel")} ${fmtRange(netWithMin, netWithMax)}`;
+
+      const price = state.priceMXN;
+      const marginText = (min, max) =>
+        `${T("msiMarginLabel")} ${fmtPctRange(min, max)}`;
+      if (b.profitMinMXN !== undefined) {
+        // With a product cost: margin = profit / price × 100.
+        const profWithMin = CALC.round2(b.profitMinMXN - msiCost);
+        const profWithMax = CALC.round2(b.profitMaxMXN - msiCost);
+        refs.msiWithout.margin.textContent = marginText(b.marginMinPct, b.marginMaxPct);
+        refs.msiWith.margin.textContent = marginText(
+          price > 0 ? CALC.round2((profWithMin / price) * 100) : 0,
+          price > 0 ? CALC.round2((profWithMax / price) * 100) : 0
+        );
+      } else {
+        // No product cost: match the card's net-based view (net / price × 100).
+        const netMarginMin = price > 0 ? CALC.round2((b.netMinMXN / price) * 100) : 0;
+        const netMarginMax = price > 0 ? CALC.round2((b.netMaxMXN / price) * 100) : 0;
+        refs.msiWithout.margin.textContent = marginText(netMarginMin, netMarginMax);
+        refs.msiWith.margin.textContent = marginText(
+          price > 0 ? CALC.round2((netWithMin / price) * 100) : 0,
+          price > 0 ? CALC.round2((netWithMax / price) * 100) : 0
+        );
+      }
     }
 
     patchRow(
@@ -560,6 +643,19 @@ globalThis.MST_CARD = (() => {
       update(false);
     });
     typeRow.appendChild(refs.compareBtn);
+    // Meses sin intereses (MSI) — Pro. Same locked-toggle pattern as Compare.
+    refs.msiBtn = el("button", `${PREFIX}-msi-toggle`, T("btnMsi"));
+    refs.msiBtn.type = "button";
+    if (!state.pro) refs.msiBtn.classList.add(`${PREFIX}-locked`);
+    refs.msiBtn.addEventListener("click", () => {
+      if (!state.pro) {
+        openUpsell();
+        return;
+      }
+      state.msiOpen = !state.msiOpen;
+      update(false);
+    });
+    typeRow.appendChild(refs.msiBtn);
     body.appendChild(typeRow);
 
     refs.compareBox = el("div", `${PREFIX}-compare`);
@@ -572,6 +668,97 @@ globalThis.MST_CARD = (() => {
       refs.compareDiff.root
     );
     body.appendChild(refs.compareBox);
+
+    // MSI box: term selector + editable per-term rate + net/margin with vs
+    // without cuotas, side by side. Only built/populated for Pro (the toggle
+    // is locked otherwise). Built once; update() shows/hides and patches text.
+    refs.msiBox = el("div", `${PREFIX}-msi`);
+    refs.msiBox.style.display = "none";
+
+    // What-if note (only when the current listing is Clásica).
+    refs.msiWhatIf = el("p", `${PREFIX}-msi__note`, T("msiWhatIfNote"));
+    refs.msiBox.appendChild(refs.msiWhatIf);
+
+    // Prominent hint pointing to the seller's real rate source.
+    refs.msiBox.appendChild(el("p", `${PREFIX}-msi__note`, T("msiHint")));
+
+    // Term selector.
+    const msiTermRow = el("div", `${PREFIX}-row`);
+    msiTermRow.appendChild(el("span", `${PREFIX}-row__label`, T("msiTermLabel")));
+    const msiTermSel = document.createElement("select");
+    msiTermSel.className = `${PREFIX}-select`;
+    msiTermSel.setAttribute("aria-label", T("msiTermLabel"));
+    for (const months of msiTermMonths) {
+      msiTermSel.appendChild(new Option(T("msiTermOption", [String(months)]), String(months)));
+    }
+    msiTermSel.addEventListener("change", () => {
+      const m = Number.parseInt(msiTermSel.value, 10);
+      state.msiTerm = msiTermMonths.includes(m) ? m : 3;
+      persistMsi();
+      refs.msiRateInput.value = String(msiCurrentRate());
+      update();
+    });
+    refs.msiTermSelect = msiTermSel;
+    msiTermRow.appendChild(msiTermSel);
+    refs.msiBox.appendChild(msiTermRow);
+
+    // Editable rate — the seller's OWN %. Not an .mst-input (that class is
+    // reserved for money fields the e2e harness indexes); own class instead.
+    const msiRateRow = el("div", `${PREFIX}-row`);
+    msiRateRow.appendChild(el("span", `${PREFIX}-row__label`, T("msiRateLabel")));
+    const msiRateInput = document.createElement("input");
+    msiRateInput.type = "text";
+    msiRateInput.inputMode = "decimal";
+    msiRateInput.autocomplete = "off";
+    msiRateInput.className = `${PREFIX}-msi__rate`;
+    msiRateInput.setAttribute("aria-label", T("msiRateAria"));
+    const applyRate = () => {
+      const pct = CALC.parseMoney(msiRateInput.value);
+      state.msiRates[String(state.msiTerm)] = pct; // seller's value wins + persists
+      persistMsi();
+      update();
+    };
+    const debouncedRate = debounced(applyRate);
+    msiRateInput.addEventListener("input", debouncedRate);
+    msiRateInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        msiRateInput.blur();
+      }
+    });
+    msiRateInput.addEventListener("blur", () => {
+      debouncedRate.flush();
+      msiRateInput.value = String(msiCurrentRate());
+    });
+    refs.msiRateInput = msiRateInput;
+    msiRateRow.appendChild(msiRateInput);
+    refs.msiBox.appendChild(msiRateRow);
+
+    // "referencia aproximada" note — shown only while using the reference
+    // default (i.e. the seller hasn't entered their own rate for this term).
+    refs.msiRefNote = el("p", `${PREFIX}-msi__ref`, T("msiReferenceNote"));
+    refs.msiBox.appendChild(refs.msiRefNote);
+
+    // MSI cost line (labeled estimate).
+    refs.msiCost = buildRow(T("msiCostLabel"));
+    refs.msiBox.appendChild(refs.msiCost.root);
+
+    // Side-by-side columns: without vs with cuotas.
+    const msiCols = el("div", `${PREFIX}-msi__cols`);
+    const buildMsiCol = (titleKey, withMod) => {
+      const col = el("div", `${PREFIX}-msi__col${withMod ? ` ${PREFIX}-msi__col--with` : ""}`);
+      col.appendChild(el("div", `${PREFIX}-msi__coltitle`, T(titleKey)));
+      const net = el("div", `${PREFIX}-msi__line`, "");
+      const margin = el("div", `${PREFIX}-msi__line ${PREFIX}-msi__line--margin`, "");
+      col.append(net, margin);
+      return { col, net, margin };
+    };
+    refs.msiWithout = buildMsiCol("msiColWithout", false);
+    refs.msiWith = buildMsiCol("msiColWith", true);
+    msiCols.append(refs.msiWithout.col, refs.msiWith.col);
+    refs.msiBox.appendChild(msiCols);
+
+    body.appendChild(refs.msiBox);
 
     // Category picker.
     const catRow = el("div", `${PREFIX}-row`);
@@ -945,6 +1132,8 @@ globalThis.MST_CARD = (() => {
     state.salesPerMonth = 0;
     state.compareOpen = false;
     state.weightKg = 0;
+    state.msiOpen = false;
+    // msiTerm/msiRates are account-wide (sync), not per item — keep them.
   }
 
   // Builds the card element. With pageData it renders the live calculator;
@@ -1008,6 +1197,12 @@ globalThis.MST_CARD = (() => {
       refs.withholdingsToggle.checked = state.showWithholdings;
       refs.reputationSelect.value = state.reputationId;
       refs.freeShippingToggle.checked = state.freeShipping;
+      if (refs.msiTermSelect) {
+        refs.msiTermSelect.value = String(state.msiTerm);
+        if (document.activeElement !== refs.msiRateInput) {
+          refs.msiRateInput.value = String(msiCurrentRate());
+        }
+      }
       update(false);
     });
     return card;

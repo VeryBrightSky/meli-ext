@@ -147,12 +147,23 @@ globalThis.MST_CALC = (() => {
     return round2(full * (1 - pct / 100));
   }
 
+  // Meses sin intereses (MSI) financing charge to the seller: a percentage of
+  // the sale price, charged when the listing offers installments. The rate is
+  // the SELLER'S OWN account rate (entered in the card); we only apply it.
+  // LABELED ESTIMATE. Returns the MXN cost to subtract from the net payout.
+  function msiCost(priceMXN, chargePct) {
+    const price = priceMXN > 0 ? priceMXN : 0;
+    const pct = chargePct > 0 ? chargePct : 0;
+    return round2((price * pct) / 100);
+  }
+
   return Object.freeze({
     computeBreakdown,
     solveTargetPrice,
     findSweetSpot,
     computeWithholdings,
     subsidizedShipping,
+    msiCost,
     round2,
     parseMoney
   });

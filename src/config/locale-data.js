@@ -126,7 +126,21 @@ globalThis.MST_MESSAGES = Object.freeze({
     "radarSetCost": "Define tu costo de adquisición en opciones para activar el Radar.",
     "btnExportProfitable": "Exportar rentables ($1)",
     "csvProfit": "Ganancia est. (MXN)",
-    "csvMargin": "Margen est. (%)"
+    "csvMargin": "Margen est. (%)",
+    "btnMsi": "Meses sin intereses",
+    "proMsiName": "Calculadora de meses sin intereses",
+    "msiTermLabel": "Número de cuotas",
+    "msiTermOption": "$1 cuotas",
+    "msiRateLabel": "% de cargo por financiación",
+    "msiRateAria": "Porcentaje de cargo por financiación de tu cuenta",
+    "msiHint": "Encuentra tu porcentaje exacto en Mercado Pago → Configuración → Comisiones y MSI",
+    "msiReferenceNote": "referencia aproximada, varía por cuenta",
+    "msiWhatIfNote": "Tu publicación es Clásica y no ofrece meses sin intereses. Esto es solo una simulación.",
+    "msiCostLabel": "Cargo por cuotas (estimado)",
+    "msiColWithout": "Sin cuotas",
+    "msiColWith": "Con cuotas",
+    "msiNetLabel": "Recibes aprox.",
+    "msiMarginLabel": "Margen"
   },
   "en": {
     "cardTitle": "Profit calculator",
@@ -253,6 +267,20 @@ globalThis.MST_MESSAGES = Object.freeze({
     "radarSetCost": "Set your acquisition cost in options to activate the Radar.",
     "btnExportProfitable": "Export profitable ($1)",
     "csvProfit": "Est. profit (MXN)",
-    "csvMargin": "Est. margin (%)"
+    "csvMargin": "Est. margin (%)",
+    "btnMsi": "Installments (MSI)",
+    "proMsiName": "Installments (MSI) calculator",
+    "msiTermLabel": "Number of installments",
+    "msiTermOption": "$1 installments",
+    "msiRateLabel": "Financing charge (%)",
+    "msiRateAria": "Your account's financing charge percentage",
+    "msiHint": "Find your exact rate in Mercado Pago → Settings → Fees and installments.",
+    "msiReferenceNote": "approximate reference, varies by account",
+    "msiWhatIfNote": "Your listing is Clásica and doesn't offer installments. This is a what-if only.",
+    "msiCostLabel": "Installments charge (estimate)",
+    "msiColWithout": "Without installments",
+    "msiColWith": "With installments",
+    "msiNetLabel": "You receive approx.",
+    "msiMarginLabel": "Margin"
   }
 });

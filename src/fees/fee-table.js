@@ -106,6 +106,23 @@ globalThis.MST_FEE_TABLE = Object.freeze({
     ]
   },
 
+  // Meses sin intereses (MSI) financing charge to the SELLER. MELI / Mercado
+  // Pago does NOT publish exact per-account percentages — they are account-
+  // specific (Mercado Pago → Configuración → Comisiones y MSI) and vary by bank
+  // agreement and campaign; public tables are explicitly "orientativos". These
+  // are ROUGH REFERENCE defaults only; the seller enters their own rate in the
+  // card and that value always wins and persists per installment count.
+  msiReference: {
+    confidence: "reference",
+    note: "Orientativo; el porcentaje real es específico de tu cuenta (Mercado Pago → Comisiones y MSI).",
+    terms: [
+      { months: 3, chargePct: 5 },
+      { months: 6, chargePct: 7.5 },
+      { months: 9, chargePct: 10 },
+      { months: 12, chargePct: 13 }
+    ]
+  },
+
   // Category groups per ProfitOS (02/02/2026). aliases are accent-stripped
   // lowercase fragments matched against the PDP breadcrumb.
   categoryGroups: [
