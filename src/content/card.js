@@ -29,6 +29,8 @@ globalThis.MST_CARD = (() => {
     compareOpen: false,
     usesFull: false,
     showWithholdings: false,
+    reputationId: "none",
+    freeShipping: false,
     weightKg: 0,
     pro: false
   };
@@ -168,11 +170,16 @@ globalThis.MST_CARD = (() => {
         defaultShippingMXN: null,
         defaultListingType: "auto",
         usesFull: false,
-        showWithholdings: false
+        showWithholdings: false,
+        reputationId: "none",
+        freeShipping: false
       })
     ]);
     state.usesFull = settings.usesFull === true;
     state.showWithholdings = settings.showWithholdings === true;
+    state.reputationId =
+      typeof settings.reputationId === "string" ? settings.reputationId : "none";
+    state.freeShipping = settings.freeShipping === true;
     state.weightKg = CALC.parseMoney(stored[`${PREFIX}:weight:${state.itemId}`] ?? 0);
     const defaults = stored[`${PREFIX}:defaults`];
     // Single default-shipping source of truth, shared with the dashboard
@@ -208,12 +215,21 @@ globalThis.MST_CARD = (() => {
       categoryGroupId: state.categoryGroupId,
       fullWeightKg: fullWeightKg()
     });
+    const subsidyPct =
+      SOURCE.shippingSubsidy.levels.find((l) => l.id === state.reputationId)?.subsidyPct || 0;
+    const effectiveShipping = CALC.subsidizedShipping({
+      fullShippingMXN: state.shippingCostMXN,
+      priceMXN: state.priceMXN,
+      freeShipping: state.freeShipping,
+      subsidyPct,
+      thresholdMXN: SOURCE.shippingSubsidy.thresholdMXN
+    });
     const b = CALC.computeBreakdown(quote, {
       priceMXN: state.priceMXN,
-      shippingCostMXN: state.shippingCostMXN,
+      shippingCostMXN: effectiveShipping,
       productCostMXN: state.productCostMXN
     });
-    return { quote, b };
+    return { quote, b, effectiveShipping };
   }
 
   function update(flash = true) {
@@ -228,7 +244,7 @@ globalThis.MST_CARD = (() => {
   }
 
   function updateUnsafe(flash) {
-    const { quote, b } = computeCurrent();
+    const { quote, b, effectiveShipping } = computeCurrent();
 
     const pro = state.pro;
     // One discontinuity model for this render: quotes, sweet spot and the
@@ -276,7 +292,9 @@ globalThis.MST_CARD = (() => {
     if (pro && state.compareOpen) {
       const inputs = {
         priceMXN: state.priceMXN,
-        shippingCostMXN: state.shippingCostMXN,
+        // Use the subsidized shipping so the Clásica/Premium comparison matches
+        // the card's own net (both are the same item at the same price).
+        shippingCostMXN: effectiveShipping,
         productCostMXN: 0
       };
       const c = CALC.computeBreakdown(
@@ -356,6 +374,18 @@ globalThis.MST_CARD = (() => {
       flash
     );
 
+    // Shipping subsidy: informational, only when a subsidy actually applies.
+    const subsidyApplies = effectiveShipping < state.shippingCostMXN;
+    refs.shippingSubsidy.root.style.display = subsidyApplies ? "" : "none";
+    if (subsidyApplies) {
+      patchRow(
+        refs.shippingSubsidy,
+        null,
+        fmtCharge(CALC.round2(state.shippingCostMXN - effectiveShipping)),
+        flash
+      );
+    }
+
     patchRow(refs.net, null, fmtRange(b.netMinMXN, b.netMaxMXN), flash);
 
     const hasProfit = b.profitMinMXN !== undefined;
@@ -380,7 +410,10 @@ globalThis.MST_CARD = (() => {
     const solve = (ratePct, marginPct) =>
       CALC.solveTargetPrice({
         costMXN: state.productCostMXN,
-        shippingMXN: state.shippingCostMXN,
+        // Subsidized shipping so break-even / target price stay consistent with
+        // the displayed net (approximated at the current price near the $299
+        // subsidy threshold).
+        shippingMXN: effectiveShipping,
         marginPct,
         ratePct,
         fixedCostFn
@@ -627,6 +660,44 @@ globalThis.MST_CARD = (() => {
     fullRow.append(el("span", `${PREFIX}-row__label`, T("rowFull")), fullCheck);
     body.appendChild(fullRow);
 
+    // Seller reputation → Mercado Envíos subsidy (free feature). Only affects
+    // free-shipping items ≥ $299; picks the subsidy % for the effective cost.
+    const repRow = el("div", `${PREFIX}-row`);
+    repRow.appendChild(el("span", `${PREFIX}-row__label`, T("rowReputation")));
+    const repSel = document.createElement("select");
+    repSel.className = `${PREFIX}-select`;
+    repSel.setAttribute("aria-label", T("rowReputation"));
+    for (const [id, label] of [
+      ["verde", T("repVerde")],
+      ["amarillo", T("repAmarillo")],
+      ["naranja", T("repNaranja")],
+      ["none", T("repNone")]
+    ]) {
+      repSel.appendChild(new Option(label, id));
+    }
+    repSel.addEventListener("change", () => {
+      state.reputationId = repSel.value || "none";
+      chrome.storage.sync.set({ reputationId: state.reputationId });
+      update();
+    });
+    refs.reputationSelect = repSel;
+    repRow.appendChild(repSel);
+    body.appendChild(repRow);
+
+    // Free-shipping toggle: seller offers free shipping (enables the subsidy).
+    const freeRow = el("label", `${PREFIX}-row ${PREFIX}-toggle-row`);
+    const freeCheck = document.createElement("input");
+    freeCheck.type = "checkbox";
+    freeCheck.className = `${PREFIX}-free-toggle`;
+    freeCheck.addEventListener("change", () => {
+      state.freeShipping = freeCheck.checked;
+      chrome.storage.sync.set({ freeShipping: state.freeShipping });
+      update();
+    });
+    refs.freeShippingToggle = freeCheck;
+    freeRow.append(el("span", `${PREFIX}-row__label`, T("rowFreeShipping")), freeCheck);
+    body.appendChild(freeRow);
+
     // Shipping input. Label is price-dependent (what-if can cross $299).
     const shipRow = el("div", `${PREFIX}-row`);
     refs.shipLabel = el("span", `${PREFIX}-row__label`, T("rowShipping"));
@@ -642,6 +713,10 @@ globalThis.MST_CARD = (() => {
     refs.shippingInput.setAttribute("aria-label", T("inputShippingAria"));
     shipRow.appendChild(refs.shippingInput);
     body.appendChild(shipRow);
+
+    // Shipping subsidy (labeled estimate). Shown only when it actually applies.
+    refs.shippingSubsidy = buildRow(T("rowShippingSubsidy"));
+    body.appendChild(refs.shippingSubsidy.root);
 
     refs.net = buildRow(T("rowNet"), "total");
     body.appendChild(refs.net.root);
@@ -931,6 +1006,8 @@ globalThis.MST_CARD = (() => {
       refs.weightSelect.value = state.weightKg > 0 ? String(state.weightKg) : "";
       refs.fullToggle.checked = state.usesFull;
       refs.withholdingsToggle.checked = state.showWithholdings;
+      refs.reputationSelect.value = state.reputationId;
+      refs.freeShippingToggle.checked = state.freeShipping;
       update(false);
     });
     return card;

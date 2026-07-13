@@ -299,6 +299,27 @@
   "withholdingsHint": {
     "message": "Retenciones vigentes desde el 01/01/2026. Aplican si tienes tu RFC registrado en Mercado Libre. Son acreditables contra tus impuestos, no son una pérdida."
   },
+  "rowReputation": {
+    "message": "Reputación del vendedor"
+  },
+  "repVerde": {
+    "message": "Verde / MercadoLíder"
+  },
+  "repAmarillo": {
+    "message": "Amarilla"
+  },
+  "repNaranja": {
+    "message": "Naranja / Roja"
+  },
+  "repNone": {
+    "message": "Sin reputación"
+  },
+  "rowFreeShipping": {
+    "message": "Ofrezco envío gratis"
+  },
+  "rowShippingSubsidy": {
+    "message": "Subsidio de envío (estimado)"
+  },
   "upsellMonthly": {
     "message": "$$89 MXN/mes"
   },

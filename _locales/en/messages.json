@@ -299,6 +299,27 @@
   "withholdingsHint": {
     "message": "Withholdings in effect since Jan 1, 2026. Apply if your RFC is registered with Mercado Libre. They are creditable against your taxes, not a loss."
   },
+  "rowReputation": {
+    "message": "Seller reputation"
+  },
+  "repVerde": {
+    "message": "Green / MercadoLíder"
+  },
+  "repAmarillo": {
+    "message": "Yellow"
+  },
+  "repNaranja": {
+    "message": "Orange / Red"
+  },
+  "repNone": {
+    "message": "No reputation"
+  },
+  "rowFreeShipping": {
+    "message": "I offer free shipping"
+  },
+  "rowShippingSubsidy": {
+    "message": "Shipping subsidy (est.)"
+  },
   "upsellMonthly": {
     "message": "$$89 MXN/mo"
   },
