@@ -4,7 +4,10 @@
 //
 // Phases: 1) never-paid (ExtPay unreachable → fail closed) asserts free
 // features + locked Pro UI; 2) dashboard shows upsell when locked; 3) Pro
-// via the QA override; 4) full Pro flows incl. real CSV download.
+// via the QA override; 4) full Pro flows incl. real CSV download;
+// 5) SPA navigation (teardown + re-inject, no stale state); 6) lazy-loaded
+// search results; 7) extraction edge cases (promo price without meta, no
+// anchor); 8) unreadable page renders nothing.
 //
 //   npm run test:e2e
 import assert from "node:assert/strict";
@@ -52,15 +55,33 @@ const fixtures = {
 fixtures.productNoPrice = fixtures.product
   .replace(/<[^>]*itemprop=["']price["'][^>]*>/gi, "")
   .replace(/andes-money-amount/g, "andes-money-x");
+// A discounted product WITHOUT the itemprop meta: price must come from the
+// visible DOM, skipping both the hidden duplicate block and the crossed-out
+// "precio anterior" — the promo-price extraction failure mode.
+fixtures.productNoMeta = fixtures.product.replace(
+  /<[^>]*itemprop=["']price["'][^>]*>/gi,
+  ""
+);
+// A product page with NO recognizable price block at all (every anchor
+// strategy misses). The extension must keep waiting silently, never inject.
+fixtures.productNoAnchor = fixtures.productNoPrice.replace(
+  /ui-pdp-price/g,
+  "ui-pdp-x"
+);
 const server = createServer(
   { key: readFileSync(join(certDir, "key.pem")), cert: readFileSync(join(certDir, "cert.pem")) },
   (req, res) => {
     const host = req.headers.host ?? "";
+    const url = req.url ?? "";
     const body = host.startsWith("listado.")
       ? fixtures.search
-      : (req.url ?? "").includes("noprice")
+      : url.includes("noprice")
         ? fixtures.productNoPrice
-        : fixtures.product;
+        : url.includes("nometa")
+          ? fixtures.productNoMeta
+          : url.includes("noanchor")
+            ? fixtures.productNoAnchor
+            : fixtures.product;
     res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
     res.end(body);
   }
@@ -471,8 +492,115 @@ try {
   );
   pass('radar "solo rentables" dims 1 loser → "Exportar rentables (2)"');
 
-  // ================= PHASE 5: resilience (render nothing safely) =============
-  console.log("\nPHASE 5 — RESILIENCE (unreadable page renders nothing, host intact)");
+  // ================= PHASE 5: SPA navigation (stale state impossible) ========
+  console.log("\nPHASE 5 — SPA NAVIGATION (stale state from a previous product impossible)");
+  await page.bringToFront();
+
+  // Simulate MELI's client-side navigation: swap the rendered price + meta,
+  // then pushState to a different product URL. No page load event fires — the
+  // URL watcher must tear down and re-inject on its own.
+  const spaNavigate = (fraction, cents, metaContent, path) =>
+    page.evaluate(({ fraction, cents, metaContent, path }) => {
+      const meta = document.querySelector('meta[itemprop="price"]');
+      if (meta) meta.content = metaContent;
+      const visibleBlock = document.querySelectorAll(".ui-pdp-price")[1];
+      visibleBlock.querySelector("span.andes-money-amount .andes-money-amount__fraction")
+        .textContent = fraction;
+      visibleBlock.querySelector("span.andes-money-amount .andes-money-amount__cents")
+        .textContent = cents;
+      history.pushState({}, "", path);
+    }, { fraction, cents, metaContent, path });
+
+  await spaNavigate("1,499", "00", "1499", "/otro-celular/p/MLM99999999");
+  // URL poll (≤1s) + teardown + settle (~650ms) + re-route.
+  await page.waitForFunction(
+    () => document.querySelector(".mst-card input.mst-input")?.value === "1499.00",
+    { timeout: 15000, polling: 250 }
+  );
+  assert.equal(await page.$$eval(".mst-card", (els) => els.length), 1);
+  pass("SPA nav → card torn down and re-injected with the NEW price ($1,499.00)");
+
+  // Product B must start clean: product A's cost (400) and ventas (10) must
+  // not leak into it, and nothing may be persisted under B's storage keys.
+  const bInputs = await page.$$eval(".mst-card input.mst-input", (els) =>
+    els.map((i) => i.value)
+  );
+  assert.equal(bInputs[2], "", `cost leaked across SPA nav: ${bInputs}`);
+  assert.equal(bInputs[3], "", `ventas leaked across SPA nav: ${bInputs}`);
+  const bStored = await dash.evaluate(() =>
+    chrome.storage.local.get(["mst:cost:MLM99999999", "mst:sales:MLM99999999"])
+  );
+  assert.deepEqual(bStored, {}, `stale write under new item's keys: ${JSON.stringify(bStored)}`);
+  pass("new product starts clean: no cost/ventas carry-over, no stale storage writes");
+
+  // Page re-render wipes the card → persistence watcher re-injects it.
+  await page.evaluate(() => document.getElementById("mst-card-root").remove());
+  await page.waitForFunction(
+    () => document.querySelector(".mst-card input.mst-input")?.value === "1499.00",
+    { timeout: 5000, polling: 200 }
+  );
+  pass("card wiped by page re-render → re-injected with the same product's data");
+
+  // Navigate BACK to product A: its per-item state must be restored intact.
+  await spaNavigate("827", "00", "827", "/celular-test-pro/p/MLM12345678");
+  await page.waitForFunction(
+    () => {
+      const inputs = document.querySelectorAll(".mst-card input.mst-input");
+      return inputs[0]?.value === "827.00" && inputs[2]?.value === "400.00";
+    },
+    { timeout: 15000, polling: 250 }
+  );
+  pass("SPA nav back → product A's price $827.00 and saved cost $400.00 restored");
+
+  // ================= PHASE 6: search lazy-load / infinite scroll ==============
+  console.log("\nPHASE 6 — SEARCH LAZY-LOAD (late results get strips)");
+  await search.bringToFront();
+  await search.click(".mst-radar__only"); // back to all results
+  await sleep(200);
+  await search.evaluate(() => {
+    const list = document.querySelector(".ui-search-layout");
+    const item = list.lastElementChild.cloneNode(true);
+    item.classList.remove("mst-dimmed");
+    item.querySelector(".mst-strip")?.remove();
+    item.querySelector("h2").textContent = "Celular Lazy Load 512 GB";
+    list.appendChild(item);
+  });
+  await search.waitForFunction(
+    () => document.querySelectorAll(".mst-strip").length === 4,
+    { timeout: 5000, polling: 200 }
+  );
+  assert.equal(
+    await search.$eval(".mst-export__btn", (b) => b.textContent),
+    "Exportar a CSV (4)"
+  );
+  pass("lazy-loaded 4th result gets a strip; export count follows (4)");
+
+  // ================= PHASE 7: extraction edge cases ===========================
+  console.log("\nPHASE 7 — EXTRACTION EDGE CASES (promo price without meta, no anchor)");
+  // Discounted listing with NO itemprop meta: the DOM-only path must skip the
+  // hidden duplicate block (1,199) and the crossed-out previous price (1,199).
+  const nometa = tap(await browser.newPage(), "nometa");
+  await nometa.goto(`${PRODUCT_URL}?e2e=nometa`, { waitUntil: "load" });
+  await nometa.waitForSelector("#mst-card-root", { visible: true, timeout: 20000 });
+  assert.equal(await nometa.$eval(".mst-card input.mst-input", (i) => i.value), "827.00");
+  assert.equal(await nometa.evaluate(rowValue("Comisión")), "−$82.70");
+  pass("promo listing without meta: reads $827.00, skips hidden dup + crossed-out $1,199");
+  await nometa.close();
+
+  // No recognizable price block at all → every anchor strategy misses → the
+  // extension keeps waiting silently and injects nothing.
+  let noAnchorFatal = false;
+  const noanchor = tap(await browser.newPage(), "noanchor");
+  noanchor.on("pageerror", () => { noAnchorFatal = true; });
+  await noanchor.goto(`${PRODUCT_URL}?e2e=noanchor`, { waitUntil: "load" });
+  await sleep(2500);
+  assert.equal(await noanchor.$("#mst-card-root"), null, "no card without any anchor");
+  assert.equal(noAnchorFatal, false, "anchorless page must not raise a fatal error");
+  pass("no price block at all → no card, no error (waits silently)");
+  await noanchor.close();
+
+  // ================= PHASE 8: resilience (render nothing safely) =============
+  console.log("\nPHASE 8 — RESILIENCE (unreadable page renders nothing, host intact)");
   let noPriceFatal = false;
   const noprice = tap(await browser.newPage(), "noprice");
   noprice.on("console", (m) => { if (/fatal/i.test(m.text())) noPriceFatal = true; });
