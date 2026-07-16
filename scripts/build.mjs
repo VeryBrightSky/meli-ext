@@ -19,7 +19,9 @@ const BRAND = globalThis.EXT_BRAND;
 
 const manifestPath = join(root, "manifest.json");
 const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
-manifest.name = release ? BRAND.name : BRAND.manifestName;
+manifest.name = release ? BRAND.storeName : BRAND.manifestName;
+// Toolbar/extensions-menu name stays short regardless of the store name.
+manifest.short_name = BRAND.name;
 manifest.version = BRAND.version;
 manifest.description = BRAND.description;
 
