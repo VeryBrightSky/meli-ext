@@ -263,9 +263,6 @@
   "dashMargin": {
     "message": "Margen"
   },
-  "dashTotals": {
-    "message": "Totales"
-  },
   "dashShippingNote": {
     "message": "Envío aplicado: tu valor predeterminado ($1). Cifras estimadas."
   },
@@ -349,9 +346,6 @@
   },
   "youLose": {
     "message": "Pierdes"
-  },
-  "radarTitle": {
-    "message": "Radar de Rentabilidad"
   },
   "radarSummary": {
     "message": "$1 productos: $2 rentables · $3 marginales · $4 en pérdida"

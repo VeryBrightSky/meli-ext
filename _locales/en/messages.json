@@ -263,9 +263,6 @@
   "dashMargin": {
     "message": "Margin"
   },
-  "dashTotals": {
-    "message": "Totals"
-  },
   "dashShippingNote": {
     "message": "Shipping applied: your default ($1). Figures are estimates."
   },
@@ -349,9 +346,6 @@
   },
   "youLose": {
     "message": "You lose"
-  },
-  "radarTitle": {
-    "message": "Profitability Radar"
   },
   "radarSummary": {
     "message": "$1 products: $2 profitable · $3 thin · $4 at a loss"
