@@ -30,7 +30,7 @@
     "message": "La detectamos de la publicación; corrígela si no coincide."
   },
   "hintNoCategory": {
-    "message": "Sin categoría detectada, la comisión por venta va de $1."
+    "message": "No detectamos la categoría; la comisión por venta puede ir de $1."
   },
   "rowCommission": {
     "message": "Comisión por venta ($1)"
@@ -42,7 +42,7 @@
     "message": "Tu costo de envío"
   },
   "rowShippingFree": {
-    "message": "Tu costo de envío (envío gratis ≥ $$299)"
+    "message": "Tu costo de envío (gratis para el comprador desde $$299)"
   },
   "rowNet": {
     "message": "Recibes aprox."
@@ -114,7 +114,7 @@
     "message": "Neto aprox."
   },
   "stripListingType": {
-    "message": "Publicación (est.)"
+    "message": "Tipo (estimado)"
   },
   "stripCategory": {
     "message": "Categoría"
@@ -135,7 +135,7 @@
     "message": "Costo fijo"
   },
   "stripNetBeforeShipping": {
-    "message": "Neto antes de envío"
+    "message": "Neto antes del envío"
   },
   "stripFooter": {
     "message": "$1 · estimado, tarifas al $2"
@@ -183,7 +183,7 @@
     "message": "Deja de adivinar el precio"
   },
   "upsellBody": {
-    "message": "PRO te dice el precio exacto para ganar el margen que quieres, cuánto te cuesta cada plazo de meses sin intereses, y pinta en verde o rojo cada resultado de búsqueda. Todo local, sin cuentas."
+    "message": "PRO te dice a qué precio vender para ganar el margen que quieres, cuánto te cuesta cada plazo de meses sin intereses y pinta en verde o rojo cada resultado de búsqueda. Todo en tu navegador, sin crear cuenta."
   },
   "upsellPricing": {
     "message": "$$89 MXN/mes (menos de $$3 al día) o $$699 MXN/año (ahorra 35%). Sin permanencia."
@@ -216,10 +216,10 @@
     "message": "Ganancia est. (costo: $1% del precio)"
   },
   "researchActive": {
-    "message": "Investigación: costo $1%"
+    "message": "Modo investigación: costo $1% del precio"
   },
   "optAcquisition": {
-    "message": "Costo de adquisición (% del precio) — Modo investigación"
+    "message": "Modo investigación: costo del producto (% del precio)"
   },
   "optSubscription": {
     "message": "Suscripción"
@@ -237,7 +237,7 @@
     "message": "Administrar suscripción / pagar"
   },
   "optLogin": {
-    "message": "Ya pagué — iniciar sesión"
+    "message": "Ya pagué, iniciar sesión"
   },
   "optDashboard": {
     "message": "Abrir Tablero de Ganancias"
@@ -264,7 +264,7 @@
     "message": "Margen"
   },
   "dashShippingNote": {
-    "message": "Envío aplicado: tu valor predeterminado ($1). Cifras estimadas."
+    "message": "Envío: se usó tu costo predeterminado ($1). Cifras estimadas."
   },
   "inputShippingAria": {
     "message": "Costo de envío en pesos"
@@ -294,7 +294,7 @@
     "message": "Neto después de retenciones"
   },
   "withholdingsHint": {
-    "message": "Retenciones vigentes desde el 01/01/2026. Aplican si tienes tu RFC registrado en Mercado Libre. Son acreditables contra tus impuestos, no son una pérdida."
+    "message": "Retenciones vigentes desde el 1 de enero de 2026 para vendedores con RFC registrado en Mercado Libre. Por lo general son acreditables en tu declaración, no una pérdida; confírmalo con tu contador."
   },
   "rowReputation": {
     "message": "Reputación del vendedor"
@@ -315,7 +315,7 @@
     "message": "Ofrezco envío gratis"
   },
   "rowShippingSubsidy": {
-    "message": "Subsidio de envío (estimado)"
+    "message": "Descuento en envío por reputación (estimado)"
   },
   "upsellMonthly": {
     "message": "Activar PRO · $$89 MXN/mes"
@@ -327,7 +327,7 @@
     "message": "Totales ($1 productos)"
   },
   "dashPortfolio": {
-    "message": "Resumen de tu portafolio"
+    "message": "Resumen de tus productos"
   },
   "dashProfitableCount": {
     "message": "$1 con ganancia"
@@ -357,7 +357,7 @@
     "message": "Solo rentables"
   },
   "radarSetCost": {
-    "message": "Escribe tu costo para encender el Radar en esta búsqueda."
+    "message": "Escribe tu costo para activar el Radar en esta búsqueda."
   },
   "btnExportProfitable": {
     "message": "Exportar rentables ($1)"
@@ -375,34 +375,34 @@
     "message": "Calculadora de meses sin intereses"
   },
   "msiTermLabel": {
-    "message": "Número de cuotas"
+    "message": "Número de meses"
   },
   "msiTermOption": {
-    "message": "$1 cuotas"
+    "message": "$1 meses"
   },
   "msiRateLabel": {
-    "message": "% de cargo por financiación"
+    "message": "Cargo por meses sin intereses (%)"
   },
   "msiRateAria": {
-    "message": "Porcentaje de cargo por financiación de tu cuenta"
+    "message": "Porcentaje de cargo por meses sin intereses de tu cuenta"
   },
   "msiHint": {
-    "message": "Encuentra tu porcentaje exacto en Mercado Pago → Configuración → Comisiones y MSI"
+    "message": "Revisa el porcentaje de tu cuenta en Mercado Pago, en los costos por ofrecer meses sin intereses."
   },
   "msiReferenceNote": {
-    "message": "referencia aproximada, varía por cuenta"
+    "message": "referencia aproximada; varía según tu cuenta"
   },
   "msiWhatIfNote": {
     "message": "Tu publicación es Clásica y no ofrece meses sin intereses. Esto es solo una simulación."
   },
   "msiCostLabel": {
-    "message": "Cargo por cuotas (estimado)"
+    "message": "Cargo por meses sin intereses (estimado)"
   },
   "msiColWithout": {
-    "message": "Sin cuotas"
+    "message": "Sin MSI"
   },
   "msiColWith": {
-    "message": "Con cuotas"
+    "message": "Con MSI"
   },
   "msiNetLabel": {
     "message": "Recibes aprox."
@@ -420,16 +420,16 @@
     "message": "Deja de adivinar el precio"
   },
   "upsellBody_generic": {
-    "message": "PRO te dice el precio exacto para ganar el margen que quieres, cuánto te cuesta cada plazo de meses sin intereses, y pinta en verde o rojo cada resultado de búsqueda. Todo local, sin cuentas."
+    "message": "PRO te dice a qué precio vender para ganar el margen que quieres, cuánto te cuesta cada plazo de meses sin intereses y pinta en verde o rojo cada resultado de búsqueda. Todo en tu navegador, sin crear cuenta."
   },
   "upsellLead_target": {
-    "message": "Para ganar $1% en este producto necesitas vender a $2"
+    "message": "Para ganar $1% en este producto tienes que venderlo en $2"
   },
   "upsellBody_target": {
     "message": "PRO calcula ese precio en cada publicación, con la comisión, el costo fijo y tu envío ya descontados. Cambia el margen y ve el precio al instante."
   },
   "upsellLead_breakeven": {
-    "message": "Por debajo de un precio exacto, cada venta te cuesta dinero"
+    "message": "Debajo de cierto precio, cada venta te cuesta dinero"
   },
   "upsellBody_breakeven": {
     "message": "PRO te muestra el precio mínimo para no perder y el precio para ganar el margen que quieras, en cada publicación."
@@ -438,25 +438,25 @@
     "message": "Hay un precio cercano donde recibes $1 más por venta"
   },
   "upsellBody_sweetspot": {
-    "message": "El costo fijo de Mercado Libre cambia por escalones. PRO te dice exactamente a qué precio subir para pagar menos y quedarte con más."
+    "message": "El costo fijo de Mercado Libre cambia por escalones. PRO te dice a qué precio subir para pagar menos y quedarte con más."
   },
   "upsellLead_loss": {
     "message": "Pierdes $1 por venta a este precio"
   },
   "upsellBody_loss": {
-    "message": "PRO te da el precio mínimo para no perder y el precio para ganar $2%, ya con comisión, costo fijo y envío. Un solo error de precio cuesta más que un mes de PRO."
+    "message": "PRO te da el precio mínimo para no perder y el precio para ganar $2%, ya con comisión, costo fijo y envío descontados. Un solo error de precio te cuesta más que un mes de PRO."
   },
   "upsellLead_msi": {
     "message": "Con $1 meses sin intereses tu ganancia baja a $2"
   },
   "upsellBody_msi": {
-    "message": "Cada plazo te cobra un porcentaje distinto y tú lo absorbes. PRO desglosa tu ganancia por plazo con tu tasa real para que no actives un plazo que te deje en rojo."
+    "message": "Cada plazo tiene un cargo distinto y lo absorbes tú. PRO desglosa tu ganancia por plazo con el porcentaje de tu cuenta, para que no actives uno que te deje en rojo."
   },
   "upsellLead_radar": {
     "message": "$1 productos de esta búsqueda sí dejan ganancia"
   },
   "upsellBody_radar": {
-    "message": "El Radar pinta cada resultado en verde, amarillo o rojo según tu costo y el margen que buscas, filtra solo los rentables y los exporta a CSV. Deja de investigar producto por producto."
+    "message": "El Radar pinta cada resultado en verde, amarillo o rojo según tu costo y el margen que buscas, filtra solo los rentables y los exporta a CSV. Deja de revisar producto por producto."
   },
   "upsellLead_dashboard": {
     "message": "Tus productos ordenados por ganancia real"
@@ -471,7 +471,7 @@
     "message": "Con PRO escribes cualquier precio y ves comisión, costo fijo, ganancia y margen al instante antes de tocar tu publicación."
   },
   "upsellLead_compare": {
-    "message": "Clásica o Premium: cuál te deja más"
+    "message": "Clásica o Premium: ¿cuál te deja más?"
   },
   "upsellBody_compare": {
     "message": "PRO compara los dos tipos de publicación lado a lado con tu precio y tu costo, incluyendo el costo de meses sin intereses."
@@ -504,16 +504,16 @@
     "message": "PRO · $1 días de prueba"
   },
   "trialActiveBanner": {
-    "message": "PRO activado gratis: te quedan $1 días. Guarda el costo de tus productos y mira tu Tablero."
+    "message": "Tienes PRO gratis: te quedan $1 días. Guarda el costo de tus productos y revisa tu Tablero."
   },
   "trialEnding": {
-    "message": "Tu prueba PRO termina en $1 días. Después pierdes precio objetivo, Radar y Tablero."
+    "message": "Tu prueba PRO termina en $1 días. Después pierdes el precio objetivo, el Radar y el Tablero."
   },
   "trialKeep": {
     "message": "Quedarme con PRO · $$89/mes"
   },
   "trialExpiredBanner": {
-    "message": "Tu prueba PRO terminó. Tu precio objetivo y tu Tablero siguen guardados."
+    "message": "Tu prueba PRO terminó. Tus costos guardados y tu Tablero siguen aquí."
   },
   "trialReactivate": {
     "message": "Reactivar PRO"
@@ -525,7 +525,7 @@
     "message": "Ver cuáles son · PRO"
   },
   "radarMoreLocked": {
-    "message": "$1 resultados más con verdicto en PRO"
+    "message": "$1 resultados más evaluados con PRO"
   },
   "radarCostLabel": {
     "message": "Tu costo (% del precio)"
@@ -537,12 +537,66 @@
     "message": "Ver todos · PRO"
   },
   "statusTrialDays": {
-    "message": "Prueba PRO: $1 días restantes"
+    "message": "Prueba PRO: te quedan $1 días"
   },
   "statusTrialExpired": {
     "message": "Plan gratuito (tu prueba PRO terminó)"
   },
   "optMetrics": {
-    "message": "Diagnóstico local de conversión"
+    "message": "Métricas de uso (solo en tu navegador)"
+  },
+  "upsellOpened": {
+    "message": "Abrimos el pago en una pestaña nueva. Al terminar, esta tarjeta se actualiza sola."
+  },
+  "welcomeTitle": {
+    "message": "Tu PRO está activado"
+  },
+  "welcomeTitlePaid": {
+    "message": "Netio PRO está activo"
+  },
+  "welcomeLead": {
+    "message": "Tienes $1 días de Netio PRO gratis. Sin correo, sin tarjeta. Así le sacas provecho desde hoy:"
+  },
+  "welcomeLeadPaid": {
+    "message": "Gracias por suscribirte. Así le sacas todo el provecho:"
+  },
+  "welcomeStep1": {
+    "message": "Abre cualquier publicación de Mercado Libre"
+  },
+  "welcomeStep1Body": {
+    "message": "La calculadora aparece debajo del precio con tu comisión, costo fijo, envío y ganancia."
+  },
+  "welcomeStep2": {
+    "message": "Escribe el costo de tu producto"
+  },
+  "welcomeStep2Body": {
+    "message": "Con eso Netio te da el precio mínimo para no perder y el precio para ganar el margen que quieras."
+  },
+  "welcomeStep3": {
+    "message": "Busca productos y mira el Radar"
+  },
+  "welcomeStep3Body": {
+    "message": "En los resultados de búsqueda, cada producto sale en verde, amarillo o rojo según tu costo."
+  },
+  "welcomeGo": {
+    "message": "Abrir Mercado Libre"
+  },
+  "welcomeNote": {
+    "message": "Todo se calcula en tu navegador. No tenemos servidores ni vemos tus datos."
+  },
+  "badgeTrialOne": {
+    "message": "PRO · último día de prueba"
+  },
+  "trialActiveBannerOne": {
+    "message": "Tienes PRO gratis: te queda 1 día. Guarda el costo de tus productos y revisa tu Tablero."
+  },
+  "trialEndingOne": {
+    "message": "Tu prueba PRO termina hoy. Después pierdes el precio objetivo, el Radar y el Tablero."
+  },
+  "statusTrialDaysOne": {
+    "message": "Prueba PRO: te queda 1 día"
+  },
+  "welcomeLeadOne": {
+    "message": "Tienes 1 día de Netio PRO gratis. Sin correo, sin tarjeta. Así le sacas provecho desde hoy:"
   }
 }

@@ -95,7 +95,9 @@ async function loadSubscriptionStatus() {
   statusEl.textContent = s.paid
     ? T("statusPro")
     : s.trialActive
-      ? (s.localTrial ? T("statusTrialDays", [String(s.trialDaysLeft)]) : T("statusTrial"))
+      ? (s.localTrial
+          ? (s.trialDaysLeft === 1 ? T("statusTrialDaysOne") : T("statusTrialDays", [String(s.trialDaysLeft)]))
+          : T("statusTrial"))
       : s.trialExpired
         ? T("statusTrialExpired")
         : T("statusFree");

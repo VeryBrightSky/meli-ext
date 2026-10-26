@@ -19,17 +19,42 @@ const INSTALLED_KEY = `${PREFIX}:installedAt`;
 
 // Reverse trial: stamp first-run time on install, and on update for users
 // who predate it (they get the same 7 PRO days — a reason to look again).
-chrome.runtime.onInstalled.addListener(async () => {
+const WELCOME_URL = "src/onboarding/welcome.html";
+const REVERSE_TRIAL_SINCE = "1.4.0";
+
+// "1.3.1" < "1.4.0" → true. Numeric, segment by segment.
+function versionBefore(a, b) {
+  const pa = String(a ?? "0").split(".").map((n) => Number(n) || 0);
+  const pb = String(b).split(".").map((n) => Number(n) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const x = pa[i] ?? 0;
+    const y = pb[i] ?? 0;
+    if (x !== y) return x < y;
+  }
+  return false;
+}
+
+chrome.runtime.onInstalled.addListener(async (details) => {
+  let stamped = false;
   try {
     const stored = await chrome.storage.local.get(INSTALLED_KEY);
     const raw = stored[INSTALLED_KEY];
     if (!(Number.isFinite(raw) && raw > 0 && raw <= Date.now())) {
       await chrome.storage.local.set({ [INSTALLED_KEY]: Date.now() });
+      stamped = true;
     }
   } catch (err) {
     console.warn("[Netio] could not stamp installedAt:", err);
   }
   refreshBadge();
+  // Welcome tab: once on install, and once on the update that first grants
+  // the reverse trial (pre-1.4 installs). Never on later updates.
+  const firstTrial =
+    details?.reason === "install" ||
+    (details?.reason === "update" && stamped && versionBefore(details.previousVersion, REVERSE_TRIAL_SINCE));
+  if (firstTrial) {
+    chrome.tabs.create({ url: chrome.runtime.getURL(WELCOME_URL) }).catch(() => {});
+  }
 });
 chrome.runtime.onStartup.addListener(() => refreshBadge());
 
@@ -96,8 +121,26 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   return true; // keep the channel open for the async response
 });
 
+// Tell every open Mercado Libre tab that the entitlement changed so the
+// injected UI rebuilds as PRO without a reload. Fire-and-forget per tab.
+async function broadcastProChanged() {
+  try {
+    // No "tabs" permission: query without a URL filter (allowed) and let the
+    // message fail silently on tabs that don't run our content script.
+    const tabs = await chrome.tabs.query({});
+    for (const tab of tabs) {
+      chrome.tabs.sendMessage(tab.id, { type: "proChanged" }).catch(() => {});
+    }
+  } catch {
+    // tabs API unavailable — the next navigation re-routes anyway
+  }
+}
+
 try {
-  extpay.onPaid.addListener(() => refreshBadge());
+  extpay.onPaid.addListener(() => {
+    refreshBadge();
+    broadcastProChanged();
+  });
 } catch {
   // onPaid unavailable with a placeholder id
 }

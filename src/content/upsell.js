@@ -33,14 +33,21 @@ globalThis.MST_UPSELL = (() => {
     const body = el("p", `${PREFIX}-upsell__body`, T("upsellBody"));
     const price = el("p", `${PREFIX}-upsell__price`, T("upsellPricing"));
     const actions = el("div", `${PREFIX}-upsell__actions`);
+    const note = el("p", `${PREFIX}-upsell__note`, T("upsellNote"));
+    // After a plan click the checkout opens in a new tab; say so here and
+    // promise the live update (content.js rebuilds on the SW's proChanged).
+    const opened = (plan) => {
+      GATE.openUpgrade(plan);
+      note.textContent = T("upsellOpened");
+      note.classList.add(`${PREFIX}-upsell__note--active`);
+    };
     const monthlyBtn = el("button", `${PREFIX}-upsell__cta`, T("upsellMonthly"));
     monthlyBtn.type = "button";
-    monthlyBtn.addEventListener("click", () => GATE.openUpgrade(BRAND.plans.monthly));
+    monthlyBtn.addEventListener("click", () => opened(BRAND.plans.monthly));
     const yearlyBtn = el("button", `${PREFIX}-upsell__alt`, T("upsellYearly"));
     yearlyBtn.type = "button";
-    yearlyBtn.addEventListener("click", () => GATE.openUpgrade(BRAND.plans.yearly));
+    yearlyBtn.addEventListener("click", () => opened(BRAND.plans.yearly));
     actions.append(monthlyBtn, yearlyBtn);
-    const note = el("p", `${PREFIX}-upsell__note`, T("upsellNote"));
     const close = el("button", `${PREFIX}-upsell__close`, T("upsellClose"));
     close.type = "button";
     close.addEventListener("click", () => {
@@ -161,10 +168,11 @@ globalThis.MST_UPSELL = (() => {
     if (status.trialActive && status.localTrial) {
       stateKey = status.trialDaysLeft <= 3 ? "ending" : "active";
       root.dataset.tone = status.trialDaysLeft <= 3 ? "ending" : "active";
+      const n = status.trialDaysLeft;
       text.textContent =
-        status.trialDaysLeft <= 3
-          ? T("trialEnding", [String(status.trialDaysLeft)])
-          : T("trialActiveBanner", [String(status.trialDaysLeft)]);
+        n <= 3
+          ? (n === 1 ? T("trialEndingOne") : T("trialEnding", [String(n)]))
+          : T("trialActiveBanner", [String(n)]);
       btn.textContent = T("trialKeep");
       btn.addEventListener("click", () => GATE.openUpgrade(BRAND.plans.monthly));
     } else if (status.trialExpired && (status.trialDaysSinceEnd ?? 0) <= 14) {

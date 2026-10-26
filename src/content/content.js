@@ -555,6 +555,26 @@
     window.addEventListener("popstate", () => setTimeout(onNavigated, 50));
   }
 
+  // Entitlement changed (payment completed in the ExtPay tab, or a
+  // successful "Ya pagué" login): rebuild in place so the seller sees PRO the
+  // moment they come back to this tab, without a reload.
+  function startProWatcher() {
+    try {
+      chrome.runtime.onMessage.addListener((message) => {
+        if (message?.type !== "proChanged") return;
+        const gen = ++generation;
+        log("entitlement changed → rebuilding");
+        runCleanups();
+        removeInjectedUi();
+        pageData = null;
+        route({ initial: false }).catch((err) => warn("route after proChanged failed:", err));
+        void gen;
+      });
+    } catch {
+      // runtime unavailable (e.g. extension reloaded) — next navigation re-routes
+    }
+  }
+
   // --- Entry -----------------------------------------------------------------
 
   async function main() {
@@ -563,6 +583,7 @@
       window.location.href
     );
     startUrlWatcher();
+    startProWatcher();
     await route({ initial: true }).catch((err) => warn("initial route failed:", err));
   }
 

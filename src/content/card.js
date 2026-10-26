@@ -640,7 +640,7 @@ globalThis.MST_CARD = (() => {
     header.appendChild(el("h2", `${PREFIX}-title`, T("cardTitle")));
     if (gateStatus.trialActive && gateStatus.localTrial) {
       const trial = el("span", `${PREFIX}-badge ${PREFIX}-badge--trial`,
-        T("badgeTrial", [String(gateStatus.trialDaysLeft)]));
+        gateStatus.trialDaysLeft === 1 ? T("badgeTrialOne") : T("badgeTrial", [String(gateStatus.trialDaysLeft)]));
       header.appendChild(trial);
     }
     const badge = el("span", `${PREFIX}-badge`, T("badgeEstimate"));

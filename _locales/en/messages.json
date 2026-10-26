@@ -387,7 +387,7 @@
     "message": "Your account's financing charge percentage"
   },
   "msiHint": {
-    "message": "Find your exact rate in Mercado Pago → Settings → Fees and installments."
+    "message": "Check your account's percentage in Mercado Pago, under the costs for offering interest-free installments."
   },
   "msiReferenceNote": {
     "message": "approximate reference, varies by account"
@@ -513,7 +513,7 @@
     "message": "Keep PRO · $$89/mo"
   },
   "trialExpiredBanner": {
-    "message": "Your PRO trial has ended. Your target price and Dashboard are still saved."
+    "message": "Your PRO trial has ended. Your saved costs and Dashboard are still here."
   },
   "trialReactivate": {
     "message": "Reactivate PRO"
@@ -544,5 +544,59 @@
   },
   "optMetrics": {
     "message": "Local conversion diagnostics"
+  },
+  "upsellOpened": {
+    "message": "Checkout opened in a new tab. When you're done, this card updates by itself."
+  },
+  "welcomeTitle": {
+    "message": "Your PRO is on"
+  },
+  "welcomeTitlePaid": {
+    "message": "Netio PRO is active"
+  },
+  "welcomeLead": {
+    "message": "You have $1 days of Netio PRO for free. No email, no card. Get value from it today:"
+  },
+  "welcomeLeadPaid": {
+    "message": "Thanks for subscribing. Here's how to get the most out of it:"
+  },
+  "welcomeStep1": {
+    "message": "Open any Mercado Libre listing"
+  },
+  "welcomeStep1Body": {
+    "message": "The calculator appears under the price with your commission, fixed fee, shipping and profit."
+  },
+  "welcomeStep2": {
+    "message": "Type your product cost"
+  },
+  "welcomeStep2Body": {
+    "message": "Netio then gives you the break-even price and the price for the margin you want."
+  },
+  "welcomeStep3": {
+    "message": "Search for products and watch the Radar"
+  },
+  "welcomeStep3Body": {
+    "message": "On search results every product shows green, yellow or red based on your cost."
+  },
+  "welcomeGo": {
+    "message": "Open Mercado Libre"
+  },
+  "welcomeNote": {
+    "message": "Everything is computed in your browser. We run no servers and never see your data."
+  },
+  "badgeTrialOne": {
+    "message": "PRO · last trial day"
+  },
+  "trialActiveBannerOne": {
+    "message": "PRO is on for free: 1 day left. Save your product costs and check your Dashboard."
+  },
+  "trialEndingOne": {
+    "message": "Your PRO trial ends today. After that you lose target price, Radar and Dashboard."
+  },
+  "statusTrialDaysOne": {
+    "message": "PRO trial: 1 day left"
+  },
+  "welcomeLeadOne": {
+    "message": "You have 1 day of Netio PRO for free. No email, no card. Get value from it today:"
   }
 }

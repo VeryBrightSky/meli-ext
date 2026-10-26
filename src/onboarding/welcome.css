@@ -1,0 +1,44 @@
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: "Proxima Nova", -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: #2d3277;
+  background-image: radial-gradient(900px 500px at 85% -10%, rgba(43, 224, 140, 0.18), transparent 55%);
+  color: #fff;
+  min-height: 100vh;
+}
+.wrap { max-width: 640px; margin: 0 auto; padding: 56px 24px 64px; }
+.head { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; }
+#brand-logo { border-radius: 12px; }
+.wm { font-size: 30px; font-weight: 800; letter-spacing: -0.5px; }
+.wm b { color: #2be08c; }
+.pill {
+  margin-left: auto; font-size: 12px; font-weight: 800; letter-spacing: 0.4px;
+  color: #9affc9; background: rgba(43, 224, 140, 0.13); border: 1px solid rgba(43, 224, 140, 0.5);
+  padding: 6px 12px; border-radius: 999px;
+}
+h1 { font-size: 34px; line-height: 1.12; letter-spacing: -0.6px; margin: 0 0 12px; }
+.lead { font-size: 17px; line-height: 1.5; color: #c7caf0; margin: 0 0 26px; }
+.steps { list-style: none; margin: 0 0 28px; padding: 0; counter-reset: s; }
+.steps li {
+  counter-increment: s; display: flex; flex-direction: column; gap: 3px;
+  padding: 14px 16px 14px 52px; position: relative; margin-bottom: 10px;
+  background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 12px;
+}
+.steps li::before {
+  content: counter(s); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px;
+  border-radius: 8px; background: linear-gradient(150deg, #2be08c, #13b673); color: #06311f;
+  font-weight: 800; display: flex; align-items: center; justify-content: center; font-size: 13px;
+}
+.steps b { font-size: 15px; }
+.steps span { font-size: 14px; color: #c7caf0; line-height: 1.45; }
+.actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.btn {
+  font: inherit; font-weight: 700; font-size: 15px; padding: 12px 18px; border-radius: 10px;
+  text-decoration: none; cursor: pointer; border: 1px solid transparent;
+}
+.btn-primary { background: #00a650; color: #fff; }
+.btn-primary:hover { background: #0b8f47; }
+.btn-ghost { background: rgba(255, 255, 255, 0.08); color: #fff; border-color: rgba(255, 255, 255, 0.2); }
+.btn-ghost:hover { background: rgba(255, 255, 255, 0.14); }
+.note { margin-top: 22px; font-size: 13px; color: #9a9ec9; line-height: 1.5; }

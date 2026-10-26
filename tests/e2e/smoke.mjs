@@ -160,13 +160,25 @@ try {
   // never-paid phases exercise the post-trial (locked) state.
   console.log("\nPHASE 0 — REVERSE TRIAL (fresh install is PRO, then expires)");
   const extId = await extensionId();
+  // onInstalled(reason: install) opens the welcome tab once.
+  const welcomeTarget = await browser.waitForTarget(
+    (t) => t.url().includes("/src/onboarding/welcome.html"),
+    { timeout: 10000 }
+  );
+  const welcome = await welcomeTarget.page();
+  await welcome.waitForFunction(() => (document.getElementById("title")?.textContent ?? "").length > 0, { timeout: 10000 });
+  assert.equal(await welcome.$eval("#title", (e) => e.textContent), "Tu PRO está activado");
+  assert.ok((await welcome.$eval("#lead", (e) => e.textContent)).includes("7 días"), "welcome lead should show 7 días");
+  assert.equal(await welcome.$eval("#go", (a) => a.href), "https://www.mercadolibre.com.mx/");
+  pass("install opens the welcome tab: 'Tu PRO está activado', 7 días, link to Mercado Libre");
+  await welcome.close();
   const seed = await browser.newPage();
   await seed.goto(`chrome-extension://${extId}/src/options/options.html`, { waitUntil: "load" });
   await seed.waitForFunction(
-    () => /Prueba PRO: \d+ días/.test(document.getElementById("sub-status")?.textContent ?? ""),
+    () => /Prueba PRO: te quedan \d+ días/.test(document.getElementById("sub-status")?.textContent ?? ""),
     { timeout: 10000 }
   );
-  pass("fresh install: options shows 'Prueba PRO: N días restantes' (reverse trial on)");
+  pass("fresh install: options shows 'Prueba PRO: te quedan N días' (reverse trial on)");
   if (process.env.E2E_SHOTS) {
     const trialPage = await browser.newPage();
     await trialPage.goto(PRODUCT_URL, { waitUntil: "load" });
@@ -274,11 +286,11 @@ try {
   await sleep(200);
   assert.equal(await page.$eval(".mst-upsell", (e) => e.hidden), false);
   const upsellText = await page.$eval(".mst-upsell", (e) => e.textContent);
-  assert.ok(upsellText.includes("necesitas vender a $750.00"), `contextual headline missing: ${upsellText}`);
+  assert.ok(upsellText.includes("tienes que venderlo en $750.00"), `contextual headline missing: ${upsellText}`);
   assert.ok(upsellText.includes("$89 MXN/mes"), "upsell missing monthly price");
   assert.ok(upsellText.includes("$699 MXN/año"), "upsell missing yearly price");
   assert.ok(upsellText.includes("ahorra 35%"), "upsell missing yearly savings");
-  pass("teaser click opens contextual upsell ('necesitas vender a $750.00') with MXN pricing");
+  pass("teaser click opens contextual upsell ('tienes que venderlo en $750.00') with MXN pricing");
 
   // MSI teaser: Premium listings show the real profit after 12 MSI (free),
   // the per-term breakdown is PRO.
@@ -417,6 +429,23 @@ try {
   await dash.evaluate(async (snap) => chrome.storage.local.set(snap), saved);
 
   // ====================== PHASE 3: product page, Pro ========================
+  // ---- Live entitlement flip (no reload) -----------------------------------
+  // The product tab from phase 1 is still open in the free state. The service
+  // worker broadcasts "proChanged" after a payment; simulate that broadcast
+  // from an extension page and assert the card rebuilds as PRO in place.
+  console.log("\nPHASE 2b — LIVE PRO FLIP WITHOUT RELOAD");
+  await page.bringToFront();
+  assert.ok((await page.$$eval(".mst-prochip", (els) => els.length)) > 0, "precondition: free card");
+  await dash.evaluate(async () => {
+    const tabs = await chrome.tabs.query({});
+    await Promise.all(tabs.map((t) => chrome.tabs.sendMessage(t.id, { type: "proChanged" }).catch(() => null)));
+  });
+  await page.waitForFunction(
+    () => document.querySelector("#mst-card-root") && document.querySelectorAll(".mst-prochip").length === 0 && !document.querySelector(".mst-card input.mst-input")?.disabled,
+    { timeout: 10000 }
+  );
+  pass("after payment broadcast the open listing rebuilds as PRO (no chips, what-if unlocked) without reload");
+
   console.log("\nPHASE 3 — PRODUCT, PRO");
   await page.bringToFront();
   await page.goto(PRODUCT_URL, { waitUntil: "load" });
