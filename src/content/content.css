@@ -769,3 +769,210 @@
   display: block;
   border-radius: 2px;
 }
+
+/* --- v1.4 conversion UI: teasers, alerts, trial banner ---------------------- */
+
+/* Flex containers must still honor the hidden attribute. */
+.mst-alert[hidden],
+.mst-trialbar[hidden],
+.mst-upsell[hidden],
+.mst-radar[hidden] {
+  display: none;
+}
+
+/* Teaser rows: the real value, blurred. Keeps full opacity so the number
+   reads as present-but-hidden rather than disabled. */
+.mst-row--teaser {
+  opacity: 1;
+}
+
+.mst-row--teaser .mst-row__label {
+  opacity: 0.85;
+}
+
+.mst-blur {
+  filter: blur(4px);
+  user-select: none;
+  pointer-events: none;
+  transition: filter 0.15s ease;
+}
+
+.mst-row--teaser:hover .mst-blur {
+  filter: blur(3px);
+}
+
+.mst-row--teaser.mst-row--loss .mst-row__label {
+  color: #d63b2f;
+  opacity: 1;
+}
+
+/* Red-number alert strip */
+.mst-alert {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 2px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.35;
+  background: #fdecea;
+  border: 1px solid rgba(214, 59, 47, 0.35);
+  color: rgba(0, 0, 0, 0.85);
+}
+
+.mst-alert[data-tone="thin"] {
+  background: #fff3cd;
+  border-color: rgba(249, 194, 0, 0.7);
+}
+
+.mst-alert__text {
+  flex: 1 1 auto;
+}
+
+.mst-alert__btn {
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 10px;
+  border: none;
+  border-radius: 5px;
+  background: #3483fa;
+  color: #fff;
+  cursor: pointer;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.mst-alert__btn:hover {
+  background: #2968c8;
+}
+
+/* Trial banner (countdown / win-back) */
+.mst-trialbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: -2px 0 10px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: rgba(0, 0, 0, 0.85);
+  background: #e8f7ee;
+  border: 1px solid rgba(0, 166, 80, 0.35);
+}
+
+.mst-trialbar[data-tone="ending"] {
+  background: #fff3cd;
+  border-color: rgba(249, 194, 0, 0.7);
+}
+
+.mst-trialbar[data-tone="expired"] {
+  background: #fdecea;
+  border-color: rgba(214, 59, 47, 0.35);
+}
+
+.mst-trialbar__text {
+  flex: 1 1 auto;
+}
+
+.mst-trialbar__btn {
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 10px;
+  border: none;
+  border-radius: 5px;
+  background: #3483fa;
+  color: #fff;
+  cursor: pointer;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.mst-trialbar__btn:hover {
+  background: #2968c8;
+}
+
+.mst-trialbar__close {
+  font-family: inherit;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0 4px;
+  border: none;
+  background: transparent;
+  color: rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.mst-trialbar__close:hover {
+  color: rgba(0, 0, 0, 0.8);
+}
+
+.mst-badge--trial {
+  background: #e8f7ee;
+  border-color: rgba(0, 166, 80, 0.5);
+  color: #0a5c34;
+  cursor: default;
+  margin-right: 6px;
+}
+
+/* Upsell panel extras */
+.mst-upsell__note {
+  font-size: 11px;
+  color: rgba(0, 0, 0, 0.55);
+  margin: 8px 0 0;
+}
+
+.mst-upsell__close {
+  font-family: inherit;
+  font-size: 11px;
+  margin-top: 6px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.mst-upsell__actions {
+  flex-wrap: wrap;
+}
+
+/* Search page: free radar summary + inline cost input */
+.mst-radar__cta {
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 10px;
+  border: none;
+  border-radius: 5px;
+  background: #3483fa;
+  color: #fff;
+  cursor: pointer;
+  margin-left: 8px;
+  white-space: nowrap;
+}
+
+.mst-radar__cta:hover {
+  background: #2968c8;
+}
+
+.mst-radar__more {
+  font-size: 11px;
+  color: rgba(0, 0, 0, 0.6);
+  margin-left: 8px;
+}
+
+.mst-radar__cost {
+  width: 52px;
+  font-family: inherit;
+  font-size: 12px;
+  padding: 3px 6px;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  border-radius: 4px;
+  margin-left: 6px;
+}

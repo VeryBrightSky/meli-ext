@@ -13,7 +13,7 @@ globalThis.EXT_BRAND = Object.freeze({
   storeName: "Netio: Calculadora de Ganancias para Mercado Libre",
   // Name used in manifest.json dev builds.
   manifestName: "Netio (dev)",
-  version: "1.3.1",
+  version: "1.4.0",
   description:
     "Calculadora de comisiones, ganancias y precios para vendedores de Mercado Libre México.",
   // ExtensionPay id (registered at extensionpay.com). Plans configured there:

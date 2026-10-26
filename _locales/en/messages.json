@@ -180,16 +180,16 @@
     "message": "Netio PRO"
   },
   "upsellHeadline": {
-    "message": "Find products that actually make money"
+    "message": "Stop guessing the price"
   },
   "upsellBody": {
-    "message": "The Profitability Radar scans the whole search and shows only the products that actually make money. Plus: target price by margin, optimal-price alerts, Clásica vs Premium comparison, CSV export, Profit Dashboard, monthly profit, research mode, and price history."
+    "message": "PRO tells you the exact price to hit the margin you want, what each interest-free installment term costs you, and paints every search result green or red. All local, no accounts."
   },
   "upsellPricing": {
-    "message": "7-day free trial. Then $$89 MXN/mo or $$699 MXN/yr (save 35%) — founder pricing."
+    "message": "$$89 MXN/mo (under $$3 a day) or $$699 MXN/yr (save 35%). No lock-in."
   },
   "upsellTrial": {
-    "message": "Start your free 7-day trial"
+    "message": "Try it free for 7 days"
   },
   "proSweetSpotName": {
     "message": "Optimal-price alert"
@@ -282,7 +282,7 @@
     "message": "Full service fee"
   },
   "rowWithholdings": {
-    "message": "I have a registered RFC (IVA & ISR withholding)"
+    "message": "Show 2026 withholdings (IVA 8% / ISR 2.5%)"
   },
   "rowIvaWithheld": {
     "message": "IVA withheld (8%)"
@@ -318,7 +318,7 @@
     "message": "Shipping subsidy (est.)"
   },
   "upsellMonthly": {
-    "message": "$$89 MXN/mo"
+    "message": "Activate PRO · $$89 MXN/mo"
   },
   "upsellYearly": {
     "message": "$$699 MXN/yr (save 35%)"
@@ -357,7 +357,7 @@
     "message": "Only profitable"
   },
   "radarSetCost": {
-    "message": "Set your acquisition cost in options to activate the Radar."
+    "message": "Enter your cost to switch the Radar on for this search."
   },
   "btnExportProfitable": {
     "message": "Export profitable ($1)"
@@ -409,5 +409,140 @@
   },
   "msiMarginLabel": {
     "message": "Margin"
+  },
+  "upsellNote": {
+    "message": "Cancel anytime. Secure payment via Stripe."
+  },
+  "upsellClose": {
+    "message": "Not now"
+  },
+  "upsellLead_generic": {
+    "message": "Stop guessing the price"
+  },
+  "upsellBody_generic": {
+    "message": "PRO tells you the exact price to hit the margin you want, what each interest-free installment term costs you, and paints every search result green or red. All local, no accounts."
+  },
+  "upsellLead_target": {
+    "message": "To earn $1% on this product you need to sell at $2"
+  },
+  "upsellBody_target": {
+    "message": "PRO computes that price on every listing, with commission, fixed fee and your shipping already deducted. Change the margin and see the price instantly."
+  },
+  "upsellLead_breakeven": {
+    "message": "Below one exact price, every sale costs you money"
+  },
+  "upsellBody_breakeven": {
+    "message": "PRO shows the break-even price and the price for the margin you want, on every listing."
+  },
+  "upsellLead_sweetspot": {
+    "message": "There's a nearby price where you keep $1 more per sale"
+  },
+  "upsellBody_sweetspot": {
+    "message": "Mercado Libre's fixed fee moves in steps. PRO tells you exactly which price to raise to so you pay less and keep more."
+  },
+  "upsellLead_loss": {
+    "message": "You lose $1 per sale at this price"
+  },
+  "upsellBody_loss": {
+    "message": "PRO gives you the break-even price and the price to earn $2%, with commission, fixed fee and shipping included. One pricing mistake costs more than a month of PRO."
+  },
+  "upsellLead_msi": {
+    "message": "With $1 interest-free months your profit drops to $2"
+  },
+  "upsellBody_msi": {
+    "message": "Each term charges you a different percentage and you absorb it. PRO breaks down your profit per term with your real rate so you never enable a term that puts you in the red."
+  },
+  "upsellLead_radar": {
+    "message": "$1 products in this search actually make money"
+  },
+  "upsellBody_radar": {
+    "message": "The Radar paints every result green, yellow or red by your cost and target margin, filters to the profitable ones and exports them to CSV. Stop researching one product at a time."
+  },
+  "upsellLead_dashboard": {
+    "message": "Your products ranked by real profit"
+  },
+  "upsellBody_dashboard": {
+    "message": "The Dashboard gathers every listing where you saved a cost, computes profit and margin per product, and puts the loss-makers on top."
+  },
+  "upsellLead_whatif": {
+    "message": "Test prices without touching the listing"
+  },
+  "upsellBody_whatif": {
+    "message": "With PRO you type any price and see commission, fixed fee, profit and margin instantly before changing your listing."
+  },
+  "upsellLead_compare": {
+    "message": "Clásica or Premium: which leaves you more"
+  },
+  "upsellBody_compare": {
+    "message": "PRO compares both listing types side by side with your price and cost, including the installment cost."
+  },
+  "upsellLead_expired": {
+    "message": "Your PRO trial has ended"
+  },
+  "upsellBody_expired": {
+    "message": "Target price, Radar, Dashboard and installments are still here. Reactivate them for under $$3 a day."
+  },
+  "alertCta": {
+    "message": "See price"
+  },
+  "alertLoss": {
+    "message": "You lose $1 per sale. PRO gives you the price to earn $2%."
+  },
+  "alertThin": {
+    "message": "Only $1% margin. PRO gives you the price to earn $2%."
+  },
+  "rowTargetTeaser": {
+    "message": "Price to earn $1%"
+  },
+  "sweetSpotTeaser": {
+    "message": "There's a nearby price where you keep $1 more per sale."
+  },
+  "msiTeaser": {
+    "message": "With $1 MSI your profit drops to $2"
+  },
+  "badgeTrial": {
+    "message": "PRO · $1 trial days"
+  },
+  "trialActiveBanner": {
+    "message": "PRO is on for free: $1 days left. Save your product costs and check your Dashboard."
+  },
+  "trialEnding": {
+    "message": "Your PRO trial ends in $1 days. After that you lose target price, Radar and Dashboard."
+  },
+  "trialKeep": {
+    "message": "Keep PRO · $$89/mo"
+  },
+  "trialExpiredBanner": {
+    "message": "Your PRO trial has ended. Your target price and Dashboard are still saved."
+  },
+  "trialReactivate": {
+    "message": "Reactivate PRO"
+  },
+  "radarFreeSummary": {
+    "message": "$1 products: $2 profitable · $3 thin · $4 at a loss (assumed cost $5% of price)"
+  },
+  "radarSeeAll": {
+    "message": "See which ones · PRO"
+  },
+  "radarMoreLocked": {
+    "message": "$1 more results with a verdict in PRO"
+  },
+  "radarCostLabel": {
+    "message": "Your cost (% of price)"
+  },
+  "dashFreeLimit": {
+    "message": "Free plan: showing $1 of $2 products. PRO shows all, ranked by profit."
+  },
+  "dashUnlock": {
+    "message": "See all · PRO"
+  },
+  "statusTrialDays": {
+    "message": "PRO trial: $1 days left"
+  },
+  "statusTrialExpired": {
+    "message": "Free plan (your PRO trial ended)"
+  },
+  "optMetrics": {
+    "message": "Local conversion diagnostics"
   }
 }

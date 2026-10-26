@@ -90,12 +90,26 @@ document.getElementById("dashboard-btn").addEventListener("click", () => send("o
 
 async function loadSubscriptionStatus() {
   const statusEl = document.getElementById("sub-status");
-  const res = await send("getProStatus");
-  if (res?.ok) {
-    const s = res.data;
-    statusEl.textContent = s.paid ? T("statusPro") : s.trialActive ? T("statusTrial") : T("statusFree");
-  } else {
-    statusEl.textContent = T("statusFree");
+  // Merged status (ExtPay + local reverse trial) — the same one the card uses.
+  const s = await globalThis.MST_GATE.refresh();
+  statusEl.textContent = s.paid
+    ? T("statusPro")
+    : s.trialActive
+      ? (s.localTrial ? T("statusTrialDays", [String(s.trialDaysLeft)]) : T("statusTrial"))
+      : s.trialExpired
+        ? T("statusTrialExpired")
+        : T("statusFree");
+
+  // Local-only funnel counters for the developer (no network, nothing sent).
+  const metricsEl = document.getElementById("metrics");
+  if (metricsEl) {
+    const stored = await chrome.storage.local.get(globalThis.MST_GATE.METRICS_KEY);
+    const m = stored[globalThis.MST_GATE.METRICS_KEY] ?? {};
+    const parts = Object.entries(m)
+      .filter(([k]) => k !== "updatedAt")
+      .sort()
+      .map(([k, v]) => `${k} ${v}`);
+    metricsEl.textContent = parts.length ? `${T("optMetrics")}: ${parts.join(" · ")}` : "";
   }
 }
 loadSubscriptionStatus();

@@ -233,3 +233,23 @@ tbody tr.mst-row--loss:hover {
   color: rgba(0, 0, 0, 0.55);
   padding: 48px 16px;
 }
+
+/* v1.4: free preview of the table */
+tr.locked td {
+  filter: blur(4px);
+  user-select: none;
+  pointer-events: none;
+}
+
+tr.locked td:first-child {
+  filter: blur(2px);
+}
+
+.note--limit {
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.8);
+}
+
+#upsell {
+  margin-top: 18px;
+}

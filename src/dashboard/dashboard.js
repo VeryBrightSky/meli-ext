@@ -19,23 +19,28 @@
     chrome.runtime.sendMessage({ type, payload }).catch(() => null);
 
   // --- Pro gate ----------------------------------------------------------------
+  // Free: the dashboard still opens with the first FREE_ROWS products (worst
+  // margin first) so the seller sees it work; the rest of the rows are
+  // blurred and the panel below sells the whole table.
+  const FREE_ROWS = 3;
   const status = await globalThis.MST_GATE.refresh();
-  if (!status.pro) {
+  const pro = status.pro;
+  if (!pro) {
     const up = document.getElementById("upsell");
     up.hidden = false;
     document.getElementById("upsell-title").textContent = T("upsellTitle");
-    document.getElementById("upsell-body").textContent = T("upsellBody");
+    document.getElementById("upsell-body").textContent =
+      `${T("upsellLead_dashboard")}. ${T("upsellBody_dashboard")}`;
     document.getElementById("upsell-pricing").textContent = T("upsellPricing");
     const trial = document.getElementById("trial-btn");
-    trial.textContent = T("upsellTrial");
-    trial.addEventListener("click", () => send("openTrialPage"));
+    trial.hidden = true;
     const monthly = document.getElementById("monthly-btn");
     monthly.textContent = T("upsellMonthly");
-    monthly.addEventListener("click", () => send("openPaymentPage", { plan: BRAND.plans.monthly }));
+    monthly.addEventListener("click", () => globalThis.MST_GATE.openUpgrade(BRAND.plans.monthly));
     const yearly = document.getElementById("yearly-btn");
     yearly.textContent = T("upsellYearly");
-    yearly.addEventListener("click", () => send("openPaymentPage", { plan: BRAND.plans.yearly }));
-    return;
+    yearly.addEventListener("click", () => globalThis.MST_GATE.openUpgrade(BRAND.plans.yearly));
+    globalThis.MST_GATE.track("open:dashboard-page");
   }
 
   // --- Data (recomputed live; see dashboard-model.js) ---------------------------
@@ -164,10 +169,20 @@
     const tbody = document.getElementById("rows");
     tbody.replaceChildren();
 
-    for (const row of rows) {
+    const limitNote = document.getElementById("limit-note");
+    if (!pro && rows.length > FREE_ROWS) {
+      limitNote.hidden = false;
+      limitNote.textContent = T("dashFreeLimit", [String(FREE_ROWS), String(rows.length)]);
+    } else {
+      limitNote.hidden = true;
+    }
+
+    rows.forEach((row, index) => {
       const tr = document.createElement("tr");
       // Flag loss-makers (worst-case profit below zero) for visual call-out.
       if (row.b.profitMinMXN < 0) tr.classList.add(`${PREFIX}-row--loss`);
+      const locked = !pro && index >= FREE_ROWS;
+      if (locked) tr.classList.add("locked");
       for (const colDef of COLS) {
         const td = document.createElement("td");
         if (colDef.num) td.className = "num";
@@ -180,7 +195,7 @@
           a.rel = "noopener";
           a.textContent = row.meta.title || row.itemId;
           td.appendChild(a);
-        } else if (colDef.editable) {
+        } else if (colDef.editable && !locked) {
           const input = document.createElement("input");
           input.type = "text";
           input.inputMode = "numeric";
@@ -195,13 +210,15 @@
             render();
           });
           td.appendChild(input);
+        } else if (colDef.editable) {
+          td.textContent = row.sales > 0 ? String(row.sales) : "—";
         } else {
           td.textContent = colDef.value(row);
         }
         tr.appendChild(td);
       }
       tbody.appendChild(tr);
-    }
+    });
 
     // Grand totals: monthly projected profit across all rows + product count.
     const tot = DASH.totals(rows);
@@ -226,6 +243,11 @@
   exportBtn.hidden = false;
   exportBtn.textContent = T("btnExportCsv");
   exportBtn.addEventListener("click", () => {
+    if (!pro) {
+      document.getElementById("upsell").scrollIntoView({ behavior: "smooth" });
+      globalThis.MST_GATE.track("open:dashboard-csv");
+      return;
+    }
     const esc = (v) => (/[",\n;]/.test(String(v)) ? `"${String(v).replaceAll('"', '""')}"` : String(v));
     const lines = [COLS.map((c) => esc(c.label)).join(",")];
     for (const row of rows) {

@@ -120,13 +120,25 @@ globalThis.MST_QUICKVIEW = (() => {
   let onlyProfitable = false;
   const radarActive = () => GATE.isPro() && acquisitionPct > 0;
 
+  // Free preview of the Radar: verdicts are computed for every result with an
+  // assumed cost (the seller's own setting if any, else 60% of price), the
+  // first FREE_VERDICTS strips show their colors for real, the rest stay plain
+  // and the summary bar names how many winners the page holds. The counts are
+  // the hook; seeing WHICH ones is PRO.
+  const FREE_VERDICTS = 3;
+  const DEFAULT_ASSUMED_COST_PCT = 60;
+  const previewPct = () => (acquisitionPct > 0 ? acquisitionPct : DEFAULT_ASSUMED_COST_PCT);
+  const radarPreview = () => !GATE.isPro();
+  let freeVerdictsShown = 0;
+  let upsellOpen = null; // set when the free export bar is built
+
   // Worst-case verdict for one result: classify by netMin (higher commission
   // bound) so "profitable" survives the conservative case.
   function evaluateStrip(data, b) {
     return RADAR.evaluate({
       priceMXN: data.priceMXN,
       netMXN: b.netMinMXN,
-      acquisitionPct,
+      acquisitionPct: radarActive() ? acquisitionPct : previewPct(),
       targetMarginPct: radarTargetPct
     });
   }
@@ -157,12 +169,25 @@ globalThis.MST_QUICKVIEW = (() => {
 
     const strip = el("div", STRIP_CLASS);
 
-    // Radar verdict (Pro): stamp the strip so the summary bar, target control,
-    // and "only profitable" filter can read it without recomputing.
-    const evaln = radarActive() ? evaluateStrip(data, b) : null;
+    // Radar verdict: stamp the strip so the summary bar, target control,
+    // and "only profitable" filter can read it without recomputing. In free
+    // preview the verdict is stamped as `preview` (counted, not shown) except
+    // for the first few strips, which show their colors for real.
+    const evaln = radarActive() || radarPreview() ? evaluateStrip(data, b) : null;
+    let showVerdict = false;
     if (evaln) {
-      strip.dataset.bucket = evaln.bucket;
       strip.dataset.margin = String(evaln.marginPct);
+      if (radarActive()) {
+        strip.dataset.bucket = evaln.bucket;
+        showVerdict = true;
+      } else {
+        strip.dataset.preview = evaln.bucket;
+        if (freeVerdictsShown < FREE_VERDICTS) {
+          strip.dataset.bucket = evaln.bucket;
+          freeVerdictsShown += 1;
+          showVerdict = true;
+        }
+      }
     }
 
     const bar = el("button", `${PREFIX}-strip__bar`);
@@ -174,7 +199,7 @@ globalThis.MST_QUICKVIEW = (() => {
     logo.width = 10;
     logo.height = 10;
     bar.appendChild(logo);
-    if (evaln) {
+    if (evaln && showVerdict) {
       bar.appendChild(buildVerdict(evaln));
     } else {
       bar.appendChild(el("span", null, T("stripNet")));
@@ -371,8 +396,69 @@ globalThis.MST_QUICKVIEW = (() => {
     }
   }
 
+  // Free preview row: live counts for the page + CTA. Rebuilt on each scan
+  // via refreshPreviewSummary().
+  function buildPreviewRow() {
+    const row = el("div", `${PREFIX}-radar ${PREFIX}-radar--preview`);
+    row.appendChild(el("span", `${PREFIX}-radar__summary`, ""));
+    const cta = el("button", `${PREFIX}-radar__cta`, T("radarSeeAll"));
+    cta.type = "button";
+    cta.addEventListener("click", () => {
+      const c = previewCounts();
+      if (upsellOpen) upsellOpen("radar", [String(c.profit)]);
+    });
+    row.appendChild(cta);
+    row.appendChild(el("span", `${PREFIX}-radar__more`, ""));
+    return row;
+  }
+
+  function previewCounts() {
+    const strips = [...document.querySelectorAll(`.${STRIP_CLASS}[data-preview]`)];
+    return RADAR.summarize(strips.map((s) => ({ bucket: s.dataset.preview })));
+  }
+
+  function refreshPreviewSummary() {
+    const summaryEl = document.querySelector(`.${PREFIX}-radar--preview .${PREFIX}-radar__summary`);
+    if (!summaryEl) return;
+    const c = previewCounts();
+    summaryEl.textContent = T("radarFreeSummary", [
+      String(c.total),
+      String(c.profit),
+      String(c.thin),
+      String(c.loss),
+      String(previewPct())
+    ]);
+    const more = document.querySelector(`.${PREFIX}-radar--preview .${PREFIX}-radar__more`);
+    const hidden = Math.max(0, c.total - FREE_VERDICTS);
+    if (more) more.textContent = hidden > 0 ? T("radarMoreLocked", [String(hidden)]) : "";
+  }
+
+  // Inline acquisition-cost input so a PRO/trial user can switch the Radar on
+  // from the results page (the options page was the only way before).
+  function buildCostField() {
+    const field = el("label", `${PREFIX}-radar__field`);
+    field.appendChild(el("span", null, T("radarCostLabel")));
+    const input = el("input", `${PREFIX}-radar__cost`);
+    input.type = "number";
+    input.min = "0";
+    input.max = "99";
+    input.step = "1";
+    input.value = acquisitionPct > 0 ? String(acquisitionPct) : "";
+    input.placeholder = String(DEFAULT_ASSUMED_COST_PCT);
+    input.setAttribute("aria-label", T("radarCostLabel"));
+    input.addEventListener("change", () => {
+      const v = Math.max(0, Math.min(99, Math.round(Number(input.value) || 0)));
+      chrome.storage.sync.set({ acquisitionPct: v });
+      // Verdicts depend on the cost: rebuild the strips and the bar in place.
+      init();
+    });
+    field.appendChild(input);
+    return field;
+  }
+
   function buildRadarRow() {
     const row = el("div", `${PREFIX}-radar`);
+    row.appendChild(buildCostField());
     row.appendChild(el("span", `${PREFIX}-radar__summary`));
 
     const field = el("label", `${PREFIX}-radar__field`);
@@ -437,9 +523,8 @@ globalThis.MST_QUICKVIEW = (() => {
         }
       } else {
         const upsell = globalThis.MST_UPSELL.attach(bar);
-        const open = () => {
-          upsell.panel.hidden = false;
-        };
+        upsellOpen = (reason, vars) => upsell.open(reason, vars);
+        const open = () => upsellOpen("radar", [String(previewCounts().profit)]);
         btn.classList.add(`${PREFIX}-locked`);
         btn.addEventListener("click", open);
         wrap.appendChild(globalThis.MST_UPSELL.chip(open));
@@ -449,17 +534,29 @@ globalThis.MST_QUICKVIEW = (() => {
         el("span", `${PREFIX}-export__brand`, BRAND.name)
       );
 
+      bar.classList.add(`${PREFIX}-export--radar`);
       if (radarActive()) {
-        bar.classList.add(`${PREFIX}-export--radar`);
         bar.appendChild(buildRadarRow());
       } else if (GATE.isPro()) {
-        bar.classList.add(`${PREFIX}-export--radar`);
-        bar.appendChild(el("div", `${PREFIX}-radar__hint`, T("radarSetCost")));
+        // Entitled but no cost yet: the row with the inline input, so the
+        // Radar is one keystroke away instead of buried in options.
+        const row = el("div", `${PREFIX}-radar`);
+        row.appendChild(buildCostField());
+        row.appendChild(el("span", `${PREFIX}-radar__more`, T("radarSetCost")));
+        bar.appendChild(row);
+      } else {
+        bar.insertBefore(buildPreviewRow(), upsellPanelOf(bar));
       }
       list.parentElement.insertBefore(bar, list);
     }
     if (radarActive()) reapplyRadar();
+    if (radarPreview()) refreshPreviewSummary();
     refreshExportBtn();
+  }
+
+  // The upsell panel (free bar) must stay last so the preview row sits above it.
+  function upsellPanelOf(bar) {
+    return bar.querySelector(`.${PREFIX}-upsell`);
   }
 
   // --- Scan & observe -----------------------------------------------------------
@@ -560,6 +657,8 @@ globalThis.MST_QUICKVIEW = (() => {
 
   async function init() {
     destroy(); // re-init after SPA navigation starts clean
+    freeVerdictsShown = 0;
+    upsellOpen = null;
     const settings = await chrome.storage.sync.get({
       acquisitionPct: 0,
       radarTargetPct: RADAR.DEFAULT_TARGET_PCT

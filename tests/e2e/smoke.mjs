@@ -100,6 +100,9 @@ const browser = await puppeteer.launch({
     `--disable-extensions-except=${dist}`,
     `--load-extension=${dist}`,
     "--host-resolver-rules=MAP www.mercadolibre.com.mx 127.0.0.1, MAP listado.mercadolibre.com.mx 127.0.0.1",
+    // The fixtures are served from 127.0.0.1; never route them through a
+    // system/CI proxy (HTTPS_PROXY) that can't reach the local server.
+    "--proxy-server=direct://",
     "--ignore-certificate-errors",
     "--lang=es-419",
     "--no-sandbox",
@@ -151,8 +154,40 @@ async function extensionId() {
 }
 
 try {
+  // ====================== PHASE 0: reverse trial ===========================
+  // A fresh install is PRO for 7 days with no email/card (reverse trial).
+  // Verify that first, then stamp the install 9 days back so the rest of the
+  // never-paid phases exercise the post-trial (locked) state.
+  console.log("\nPHASE 0 — REVERSE TRIAL (fresh install is PRO, then expires)");
+  const extId = await extensionId();
+  const seed = await browser.newPage();
+  await seed.goto(`chrome-extension://${extId}/src/options/options.html`, { waitUntil: "load" });
+  await seed.waitForFunction(
+    () => /Prueba PRO: \d+ días/.test(document.getElementById("sub-status")?.textContent ?? ""),
+    { timeout: 10000 }
+  );
+  pass("fresh install: options shows 'Prueba PRO: N días restantes' (reverse trial on)");
+  if (process.env.E2E_SHOTS) {
+    const trialPage = await browser.newPage();
+    await trialPage.goto(PRODUCT_URL, { waitUntil: "load" });
+    await trialPage.waitForSelector("#mst-card-root", { visible: true, timeout: 20000 });
+    await sleep(600);
+    await (await trialPage.$("#mst-card-root")).screenshot({ path: join(process.env.E2E_SHOTS, "card-trial.png") });
+    await trialPage.close();
+  }
+  await seed.evaluate(async () => {
+    await chrome.storage.local.set({ "mst:installedAt": Date.now() - 9 * 24 * 3600 * 1000 });
+  });
+  await seed.reload({ waitUntil: "load" });
+  await seed.waitForFunction(
+    () => (document.getElementById("sub-status")?.textContent ?? "").includes("terminó"),
+    { timeout: 10000 }
+  );
+  pass("install stamped 9 days back → status 'tu prueba PRO terminó'");
+  await seed.close();
+
   // ====================== PHASE 1: never-paid (locked) ======================
-  console.log("\nPHASE 1 — PRODUCT, NEVER-PAID (fail closed)");
+  console.log("\nPHASE 1 — PRODUCT, TRIAL EXPIRED, NEVER PAID (fail closed)");
   const page = tap(await browser.newPage(), "product");
   await browser.defaultBrowserContext().overridePermissions(
     `https://www.mercadolibre.com.mx:${PORT}`,
@@ -189,29 +224,80 @@ try {
   assert.equal(await page.evaluate(rowValue("Precio mínimo")), "$500.00");
   pass("breakeven stays FREE: cost 400 + ship 50 → $500.00");
 
-  const lockedRows = await page.$$eval(".mst-row--locked", (rows) =>
-    rows.map((r) => r.textContent)
+  // Post-trial win-back banner is visible (trial ended 2 days ago).
+  assert.equal(await page.$eval(".mst-trialbar", (e) => e.hidden), false);
+  assert.ok(
+    (await page.$eval(".mst-trialbar", (e) => e.textContent)).includes("Tu prueba PRO terminó"),
+    "win-back banner copy missing"
   );
-  assert.ok(lockedRows.some((t) => t.includes("Precio objetivo")), "target price not locked");
+  pass("post-trial banner shows 'Tu prueba PRO terminó' with reactivate button");
+
+  // Target price teaser: the REAL number for this listing, blurred.
+  // cost 400 + ship 50, rate 10%, margin 30% → (450)/(1-0.10-0.30) = 750.00
+  const teaser = await page.$eval(".mst-row--teaser", (r) => ({
+    label: r.querySelector(".mst-row__label").textContent,
+    value: r.querySelector(".mst-blur").textContent,
+    blurred: getComputedStyle(r.querySelector(".mst-blur")).filter.includes("blur")
+  }));
+  assert.ok(teaser.label.includes("Precio para ganar 30%"), `teaser label: ${teaser.label}`);
+  assert.equal(teaser.value, "$750.00");
+  assert.equal(teaser.blurred, true, "teaser value must be blurred");
+  pass("target-price teaser renders real $750.00 (30% margin) blurred for free users");
+
+  const lockedRows = await page.$$eval(".mst-row--locked", (rows) => rows.map((r) => r.textContent));
   assert.ok(lockedRows.some((t) => t.includes("Ventas al mes")), "sales not locked");
   const chips = await page.$$eval(".mst-prochip", (els) => els.length);
   assert.ok(chips >= 4, `expected ≥4 PRO chips, got ${chips}`);
   pass(`locked rows render with PRO chips (${chips} chips)`);
 
-  assert.equal(
-    await page.$eval(".mst-sweetspot", (e) => e.style.display !== "none"),
-    false
-  );
+  // Loss alert: drop price below cost → alert strip with the real loss.
+  // Price 400: net 360 − ship 50 − cost 400 = −90 → "Pierdes $90.00 por venta".
+  // (what-if is locked; simulate via product cost 900 instead: 744.30−50−900 = −205.70)
+  const alertVisible = () => page.$eval(".mst-alert", (e) => !e.hidden && e.offsetHeight > 0);
+  assert.equal(await alertVisible(), false);
+  await typeInto(page, 2, "900");
+  assert.equal(await alertVisible(), true);
+  const alertText = await page.$eval(".mst-alert__text", (e) => e.textContent);
+  assert.ok(alertText.includes("Pierdes $205.70 por venta"), `alert text: ${alertText}`);
+  pass("red-number moment: alert strip names the real loss ($205.70) and offers the fix");
+  await typeInto(page, 2, "400");
+  assert.equal(await alertVisible(), false, "alert must actually disappear (display) once profitable again");
+  pass("alert strip hides again when the listing is profitable");
+
+  // Upsell never opens on load; clicking the teaser opens it with THIS
+  // listing's number in the headline.
   assert.equal(await page.$eval(".mst-upsell", (e) => e.hidden), true);
-  await page.click(".mst-compare-toggle");
+  await page.click(".mst-row--teaser");
   await sleep(200);
   assert.equal(await page.$eval(".mst-upsell", (e) => e.hidden), false);
   const upsellText = await page.$eval(".mst-upsell", (e) => e.textContent);
-  assert.ok(upsellText.includes("7 días"), "upsell missing trial copy");
+  assert.ok(upsellText.includes("necesitas vender a $750.00"), `contextual headline missing: ${upsellText}`);
   assert.ok(upsellText.includes("$89 MXN/mes"), "upsell missing monthly price");
   assert.ok(upsellText.includes("$699 MXN/año"), "upsell missing yearly price");
   assert.ok(upsellText.includes("ahorra 35%"), "upsell missing yearly savings");
-  pass("locked feature click opens upsell (trial + MXN founder pricing), never on load");
+  pass("teaser click opens contextual upsell ('necesitas vender a $750.00') with MXN pricing");
+
+  // MSI teaser: Premium listings show the real profit after 12 MSI (free),
+  // the per-term breakdown is PRO.
+  const msiTeaserVisible = () => page.$eval(".mst-row--teaser:nth-of-type(n)", () => true).catch(() => false);
+  await page.$$eval(".mst-toggle__btn", (btns) => btns.find((b) => b.textContent === "Premium").click());
+  await sleep(300);
+  const msiTeaserText = await page.$$eval(".mst-row--teaser", (rows) =>
+    rows.map((r) => ({ text: r.textContent, shown: r.style.display !== "none" }))
+  );
+  const msiRow = msiTeaserText.find((r) => r.text.includes("MSI"));
+  assert.ok(msiRow && msiRow.shown, `msi teaser missing: ${JSON.stringify(msiTeaserText)}`);
+  assert.ok(/Con 12 MSI tu ganancia baja a \$[\d,]+\.\d{2}/.test(msiRow.text), msiRow.text);
+  pass(`MSI teaser on Premium (free): "${msiRow.text.replace("PRO", "").trim()}"`);
+  await page.$$eval(".mst-toggle__btn", (btns) => btns.find((b) => b.textContent === "Clásica").click());
+  await sleep(300);
+  assert.equal((await page.$$eval(".mst-row--teaser", (rows) => rows.map((r) => r.style.display !== "none" && r.textContent.includes("MSI")))).some(Boolean), false);
+  pass("MSI teaser hidden again on Clásica (no MSI there)");
+
+  // Sweet spot: free users see the gain for real, price hidden. (Fixture price
+  // 827 has no higher fixed-cost step within +20%, so the nudge is hidden.)
+  assert.equal(await page.$eval(".mst-sweetspot", (e) => e.style.display !== "none"), false);
+  pass("sweet-spot nudge hidden when no better step exists (no false hook)");
 
   await page.click(".mst-copy");
   await sleep(300);
@@ -219,20 +305,54 @@ try {
   assert.ok(clip.includes("Recibes aprox.: $694.30"), `clipboard wrong:\n${clip}`);
   pass("copy summary stays FREE");
 
+  if (process.env.E2E_SHOTS) {
+    await page.$eval(".mst-upsell", (e) => (e.hidden = true));
+    await (await page.$("#mst-card-root")).screenshot({ path: join(process.env.E2E_SHOTS, "card-free.png") });
+  }
+
+  // ====================== PHASE 1b: search, free (radar preview) ============
+  console.log("\nPHASE 1b — SEARCH, TRIAL EXPIRED (radar preview with real counts)");
+  const freeSearch = tap(await browser.newPage(), "search-free");
+  await freeSearch.bringToFront();
+  await freeSearch.goto(SEARCH_URL, { waitUntil: "load" });
+  await freeSearch.waitForSelector(".mst-radar--preview", { timeout: 20000 });
+  await sleep(500);
+  const preview = await freeSearch.$eval(".mst-radar--preview .mst-radar__summary", (e) => e.textContent);
+  assert.equal(preview, "3 productos: 2 rentables · 1 marginales · 0 en pérdida (costo supuesto 60% del precio)", preview);
+  pass("free search bar: real radar counts at the assumed 60% cost");
+  const previewBuckets = await freeSearch.$$eval(".mst-strip", (els) => els.map((e) => e.dataset.preview));
+  assert.deepEqual(previewBuckets.filter(Boolean).length, 3, `preview stamps: ${previewBuckets}`);
+  const shownVerdicts = await freeSearch.$$eval(".mst-strip__verdict", (els) => els.length);
+  assert.ok(shownVerdicts >= 1 && shownVerdicts <= 3, `free verdict pills: ${shownVerdicts}`);
+  pass(`free strips: first ${shownVerdicts} show a colored verdict, rest stay plain`);
+  assert.equal(await freeSearch.$eval(".mst-upsell", (e) => e.hidden), true);
+  await freeSearch.click(".mst-radar__cta");
+  await sleep(200);
+  assert.equal(await freeSearch.$eval(".mst-upsell", (e) => e.hidden), false);
+  const radarUpsell = await freeSearch.$eval(".mst-upsell", (e) => e.textContent);
+  assert.ok(radarUpsell.includes("2 productos de esta búsqueda sí dejan ganancia"), radarUpsell);
+  pass("'Ver cuáles son · PRO' opens the radar upsell with the real winner count");
+  if (process.env.E2E_SHOTS) {
+    await freeSearch.screenshot({ path: join(process.env.E2E_SHOTS, "search-free.png") });
+  }
+  await freeSearch.close();
+
   // ====================== PHASE 2: dashboard locked =========================
-  console.log("\nPHASE 2 — DASHBOARD (locked) + SEED PRO");
-  const extId = await extensionId();
+  console.log("\nPHASE 2 — DASHBOARD (free preview) + SEED PRO");
   const dash = await browser.newPage();
   await dash.goto(`chrome-extension://${extId}/src/dashboard/dashboard.html`, {
     waitUntil: "load"
   });
   await dash.waitForFunction(
-    () => !document.getElementById("upsell")?.hidden || !document.getElementById("content")?.hidden,
+    () => !document.getElementById("upsell")?.hidden && !document.getElementById("content")?.hidden,
     { timeout: 10000 }
   );
   assert.equal(await dash.$eval("#upsell", (e) => e.hidden), false);
-  assert.equal(await dash.$eval("#content", (e) => e.hidden), true);
-  pass("dashboard shows upsell when not Pro");
+  assert.equal(await dash.$eval("#content", (e) => e.hidden), false);
+  // One saved product → within the free limit, so it renders unblurred.
+  assert.equal(await dash.$$eval("#rows tr", (trs) => trs.length), 1);
+  assert.equal(await dash.$$eval("#rows tr.locked", (trs) => trs.length), 0);
+  pass("dashboard (free): table renders with the first products visible + upsell below");
 
   // QA override + sales seed; options default shipping = 0 (meta/cost were
   // written by the real card in phase 1).
@@ -383,6 +503,9 @@ try {
   await typeInto(page, 2, "400"); // restore
 
   // ====================== PHASE 4: search page, Pro =========================
+  if (process.env.E2E_SHOTS) {
+    await (await page.$("#mst-card-root")).screenshot({ path: join(process.env.E2E_SHOTS, "card-pro.png") });
+  }
   console.log("\nPHASE 4 — SEARCH, PRO");
   const search = tap(await browser.newPage(), "search");
   await search.bringToFront();
@@ -397,6 +520,9 @@ try {
     )
   );
   pass("3 strips, all collapsed on load");
+  if (process.env.E2E_SHOTS) {
+    await search.screenshot({ path: join(process.env.E2E_SHOTS, "search-pro.png") });
+  }
 
   await search.click(".mst-strip__bar");
   await sleep(200);

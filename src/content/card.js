@@ -60,6 +60,11 @@ globalThis.MST_CARD = (() => {
   const fullWeightKg = () =>
     state.usesFull ? (state.weightKg > 0 ? state.weightKg : 0.3) : null;
 
+  // Free-tier teaser defaults: the margin the blurred target price is solved
+  // for, and the margin below which the "thin" alert fires.
+  const DEFAULT_TEASER_MARGIN_PCT = 30;
+  const THIN_MARGIN_PCT = 10;
+
   // Live references into the current card DOM, repopulated on each build().
   const refs = {};
 
@@ -296,24 +301,25 @@ globalThis.MST_CARD = (() => {
         ? T("rowShippingFree")
         : T("rowShipping");
 
-    // Sweet spot (worst-case rate so the promised gain is conservative). Pro.
-    const spot = pro
-      ? CALC.findSweetSpot({
-          priceMXN: state.priceMXN,
-          ratePct: quote.pctMax,
-          fixedCostFn,
-          thresholds: SOURCE.getFixedCostThresholds()
-        })
-      : null;
+    // Sweet spot (worst-case rate so the promised gain is conservative).
+    // Pro: actionable (click applies the price). Free: the gain is shown for
+    // real, the price is what PRO unlocks.
+    const spot = CALC.findSweetSpot({
+      priceMXN: state.priceMXN,
+      ratePct: quote.pctMax,
+      fixedCostFn,
+      thresholds: SOURCE.getFixedCostThresholds()
+    });
     refs.sweetspot.style.display = spot ? "" : "none";
     if (spot) {
-      refs.sweetspot.textContent = T("sweetSpot", [
-        fmtMoney(spot.targetPriceMXN),
-        fmtMoney(spot.netGainMXN)
-      ]);
+      refs.sweetspot.textContent = pro
+        ? T("sweetSpot", [fmtMoney(spot.targetPriceMXN), fmtMoney(spot.netGainMXN)])
+        : T("sweetSpotTeaser", [fmtMoney(spot.netGainMXN)]);
       refs.sweetspot.dataset.target = String(spot.targetPriceMXN);
+      refs.sweetspot.dataset.gain = fmtMoney(spot.netGainMXN);
     } else {
       delete refs.sweetspot.dataset.target;
+      delete refs.sweetspot.dataset.gain;
     }
 
     // Clásica vs Premium comparison. Pro.
@@ -409,6 +415,21 @@ globalThis.MST_CARD = (() => {
           price > 0 ? CALC.round2((netWithMin / price) * 100) : 0,
           price > 0 ? CALC.round2((netWithMax / price) * 100) : 0
         );
+      }
+    }
+
+    // Free: one-line MSI teaser on Premium listings with the REAL profit after
+    // the reference 12-MSI cost; the per-term breakdown is PRO.
+    if (!pro && refs.msiTeaser) {
+      const teaserTerm = 12;
+      const show = state.listingTypeId === "premium" && b.profitMinMXN !== undefined;
+      refs.msiTeaser.root.style.display = show ? "" : "none";
+      if (show) {
+        const cost = CALC.msiCost(state.priceMXN, msiReferencePct(teaserTerm));
+        const after = CALC.round2(b.profitMinMXN - cost);
+        refs.msiTeaser.set(T("msiTeaser", [String(teaserTerm), fmtMoney(after)]));
+        refs.msiTeaser.vars = [String(teaserTerm), fmtMoney(after)];
+        refs.msiTeaser.root.classList.toggle(`${PREFIX}-row--loss`, after < 0);
       }
     }
 
@@ -509,6 +530,36 @@ globalThis.MST_CARD = (() => {
       patchRow(refs.breakeven, null, lo !== null && hi !== null ? fmtRange(lo, hi) : "—", flash);
     }
 
+    if (!pro) {
+      // Free: the target price for the default margin exists and is shown
+      // blurred; the loss/thin-margin alert names the real number. Both open
+      // the contextual upsell with the exact figures for THIS listing.
+      const teaserPct = state.targetMarginPct > 0 ? state.targetMarginPct : DEFAULT_TEASER_MARGIN_PCT;
+      refs.targetTeaser.root.style.display = hasCost ? "" : "none";
+      if (hasCost) {
+        const hi = solve(quote.pctMax, teaserPct);
+        const text = hi !== null ? fmtMoney(hi) : T("targetUnreachable");
+        refs.targetTeaser.label.textContent = T("rowTargetTeaser", [String(teaserPct)]);
+        refs.targetTeaser.set(text);
+        refs.targetTeaser.vars = [String(teaserPct), text];
+      }
+      if (hasCost && b.profitMinMXN !== undefined) {
+        const losing = b.profitMaxMXN < 0;
+        const thin = !losing && b.marginMinPct < THIN_MARGIN_PCT;
+        if (losing) {
+          refs.alert.show(T("alertLoss", [fmtMoney(-b.profitMaxMXN), String(teaserPct)]), "loss");
+          refs.alert.reason = ["loss", [fmtMoney(-b.profitMaxMXN), String(teaserPct)]];
+        } else if (thin) {
+          refs.alert.show(T("alertThin", [String(b.marginMinPct), String(teaserPct)]), "thin");
+          refs.alert.reason = ["target", refs.targetTeaser.vars];
+        } else {
+          refs.alert.hide();
+        }
+      } else {
+        refs.alert.hide();
+      }
+    }
+
     if (pro) {
       refs.targetMarginRow.style.display = hasCost ? "" : "none";
       const hasTarget = hasCost && state.targetMarginPct > 0;
@@ -575,8 +626,19 @@ globalThis.MST_CARD = (() => {
     let openUpsell = () => {};
     const UPSELL = globalThis.MST_UPSELL;
 
+    const gateStatus = globalThis.MST_GATE.status();
+
+    // Trial banner (countdown / win-back) sits above everything; it decides
+    // its own visibility and remembers dismissal.
+    body.appendChild(UPSELL.trialBanner(gateStatus, (reason) => openUpsell(reason)));
+
     const header = el("div", `${PREFIX}-header`);
     header.appendChild(el("h2", `${PREFIX}-title`, T("cardTitle")));
+    if (gateStatus.trialActive && gateStatus.localTrial) {
+      const trial = el("span", `${PREFIX}-badge ${PREFIX}-badge--trial`,
+        T("badgeTrial", [String(gateStatus.trialDaysLeft)]));
+      header.appendChild(trial);
+    }
     const badge = el("span", `${PREFIX}-badge`, T("badgeEstimate"));
     badge.setAttribute("title", T("badgeTooltip", [SOURCE.meta.retrievedAt]));
     badge.tabIndex = 0;
@@ -607,7 +669,7 @@ globalThis.MST_CARD = (() => {
       // What-if editing is Pro: input stays visible (shows the page price)
       // but read-only, with a chip that opens the upsell.
       refs.priceInput.disabled = true;
-      priceWrap.appendChild(UPSELL.chip(() => openUpsell()));
+      priceWrap.appendChild(UPSELL.chip(() => openUpsell("whatif")));
     }
     priceRow.appendChild(priceWrap);
     body.appendChild(priceRow);
@@ -636,7 +698,7 @@ globalThis.MST_CARD = (() => {
     if (!state.pro) refs.compareBtn.classList.add(`${PREFIX}-locked`);
     refs.compareBtn.addEventListener("click", () => {
       if (!state.pro) {
-        openUpsell();
+        openUpsell("compare");
         return;
       }
       state.compareOpen = !state.compareOpen;
@@ -649,7 +711,7 @@ globalThis.MST_CARD = (() => {
     if (!state.pro) refs.msiBtn.classList.add(`${PREFIX}-locked`);
     refs.msiBtn.addEventListener("click", () => {
       if (!state.pro) {
-        openUpsell();
+        openUpsell("msi", refs.msiTeaser?.vars);
         return;
       }
       state.msiOpen = !state.msiOpen;
@@ -935,6 +997,10 @@ globalThis.MST_CARD = (() => {
     refs.sweetspot = el("button", `${PREFIX}-sweetspot`, "");
     refs.sweetspot.type = "button";
     refs.sweetspot.addEventListener("click", () => {
+      if (!state.pro) {
+        openUpsell("sweetspot", [refs.sweetspot.dataset.gain ?? ""]);
+        return;
+      }
       const target = Number(refs.sweetspot.dataset.target);
       if (target > 0) {
         state.priceMXN = target;
@@ -1018,11 +1084,31 @@ globalThis.MST_CARD = (() => {
         }
       });
     } else {
-      // Locked Pro features: name + PRO chip, click opens the upsell.
-      body.appendChild(UPSELL.lockedRow(T("rowTargetPrice"), () => openUpsell()));
-      body.appendChild(UPSELL.lockedRow(T("proSweetSpotName"), () => openUpsell()));
-      body.appendChild(UPSELL.lockedRow(T("rowSales"), () => openUpsell()));
-      body.appendChild(UPSELL.lockedRow(T("rowHistory"), () => openUpsell()));
+      // Free: the red-number alert, then the target price as a blurred REAL
+      // number for this listing (what PRO unlocks), then the two remaining
+      // locked rows. Every one opens the panel with this listing's figures.
+      refs.alert = UPSELL.alertStrip(() => {
+        const [reason, vars] = refs.alert.reason ?? ["target", refs.targetTeaser?.vars];
+        openUpsell(reason, vars);
+      });
+      body.appendChild(refs.alert.root);
+      refs.targetTeaser = UPSELL.teaserRow(
+        T("rowTargetTeaser", [String(DEFAULT_TEASER_MARGIN_PCT)]),
+        () => openUpsell("target", refs.targetTeaser.vars),
+        "total"
+      );
+      refs.targetTeaser.label = refs.targetTeaser.root.querySelector(`.${PREFIX}-row__label`);
+      refs.targetTeaser.root.style.display = "none";
+      body.appendChild(refs.targetTeaser.root);
+      refs.msiTeaser = UPSELL.teaserRow("", () => openUpsell("msi", refs.msiTeaser.vars));
+      refs.msiTeaser.label = refs.msiTeaser.root.querySelector(`.${PREFIX}-row__label`);
+      refs.msiTeaser.set = (text) => {
+        if (refs.msiTeaser.label.textContent !== text) refs.msiTeaser.label.textContent = text;
+      };
+      refs.msiTeaser.value.remove();
+      refs.msiTeaser.root.style.display = "none";
+      body.appendChild(refs.msiTeaser.root);
+      body.appendChild(UPSELL.lockedRow(T("rowSales"), () => openUpsell("dashboard")));
     }
 
     // Dashboard link (the dashboard itself is Pro).
@@ -1032,10 +1118,10 @@ globalThis.MST_CARD = (() => {
       if (state.pro) {
         globalThis.MST_GATE.openDashboard();
       } else {
-        openUpsell();
+        openUpsell("dashboard");
       }
     });
-    if (!state.pro) dashBtn.appendChild(UPSELL.chip(() => openUpsell()));
+    if (!state.pro) dashBtn.appendChild(UPSELL.chip(() => openUpsell("dashboard")));
     body.appendChild(dashBtn);
 
     // Copy plain-text summary (WhatsApp/notes friendly).
@@ -1054,9 +1140,7 @@ globalThis.MST_CARD = (() => {
 
     // Upsell panel lives at the bottom of the card; never opens on load.
     const upsell = UPSELL.attach(body);
-    openUpsell = () => {
-      upsell.panel.hidden = false;
-    };
+    openUpsell = (reason, vars) => upsell.open(reason, vars);
   }
 
   function buildSummaryText() {

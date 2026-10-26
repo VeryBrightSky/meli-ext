@@ -388,7 +388,9 @@ test("gate: never-paid user is not pro", () => {
   assert.deepEqual(GATE.computeProStatus({ paid: false }, now), {
     pro: false,
     paid: false,
-    trialActive: false
+    trialActive: false,
+    trialExpired: false,
+    trialDaysLeft: 0
   });
   assert.equal(GATE.computeProStatus(null, now).pro, false);
 });
@@ -399,12 +401,12 @@ test("gate: active trial is pro, expired trial is not", () => {
     { paid: false, trialStartedAt: new Date(now - 3 * 24 * 3600 * 1000).toISOString() },
     now
   );
-  assert.deepEqual(active, { pro: true, paid: false, trialActive: true });
+  assert.deepEqual(active, { pro: true, paid: false, trialActive: true, trialExpired: false, trialDaysLeft: 4 });
   const expired = GATE.computeProStatus(
     { paid: false, trialStartedAt: new Date(now - 8 * 24 * 3600 * 1000).toISOString() },
     now
   );
-  assert.deepEqual(expired, { pro: false, paid: false, trialActive: false });
+  assert.deepEqual(expired, { pro: false, paid: false, trialActive: false, trialExpired: true, trialDaysLeft: 0 });
   // boundary: exactly 7 days → expired
   const edge = GATE.computeProStatus(
     { paid: false, trialStartedAt: new Date(now - GATE.TRIAL_MS).toISOString() },
@@ -672,4 +674,38 @@ test("fee table meta carries source citations and retrieval date", () => {
   assert.equal(SOURCE.meta.retrievedAt, "2026-06-12");
   assert.ok(SOURCE.meta.sources.length >= 3);
   assert.ok(SOURCE.meta.sources.some((s) => s.confidence === "official"));
+});
+
+test("gate: local reverse trial — active for 7 days from install, then expired", () => {
+  const now = Date.UTC(2026, 5, 12);
+  const day = 24 * 3600 * 1000;
+  assert.deepEqual(GATE.computeLocalTrial(null, now), { active: false, expired: false, daysLeft: 0, daysSinceEnd: 0 });
+  const fresh = GATE.computeLocalTrial(now - 1000, now);
+  assert.equal(fresh.active, true);
+  assert.equal(fresh.daysLeft, 7);
+  const day5 = GATE.computeLocalTrial(now - 5 * day - 1000, now);
+  assert.equal(day5.active, true);
+  assert.equal(day5.daysLeft, 2);
+  const over = GATE.computeLocalTrial(now - 9 * day, now);
+  assert.deepEqual(over, { active: false, expired: true, daysLeft: 0, daysSinceEnd: 2 });
+  // boundary: exactly 7 days → expired
+  assert.equal(GATE.computeLocalTrial(now - GATE.TRIAL_MS, now).active, false);
+});
+
+test("gate: mergeStatus — paid wins, ExtPay trial counts, local trial fills in, expiry is explicit", () => {
+  const base = (o) => ({ pro: false, paid: false, trialActive: false, trialExpired: false, trialDaysLeft: 0, ...o });
+  const local = { active: true, expired: false, daysLeft: 3, daysSinceEnd: 0 };
+  const none = { active: false, expired: true, daysLeft: 0, daysSinceEnd: 4 };
+  assert.equal(GATE.mergeStatus(base({ paid: true, pro: true }), none).pro, true);
+  assert.equal(GATE.mergeStatus(base({ paid: true, pro: true }), none).trialExpired, false);
+  const ext = GATE.mergeStatus(base({ pro: true, trialActive: true, trialDaysLeft: 2 }), none);
+  assert.equal(ext.pro, true);
+  assert.equal(ext.localTrial, false);
+  const loc = GATE.mergeStatus(base({}), local);
+  assert.deepEqual([loc.pro, loc.trialActive, loc.localTrial, loc.trialDaysLeft], [true, true, true, 3]);
+  const exp = GATE.mergeStatus(base({}), none);
+  assert.deepEqual([exp.pro, exp.trialActive, exp.trialExpired, exp.trialDaysSinceEnd], [false, false, true, 4]);
+  // never-installed-stamp + never paid → plain free, no expiry prompt
+  const plain = GATE.mergeStatus(base({}), { active: false, expired: false, daysLeft: 0, daysSinceEnd: 0 });
+  assert.equal(plain.trialExpired, false);
 });
