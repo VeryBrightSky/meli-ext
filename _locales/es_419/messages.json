@@ -30,7 +30,7 @@
     "message": "La detectamos de la publicación; corrígela si no coincide."
   },
   "hintNoCategory": {
-    "message": "No detectamos la categoría; la comisión por venta puede ir de $1."
+    "message": "No detectamos la categoría; la comisión por venta va del $1 al $2."
   },
   "rowCommission": {
     "message": "Comisión por venta ($1)"
@@ -69,7 +69,7 @@
     "message": "Comparar"
   },
   "compareDiff": {
-    "message": "Diferencia (costo de meses sin intereses)"
+    "message": "Diferencia Clásica − Premium"
   },
   "btnExportCsv": {
     "message": "Exportar a CSV"
@@ -324,7 +324,7 @@
     "message": "$$699 al año (equivale a $$58 al mes)"
   },
   "dashTotalsLabel": {
-    "message": "Totales ($1 productos)"
+    "message": "Totales · productos: $1"
   },
   "dashPortfolio": {
     "message": "Resumen de tus productos"
@@ -348,7 +348,7 @@
     "message": "Pierdes"
   },
   "radarSummary": {
-    "message": "$1 productos: $2 rentables · $3 marginales · $4 en pérdida"
+    "message": "Analizados: $1 · rentables: $2 · marginales: $3 · en pérdida: $4"
   },
   "radarTarget": {
     "message": "Margen objetivo"
@@ -453,7 +453,7 @@
     "message": "Cada plazo tiene un cargo distinto y lo absorbes tú. PRO desglosa tu ganancia por plazo con el porcentaje de tu cuenta, para que no actives uno que te deje en rojo."
   },
   "upsellLead_radar": {
-    "message": "$1 productos de esta búsqueda sí dejan ganancia"
+    "message": "Productos de esta búsqueda que sí dejan ganancia: $1"
   },
   "upsellBody_radar": {
     "message": "El Radar pinta cada resultado en verde, amarillo o rojo según tu costo y el margen que buscas, filtra solo los rentables y los exporta a CSV. Deja de revisar producto por producto."
@@ -519,13 +519,13 @@
     "message": "Reactivar PRO"
   },
   "radarFreeSummary": {
-    "message": "$1 productos: $2 rentables · $3 marginales · $4 en pérdida (costo supuesto $5% del precio)"
+    "message": "Analizados: $1 · rentables: $2 · marginales: $3 · en pérdida: $4 (costo supuesto: $5% del precio)"
   },
   "radarSeeAll": {
     "message": "Ver cuáles son · PRO"
   },
   "radarMoreLocked": {
-    "message": "$1 resultados más evaluados con PRO"
+    "message": "Más resultados con veredicto en PRO: $1"
   },
   "radarCostLabel": {
     "message": "Tu costo (% del precio)"
@@ -582,7 +582,7 @@
     "message": "Abrir Mercado Libre"
   },
   "welcomeNote": {
-    "message": "Todo se calcula en tu navegador. No tenemos servidores ni vemos tus datos."
+    "message": "Tus costos y productos se calculan y se guardan en tu navegador; no los enviamos a ningún lado. Solo el pago de PRO pasa por ExtensionPay."
   },
   "badgeTrialOne": {
     "message": "PRO · último día de prueba"
@@ -602,6 +602,9 @@
   "btnShare": {
     "message": "Mándale este cálculo a otro vendedor"
   },
+  "btnShareApp": {
+    "message": "Recomiéndale Netio a otro vendedor"
+  },
   "shareText": {
     "message": "Uso Netio para ver mi ganancia real en cada publicación de Mercado Libre: comisión, costo fijo, envío y retenciones, sin salir de la página. Es gratis para Chrome y los primeros 7 días traen PRO: $1"
   },
@@ -612,7 +615,7 @@
     "message": "Precio para ganar $1%"
   },
   "summaryNet": {
-    "message": "Te quedan $1 por venta"
+    "message": "Mercado Libre te deposita $1 por venta"
   },
   "summaryProfit": {
     "message": "Ganancia $1 · $2"
@@ -630,10 +633,10 @@
     "message": "No pudimos abrir el pago. Revisa tu conexión e inténtalo de nuevo."
   },
   "trialEndingProducts": {
-    "message": "En $1 días pierdes el precio objetivo de tus $2 productos guardados."
+    "message": "En $1 días pierdes el precio objetivo de tus productos guardados ($2)."
   },
   "trialEndingProductsOne": {
-    "message": "En menos de 24 horas pierdes el precio objetivo de tus $1 productos guardados."
+    "message": "En menos de 24 horas pierdes el precio objetivo de tus productos guardados ($1)."
   },
   "researchAssumed": {
     "message": "Costo supuesto: $1% del precio. Cámbialo con tu costo real."

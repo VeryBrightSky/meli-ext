@@ -1,15 +1,18 @@
 # Privacy Policy / Política de Privacidad
 
-_Last updated / Última actualización: 2026-06-12_
+_Last updated / Última actualización: 2026-10-26_
 
 ## Español
 
-Esta extensión **no recopila, transmite ni vende ningún dato personal**.
+Netio **no vende datos y no tiene servidores propios**. Tus costos, productos y
+navegación nunca salen de tu navegador. La única excepción es el pago de PRO:
+ExtensionPay recibe tu correo si pagas (detalle abajo).
 
 - **Almacenamiento:** tus ajustes (costos de envío, costos de producto,
   preferencias) se guardan únicamente en tu navegador mediante
-  `chrome.storage` (local y sync de Chrome). Nunca salen hacia servidores
-  nuestros — no tenemos servidores.
+  `chrome.storage`. Algunas preferencias usan Chrome sync, que Google
+  sincroniza entre tus navegadores con tu cuenta. Nunca llegan a servidores
+  nuestros: no tenemos servidores.
 - **Sin seguimiento:** no usamos analítica, cookies, píxeles ni
   identificadores.
 - **Acceso a páginas:** la extensión lee solamente el contenido de las páginas
@@ -35,11 +38,14 @@ Esta extensión **no recopila, transmite ni vende ningún dato personal**.
 
 ## English
 
-This extension **does not collect, transmit, or sell any personal data**.
+Netio **does not sell data and runs no servers of its own**. Your costs,
+products and browsing never leave your browser. The one exception is PRO
+payment: ExtensionPay receives your email if you pay (details below).
 
 - **Storage:** your settings (shipping costs, product costs, preferences) are
-  stored only in your browser via `chrome.storage` (Chrome local and sync).
-  They never leave for our servers — we have no servers.
+  stored in your browser via `chrome.storage`. Some preferences use Chrome
+  sync, which Google syncs across your browsers with your account. They never
+  reach servers of ours: we have none.
 - **No tracking:** no analytics, cookies, pixels, or identifiers.
 - **Page access:** the extension only reads the content of the
   mercadolibre.com.mx pages you are viewing, to render the calculator. It does

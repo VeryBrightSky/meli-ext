@@ -266,7 +266,9 @@ globalThis.MST_CARD = (() => {
     return CALC.subsidizedShipping({
       fullShippingMXN: full,
       priceMXN: p,
-      freeShipping: forceFree || state.freeShipping,
+      // Free shipping is mandatory at/above the threshold, so the discount
+      // applies there whether or not the seller ticked the box.
+      freeShipping: forceFree || state.freeShipping || p >= SOURCE.freeShippingThresholdMXN,
       subsidyPct,
       thresholdMXN: SOURCE.shippingSubsidy.thresholdMXN
     });
@@ -284,7 +286,7 @@ globalThis.MST_CARD = (() => {
     const effectiveShipping = CALC.subsidizedShipping({
       fullShippingMXN: state.shippingCostMXN,
       priceMXN: state.priceMXN,
-      freeShipping: state.freeShipping,
+      freeShipping: state.freeShipping || state.priceMXN >= SOURCE.freeShippingThresholdMXN,
       subsidyPct,
       thresholdMXN: SOURCE.shippingSubsidy.thresholdMXN
     });
@@ -528,6 +530,8 @@ globalThis.MST_CARD = (() => {
     patchRow(refs.net, null, fmtRange(b.netMinMXN, b.netMaxMXN), flash);
     if (refs.shareBtn) refs.shareBtn.href = buildShareUrl();
     refs.summaryNet.textContent = T("summaryNet", [fmtRange(b.netMinMXN, b.netMaxMXN)]);
+    // The button says "this calculation" only when the message carries one.
+    if (refs.shareBtn) refs.shareBtn.textContent = state.productCostMXN > 0 ? T("btnShare") : T("btnShareApp");
     if (b.profitMinMXN !== undefined) {
       const losing = b.profitMaxMXN < 0;
       refs.summaryProfit.hidden = false;
@@ -656,7 +660,7 @@ globalThis.MST_CARD = (() => {
 
     // Category hint + toggle button states.
     if (!state.categoryGroupId) {
-      refs.hint.textContent = T("hintNoCategory", [fmtPctRange(quote.pctMin, quote.pctMax)]);
+      refs.hint.textContent = T("hintNoCategory", [`${quote.pctMin}%`, `${quote.pctMax}%`]);
       refs.hint.style.display = "";
     } else if (state.categoryAutoDetected) {
       refs.hint.textContent = T("hintDetected");
@@ -668,6 +672,26 @@ globalThis.MST_CARD = (() => {
       const active = state.listingTypeId === id;
       btn.classList.toggle(`${PREFIX}-toggle__btn--active`, active);
       btn.setAttribute("aria-pressed", String(active));
+    }
+
+    // An open upsell panel quotes this listing's numbers: keep them current
+    // after an edit, and close it when the loss it describes is gone.
+    if (refs.upsellPanel && !refs.upsellPanel.panel.hidden && refs.upsellReason) {
+      const r = refs.upsellReason;
+      if (r === "loss") {
+        if (refs.alert && !refs.alert.root.hidden && refs.alert.reason?.[0] === "loss") {
+          refs.upsellPanel.refresh("loss", refs.alert.reason[1]);
+        } else {
+          refs.upsellPanel.close();
+        }
+      } else if (r === "target") {
+        refs.upsellPanel.refresh("target", refs.targetTeaser?.vars ?? []);
+      } else if (r === "msi") {
+        refs.upsellPanel.refresh("msi", refs.msiTeaser?.vars ?? []);
+      } else if (r === "sweetspot") {
+        if (refs.sweetspot.dataset.gain) refs.upsellPanel.refresh("sweetspot", [refs.sweetspot.dataset.gain]);
+        else refs.upsellPanel.close();
+      }
     }
   }
 
@@ -780,6 +804,7 @@ globalThis.MST_CARD = (() => {
         if (state.itemId) {
           chrome.storage.local.set({ [`${PREFIX}:type:${state.itemId}`]: id });
         }
+        persistInputs(); // keep the dashboard snapshot in step
         update();
       });
       refs.toggleButtons[id] = btn;
@@ -945,6 +970,7 @@ globalThis.MST_CARD = (() => {
           chrome.storage.local.remove(key);
         }
       }
+      persistInputs(); // keep the dashboard snapshot in step
       update();
     });
     refs.categorySelect = select;
@@ -1292,7 +1318,11 @@ globalThis.MST_CARD = (() => {
     // Upsell panel; never opens on load. It is moved next to whatever the
     // seller clicked (see upsell.js) so it never appears 900px away.
     const upsell = UPSELL.attach(body);
-    openUpsell = (reason, vars) => upsell.open(reason, vars);
+    refs.upsellPanel = upsell;
+    openUpsell = (reason, vars) => {
+      refs.upsellReason = reason;
+      upsell.open(reason, vars);
+    };
   }
 
   function buildShareUrl() {

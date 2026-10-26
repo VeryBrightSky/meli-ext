@@ -1223,3 +1223,15 @@
   font-size: 15px;
   line-height: 1;
 }
+
+/* v1.4.2: selects get their own full-width line in the 326px column, so
+   long category names are never cut off. */
+.mst-row:has(> .mst-select) {
+  flex-wrap: wrap;
+}
+.mst-row > .mst-select {
+  flex: 1 1 100%;
+  max-width: 100%;
+  width: 100%;
+  margin-top: 4px;
+}

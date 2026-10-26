@@ -15,7 +15,7 @@
   document.getElementById("brand-logo").src = chrome.runtime.getURL(BRAND.logoPath);
   document.getElementById("dash-title").textContent = T("dashTitle");
   const shareBtn = document.getElementById("share-btn");
-  shareBtn.textContent = T("btnShare");
+  shareBtn.textContent = T("btnShareApp");
   shareBtn.href = `https://wa.me/?text=${encodeURIComponent(T("shareText", [BRAND.shareUrl("dashboard")]))}`;
   shareBtn.addEventListener("click", () => globalThis.MST_GATE.track("click:share"));
 
@@ -36,14 +36,19 @@
     document.getElementById("upsell-body").textContent =
       `${T("upsellLead_dashboard")}. ${T("upsellBody_dashboard")}`;
     document.getElementById("upsell-pricing").textContent = T("upsellPricing");
+    const upgrade = async (plan) => {
+      const res = await globalThis.MST_GATE.openUpgrade(plan);
+      const note = document.getElementById("upsell-pricing");
+      note.textContent = res?.ok ? T("upsellOpened") : T("upsellOpenFailed");
+    };
     const trial = document.getElementById("trial-btn");
     trial.hidden = true;
     const monthly = document.getElementById("monthly-btn");
     monthly.textContent = T("upsellMonthly");
-    monthly.addEventListener("click", () => globalThis.MST_GATE.openUpgrade(BRAND.plans.monthly));
+    monthly.addEventListener("click", () => upgrade(BRAND.plans.monthly));
     const yearly = document.getElementById("yearly-btn");
     yearly.textContent = T("upsellYearly");
-    yearly.addEventListener("click", () => globalThis.MST_GATE.openUpgrade(BRAND.plans.yearly));
+    yearly.addEventListener("click", () => upgrade(BRAND.plans.yearly));
     globalThis.MST_GATE.track("open:dashboard-page");
   }
 
@@ -53,10 +58,15 @@
   // null default so an unset options value stays distinguishable from an
   // explicit 0 (resolveDefaultShipping falls back to the card's last-used value
   // only when unset).
-  const sync = await chrome.storage.sync.get({ defaultShippingMXN: null });
+  const sync = await chrome.storage.sync.get({
+    defaultShippingMXN: null,
+    usesFull: false,
+    reputationId: "none",
+    freeShipping: false
+  });
   const defaultShipping = DASH.resolveDefaultShipping(sync, all[`${PREFIX}:defaults`]);
 
-  let rows = DASH.computeRows(all, PREFIX, defaultShipping);
+  let rows = DASH.computeRows(all, PREFIX, defaultShipping, sync);
   // Free preview shows the same FREE_ROWS products no matter how the table is
   // sorted afterwards (worst margin first at load), so re-sorting can't be
   // used to read every row three at a time.
@@ -78,9 +88,9 @@
   const COLS = [
     { key: "title", label: T("csvHeaderTitle"), value: (r) => r.meta.title, sort: (r) => r.meta.title.toLowerCase() },
     { key: "price", label: T("rowPrice"), num: true, value: (r) => UI.fmtMoney(r.meta.priceMXN), sort: (r) => r.meta.priceMXN },
-    { key: "type", label: T("rowListingType"), value: (r) => (r.meta.listingTypeId === "premium" ? T("typePremium") : T("typeClassic")), sort: (r) => r.meta.listingTypeId },
-    { key: "commission", label: T("dashCommission"), num: true, value: (r) => UI.fmtCharge(r.b.commissionMinMXN, r.b.commissionMaxMXN), sort: (r) => r.b.commissionMaxMXN },
-    { key: "shipping", label: T("dashShipping"), num: true, value: (r) => UI.fmtCharge(r.b.shippingCostMXN), sort: (r) => r.b.shippingCostMXN },
+    { key: "type", csvOnly: true, label: T("rowListingType"), value: (r) => (r.meta.listingTypeId === "premium" ? T("typePremium") : T("typeClassic")), sort: (r) => r.meta.listingTypeId },
+    { key: "commission", csvOnly: true, label: T("dashCommission"), num: true, value: (r) => UI.fmtCharge(r.b.commissionMinMXN, r.b.commissionMaxMXN), sort: (r) => r.b.commissionMaxMXN },
+    { key: "shipping", csvOnly: true, label: T("dashShipping"), num: true, value: (r) => UI.fmtCharge(r.b.shippingCostMXN), sort: (r) => r.b.shippingCostMXN },
     { key: "net", label: T("dashNet"), num: true, value: (r) => UI.fmtRange(r.b.netMinMXN, r.b.netMaxMXN), sort: (r) => r.b.netMinMXN },
     { key: "cost", label: T("dashCost"), num: true, value: (r) => UI.fmtMoney(r.cost), sort: (r) => r.cost },
     { key: "profit", label: T("rowProfit"), num: true, value: (r) => UI.fmtRange(r.b.profitMinMXN, r.b.profitMaxMXN), tone: (r) => toneBy(r.b.profitMinMXN), sort: (r) => r.b.profitMinMXN },
@@ -89,6 +99,10 @@
     { key: "monthly", label: T("rowMonthlyProfit"), num: true, value: (r) => (r.sales > 0 ? UI.fmtRange(CALC.round2(r.b.profitMinMXN * r.sales), CALC.round2(r.b.profitMaxMXN * r.sales)) : "—"), tone: (r) => (r.sales > 0 ? toneBy(r.b.profitMinMXN) : null), sort: (r) => r.b.profitMinMXN * r.sales }
   ];
 
+  // Commission, shipping and type stay in the CSV; the on-screen table keeps
+  // the 8 columns that fit a 1280px screen (net already includes those fees).
+  const TABLE_COLS = COLS.filter((c) => !c.csvOnly);
+
   // Default sort: worst margin first, so loss-makers surface at the top.
   let sortKey = "margin";
   let sortDir = 1;
@@ -96,7 +110,7 @@
   function renderHead() {
     const tr = document.getElementById("head-row");
     tr.replaceChildren();
-    for (const col of COLS) {
+    for (const col of TABLE_COLS) {
       const th = document.createElement("th");
       if (col.num) th.className = "num";
       const arrow = sortKey === col.key ? (sortDir > 0 ? " ↑" : " ↓") : "";
@@ -198,7 +212,7 @@
       if (row.b.profitMinMXN < 0) tr.classList.add(`${PREFIX}-row--loss`);
       const locked = !pro && !freeIds.has(row.itemId);
       if (locked) tr.classList.add("locked");
-      for (const colDef of COLS) {
+      for (const colDef of TABLE_COLS) {
         const td = document.createElement("td");
         if (colDef.num) td.className = "num";
         const tone = colDef.tone ? colDef.tone(row) : null;
@@ -242,7 +256,7 @@
     const tfoot = document.getElementById("totals-row");
     tfoot.replaceChildren();
     const labelTd = document.createElement("td");
-    labelTd.colSpan = COLS.length - 1;
+    labelTd.colSpan = TABLE_COLS.length - 1;
     labelTd.textContent = T("dashTotalsLabel", [String(tot.count)]);
     const valueTd = document.createElement("td");
     valueTd.className = "num";

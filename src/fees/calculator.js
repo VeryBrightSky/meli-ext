@@ -125,23 +125,19 @@ globalThis.MST_CALC = (() => {
       for (let i = 0; i < 5 && !feasible(out); i++) out = ceil2(out + 0.01);
       return out;
     };
-    if (feasible(price)) return finish(price);
-    // Oscillation across a step: pick the lowest feasible candidate among the
-    // steps above the un-fixed price and the fixed-point attempts. Every
-    // candidate re-evaluates fixedCostFn at its own price, so a price-dependent
-    // cost (fixed charge, Full service cost, shipping that flips at $299) is
-    // always charged at the price actually returned.
-    const candidates = [
-      ...thresholds.filter((t) => t > base / denom - 1e-9),
-      price,
-      (base + fixedCostFn(price)) / denom
-    ];
-    // Also try solving inside each step band directly.
+    // fixedCostFn is piecewise constant between `thresholds`, and NOT monotonic
+    // (the fixed charge vanishes and the shipping discount starts at $299), so
+    // the fixed-point price above can sit in a higher band than the cheapest
+    // answer. The feasible set is a union of [max(band start, band solution),
+    // next band) intervals, so its minimum is always a band start or a band
+    // solution: test them all and take the lowest that truly covers. Every
+    // candidate re-evaluates fixedCostFn at its own price.
+    const candidates = [price, ...thresholds];
     for (const t of [0, ...thresholds]) {
       const p = (base + fixedCostFn(t)) / denom;
       if (p >= t) candidates.push(p);
     }
-    const ok = candidates.filter((p) => feasible(p)).sort((a, b) => a - b);
+    const ok = candidates.filter((p) => p > 0 && feasible(p)).sort((a, b) => a - b);
     return ok.length ? finish(ok[0]) : finish(price);
   }
 

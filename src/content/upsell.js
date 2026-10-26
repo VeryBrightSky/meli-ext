@@ -86,8 +86,7 @@ globalThis.MST_UPSELL = (() => {
         anchor.after(panel);
       }
     };
-    const open = (reason = "generic", vars = []) => {
-      placeNear();
+    const setText = (reason, vars) => {
       let key = KNOWN.has(reason) ? reason : "generic";
       // A reason whose headline needs numbers falls back to the generic pitch
       // when the caller has none (e.g. no product cost entered yet).
@@ -97,6 +96,11 @@ globalThis.MST_UPSELL = (() => {
       lead.textContent = T(`upsellLead_${key}`, vars);
       body.textContent = T(`upsellBody_${key}`, vars);
       panel.dataset.reason = key;
+      return key;
+    };
+    const open = (reason = "generic", vars = []) => {
+      placeNear();
+      const key = setText(reason, vars);
       panel.hidden = false;
       GATE.track(`open:${key}`);
       try {
@@ -108,7 +112,12 @@ globalThis.MST_UPSELL = (() => {
     const close = () => {
       panel.hidden = true;
     };
-    return { panel, open, close, toggle: () => (panel.hidden ? open() : close()) };
+    // Re-render an open panel's numbers after the seller edits an input, so
+    // the headline never quotes a price or loss that is no longer true.
+    const refresh = (reason, vars) => {
+      if (!panel.hidden) setText(reason, vars);
+    };
+    return { panel, open, close, refresh, toggle: () => (panel.hidden ? open() : close()) };
   }
 
   function chip(onClick) {
@@ -190,6 +199,11 @@ globalThis.MST_UPSELL = (() => {
     close.setAttribute("aria-label", T("upsellClose"));
     root.append(text, btn, close);
 
+    // Offline checkout: say so in the banner instead of a dead button.
+    const failNote = (res) => {
+      if (!res?.ok) text.textContent = T("upsellOpenFailed");
+    };
+
     let stateKey = null;
     if (status.trialActive && status.localTrial) {
       stateKey = status.trialDaysLeft <= 3 ? "ending" : "active";
@@ -211,14 +225,14 @@ globalThis.MST_UPSELL = (() => {
         }).catch(() => {});
       }
       btn.textContent = T("trialKeep");
-      btn.addEventListener("click", () => GATE.openUpgrade(BRAND.plans.monthly));
+      btn.addEventListener("click", () => GATE.openUpgrade(BRAND.plans.monthly).then(failNote));
     } else if (status.trialExpired && (status.trialDaysSinceEnd ?? 0) <= 14) {
       stateKey = "expired";
       root.dataset.tone = "expired";
       text.textContent = T("trialExpiredBanner");
       btn.textContent = T("trialReactivate");
       // Straight to the plan picker; no detour through a panel at the bottom.
-      btn.addEventListener("click", () => GATE.openUpgrade());
+      btn.addEventListener("click", () => GATE.openUpgrade().then(failNote));
     }
     if (!stateKey) return root;
 

@@ -84,8 +84,14 @@ acquisitionInput.addEventListener("change", () => {
 });
 
 const send = (type) => chrome.runtime.sendMessage({ type }).catch(() => null);
-document.getElementById("manage-btn").addEventListener("click", () => send("openPaymentPage"));
-document.getElementById("login-btn").addEventListener("click", () => send("openLoginPage"));
+// Checkout/login open in a new tab; if that fails (offline), say so instead
+// of a button that silently does nothing.
+const withFeedback = (type) => async () => {
+  const res = await send(type);
+  if (!res?.ok) document.getElementById("sub-status").textContent = T("upsellOpenFailed");
+};
+document.getElementById("manage-btn").addEventListener("click", withFeedback("openPaymentPage"));
+document.getElementById("login-btn").addEventListener("click", withFeedback("openLoginPage"));
 document.getElementById("dashboard-btn").addEventListener("click", () => send("openDashboard"));
 
 async function loadSubscriptionStatus() {

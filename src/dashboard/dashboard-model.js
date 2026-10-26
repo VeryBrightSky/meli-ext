@@ -20,7 +20,10 @@ globalThis.MST_DASH = (() => {
 
   // all: a chrome.storage.local snapshot ({key: value}). Returns one row per
   // saved listing that has a cost + meta, recomputed at `defaultShipping`.
-  function computeRows(all, prefix, defaultShipping) {
+  // opts: the account-wide card settings from storage.sync
+  // ({ usesFull, reputationId, freeShipping }), so a row's profit matches the
+  // card for the same listing (Full fees, reputation shipping discount).
+  function computeRows(all, prefix, defaultShipping, opts = {}) {
     const SOURCE = globalThis.MST_FEE_SOURCE;
     const CALC = globalThis.MST_CALC;
     const costPrefix = `${prefix}:cost:`;
@@ -32,14 +35,27 @@ globalThis.MST_DASH = (() => {
       const meta = all[`${prefix}:meta:${itemId}`];
       if (!(cost > 0) || !meta || !(meta.priceMXN > 0)) continue;
       const sales = CALC.parseMoney(all[`${prefix}:sales:${itemId}`]);
+      const weight = CALC.parseMoney(all[`${prefix}:weight:${itemId}`] ?? 0);
+      const fullWeightKg = opts.usesFull === true ? (weight > 0 ? weight : 0.3) : null;
       const quote = SOURCE.getQuote({
         priceMXN: meta.priceMXN,
         listingTypeId: meta.listingTypeId,
-        categoryGroupId: meta.categoryGroupId
+        categoryGroupId: meta.categoryGroupId,
+        fullWeightKg
+      });
+      const threshold = SOURCE.shippingSubsidy?.thresholdMXN ?? 299;
+      const subsidyPct =
+        SOURCE.shippingSubsidy?.levels?.find((l) => l.id === opts.reputationId)?.subsidyPct || 0;
+      const shipping = CALC.subsidizedShipping({
+        fullShippingMXN: defaultShipping,
+        priceMXN: meta.priceMXN,
+        freeShipping: opts.freeShipping === true || meta.priceMXN >= SOURCE.freeShippingThresholdMXN,
+        subsidyPct,
+        thresholdMXN: threshold
       });
       const b = CALC.computeBreakdown(quote, {
         priceMXN: meta.priceMXN,
-        shippingCostMXN: defaultShipping,
+        shippingCostMXN: shipping,
         productCostMXN: cost
       });
       rows.push({ itemId, meta, cost, sales, b });

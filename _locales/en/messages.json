@@ -30,7 +30,7 @@
     "message": "We detected this from the listing — fix it if it's wrong."
   },
   "hintNoCategory": {
-    "message": "No category detected — the sale commission ranges from $1."
+    "message": "No category detected; the sale commission ranges from $1 to $2."
   },
   "rowCommission": {
     "message": "Sale commission ($1)"
@@ -69,7 +69,7 @@
     "message": "Compare"
   },
   "compareDiff": {
-    "message": "Difference (cost of installments)"
+    "message": "Difference Clásica − Premium"
   },
   "btnExportCsv": {
     "message": "Export to CSV"
@@ -294,7 +294,7 @@
     "message": "Net after withholdings"
   },
   "withholdingsHint": {
-    "message": "Withholdings in effect since Jan 1, 2026. Apply if your RFC is registered with Mercado Libre. They are creditable against your taxes, not a loss."
+    "message": "Withholdings in effect since Jan 1, 2026 for sellers with an RFC registered with Mercado Libre. They are usually creditable on your tax return, not a loss; confirm with your accountant."
   },
   "rowReputation": {
     "message": "Seller reputation"
@@ -324,7 +324,7 @@
     "message": "$$699 a year (works out to $$58 a month)"
   },
   "dashTotalsLabel": {
-    "message": "Totals ($1 products)"
+    "message": "Totals · products: $1"
   },
   "dashPortfolio": {
     "message": "Portfolio summary"
@@ -348,7 +348,7 @@
     "message": "You lose"
   },
   "radarSummary": {
-    "message": "$1 products: $2 profitable · $3 thin · $4 at a loss"
+    "message": "Checked: $1 · profitable: $2 · thin: $3 · at a loss: $4"
   },
   "radarTarget": {
     "message": "Target margin"
@@ -453,7 +453,7 @@
     "message": "Each term charges you a different percentage and you absorb it. PRO breaks down your profit per term with your real rate so you never enable a term that puts you in the red."
   },
   "upsellLead_radar": {
-    "message": "$1 products in this search actually make money"
+    "message": "Products in this search that make money: $1"
   },
   "upsellBody_radar": {
     "message": "The Radar paints every result green, yellow or red by your cost and target margin, filters to the profitable ones and exports them to CSV. Stop researching one product at a time."
@@ -519,13 +519,13 @@
     "message": "Reactivate PRO"
   },
   "radarFreeSummary": {
-    "message": "$1 products: $2 profitable · $3 thin · $4 at a loss (assumed cost $5% of price)"
+    "message": "Checked: $1 · profitable: $2 · thin: $3 · at a loss: $4 (assumed cost: $5% of price)"
   },
   "radarSeeAll": {
     "message": "See which ones · PRO"
   },
   "radarMoreLocked": {
-    "message": "$1 more results with a verdict in PRO"
+    "message": "More results with a verdict in PRO: $1"
   },
   "radarCostLabel": {
     "message": "Your cost (% of price)"
@@ -582,7 +582,7 @@
     "message": "Open Mercado Libre"
   },
   "welcomeNote": {
-    "message": "Everything is computed in your browser. We run no servers and never see your data."
+    "message": "Your costs and products are calculated and stored in your browser; we never send them anywhere. Only PRO payment goes through ExtensionPay."
   },
   "badgeTrialOne": {
     "message": "PRO · last trial day"
@@ -602,6 +602,9 @@
   "btnShare": {
     "message": "Send this to another seller"
   },
+  "btnShareApp": {
+    "message": "Recommend Netio to another seller"
+  },
   "shareText": {
     "message": "I use Netio to see my real profit on every Mercado Libre listing: commission, fixed fee, shipping and withholdings, right on the page. Free for Chrome, and the first 7 days include PRO: $1"
   },
@@ -612,7 +615,7 @@
     "message": "Price to earn $1%"
   },
   "summaryNet": {
-    "message": "You keep $1 per sale"
+    "message": "Mercado Libre pays you $1 per sale"
   },
   "summaryProfit": {
     "message": "Profit $1 · $2"
@@ -630,10 +633,10 @@
     "message": "We couldn't open checkout. Check your connection and try again."
   },
   "trialEndingProducts": {
-    "message": "In $1 days you lose the target price for your $2 saved products."
+    "message": "In $1 days you lose the target price for your saved products ($2)."
   },
   "trialEndingProductsOne": {
-    "message": "In less than 24 hours you lose the target price for your $1 saved products."
+    "message": "In less than 24 hours you lose the target price for your saved products ($1)."
   },
   "researchAssumed": {
     "message": "Assumed cost: $1% of price. Change it to your real cost."

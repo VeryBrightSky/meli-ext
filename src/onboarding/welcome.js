@@ -24,7 +24,7 @@
   dash.textContent = T("optDashboard");
   dash.addEventListener("click", () => globalThis.MST_GATE.openDashboard());
   const share = document.getElementById("share");
-  share.textContent = T("btnShare");
+  share.textContent = T("btnShareApp");
   share.href = `https://wa.me/?text=${encodeURIComponent(T("shareText", [BRAND.shareUrl("welcome")]))}`;
   share.addEventListener("click", () => globalThis.MST_GATE.track("click:share"));
   document.getElementById("note").textContent = T("welcomeNote");

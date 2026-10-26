@@ -220,13 +220,13 @@ try {
   pass("card injects and is visible");
 
   // Answer-first summary + collapsed breakdown.
-  assert.equal(await page.$eval(".mst-summary__net", (e) => e.textContent), "Te quedan $744.30 por venta");
+  assert.equal(await page.$eval(".mst-summary__net", (e) => e.textContent), "Mercado Libre te deposita $744.30 por venta");
   assert.equal(await page.$eval("details.mst-breakdown", (d) => d.open), false, "breakdown collapsed by default");
   assert.ok(
     await page.$eval("details.mst-breakdown", (d) => d.textContent.includes("Comisión por venta")),
     "commission row lives inside the breakdown"
   );
-  pass("summary leads with 'Te quedan $744.30 por venta'; fee breakdown collapsed by default");
+  pass("summary leads with 'Mercado Libre te deposita $744.30 por venta'; fee breakdown collapsed by default");
 
   // Spanish UI must render Spanish (regression: chrome.i18n served English).
   assert.equal(await page.$eval(".mst-title", (e) => e.textContent), "Calculadora de ganancias");
@@ -395,7 +395,7 @@ try {
   await freeSearch.waitForSelector(".mst-radar--preview", { timeout: 20000 });
   await sleep(500);
   const preview = await freeSearch.$eval(".mst-radar--preview .mst-radar__summary", (e) => e.textContent);
-  assert.equal(preview, "3 productos: 2 rentables · 1 marginales · 0 en pérdida (costo supuesto 60% del precio)", preview);
+  assert.equal(preview, "Analizados: 3 · rentables: 2 · marginales: 1 · en pérdida: 0 (costo supuesto: 60% del precio)", preview);
   pass("free search bar: real radar counts at the assumed 60% cost");
   const previewBuckets = await freeSearch.$$eval(".mst-strip", (els) => els.map((e) => e.dataset.preview));
   assert.deepEqual(previewBuckets.filter(Boolean).length, 3, `preview stamps: ${previewBuckets}`);
@@ -407,7 +407,7 @@ try {
   await sleep(200);
   assert.equal(await freeSearch.$eval(".mst-upsell", (e) => e.hidden), false);
   const radarUpsell = await freeSearch.$eval(".mst-upsell", (e) => e.textContent);
-  assert.ok(radarUpsell.includes("2 productos de esta búsqueda sí dejan ganancia"), radarUpsell);
+  assert.ok(radarUpsell.includes("Productos de esta búsqueda que sí dejan ganancia: 2"), radarUpsell);
   pass("'Ver cuáles son · PRO' opens the radar upsell with the real winner count");
   if (process.env.E2E_SHOTS) {
     await freeSearch.screenshot({ path: join(process.env.E2E_SHOTS, "search-free.png") });
@@ -471,8 +471,22 @@ try {
   );
   totals = await dash.$eval("#totals-row", (e) => e.textContent);
   assert.ok(totals.includes("$2,943.00"), `totals after shipping change wrong: ${totals}`);
-  assert.ok(totals.includes("1 productos"), `totals label/count wrong: ${totals}`);
+  assert.ok(totals.includes("productos: 1"), `totals label/count wrong: ${totals}`);
   pass("dashboard reflects changed options shipping $50 → monthly $2,943.00 (bug 1 fixed)");
+
+  // The whole table fits a 1280px laptop screen: no column hidden behind a
+  // scrollbar (critic blocker: 1361px table in a 1080px box).
+  for (const width of [1280, 1920]) {
+    await dash.setViewport({ width, height: 900 });
+    await sleep(100);
+    const fit = await dash.evaluate(() => {
+      const t = document.querySelector("table");
+      return { table: t.scrollWidth, box: t.parentElement.clientWidth, cols: t.querySelectorAll("thead th").length };
+    });
+    assert.ok(fit.table <= fit.box + 1, `dashboard table overflows at ${width}px: ${JSON.stringify(fit)}`);
+    assert.equal(fit.cols, 8);
+  }
+  pass("dashboard table fits at 1280px and 1920px (8 columns, nothing cut off)");
 
   // Empty state when nothing is saved (snapshot + restore so later phases keep
   // the seeded product).
@@ -810,9 +824,9 @@ try {
 
   const summary = await search.$eval(".mst-radar__summary", (e) => e.textContent);
   assert.ok(
-    summary.includes("3 productos") &&
-      summary.includes("2 rentables") &&
-      summary.includes("0 en pérdida"),
+    summary.includes("Analizados: 3") &&
+      summary.includes("rentables: 2") &&
+      summary.includes("en pérdida: 0"),
     `summary: ${summary}`
   );
   pass(`radar summary bar: "${summary.trim()}"`);

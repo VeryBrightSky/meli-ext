@@ -790,3 +790,64 @@ test("sweet spot: crossing $299 into paid free shipping is not a gain", () => {
   });
   assert.equal(spot, null);
 });
+
+// --- v1.4.2 critic fixes -------------------------------------------------------
+
+test("solveTargetPrice returns the LOWEST covering price around the $299 step (brute force)", () => {
+  const fixed = SOURCE.fixedCostFnFor({ listingTypeId: "classic" });
+  const ship = (p) =>
+    CALC.subsidizedShipping({ fullShippingMXN: 120, priceMXN: p, freeShipping: p >= 299, subsidyPct: 50, thresholdMXN: 299 });
+  const fn = (p) => fixed(p) + ship(p);
+  const thresholds = [...new Set([...SOURCE.getFixedCostThresholds(null), 299])].sort((a, b) => a - b);
+  for (const cost of [60, 120, 150, 170, 185, 200, 230]) {
+    for (const margin of [0, 10, 30]) {
+      const rate = 16;
+      const got = CALC.solveTargetPrice({ costMXN: cost, shippingMXN: 0, marginPct: margin, ratePct: rate, fixedCostFn: fn, thresholds, minPriceMXN: 35 });
+      const denom = 1 - rate / 100 - margin / 100;
+      const covers = (p) => p * denom + 1e-9 >= cost + fn(p);
+      assert.ok(covers(got), `cost ${cost} m ${margin}: ${got} must cover`);
+      // No cheaper cent price (≥ the $35 minimum) covers.
+      for (let c = 3500; c < Math.round(got * 100); c++) {
+        assert.ok(!covers(c / 100), `cost ${cost} m ${margin}: ${c / 100} covers but solver said ${got}`);
+      }
+    }
+  }
+});
+
+test("dashboard applies the reputation shipping discount and Full like the card", () => {
+  const all = {
+    "mst:cost:MLM9": 200,
+    "mst:meta:MLM9": { title: "X", priceMXN: 500, listingTypeId: "classic", categoryGroupId: "tech", url: "u" },
+    "mst:weight:MLM9": 2
+  };
+  const plain = DASH.computeRows(all, "mst", 100)[0];
+  const verde = DASH.computeRows(all, "mst", 100, { reputationId: "verde" })[0];
+  assert.equal(plain.b.shippingCostMXN, 100);
+  assert.equal(verde.b.shippingCostMXN, 50); // $299+ is always free shipping
+  // Below $299 the discount does not apply unless free shipping is on.
+  const low = { ...all, "mst:meta:MLM9": { ...all["mst:meta:MLM9"], priceMXN: 250 } };
+  assert.equal(DASH.computeRows(low, "mst", 100, { reputationId: "verde" })[0].b.shippingCostMXN, 100);
+  // Full: the quote takes the Full service cost for the saved weight.
+  const full = DASH.computeRows(low, "mst", 0, { usesFull: true })[0];
+  const expected = SOURCE.getQuote({ priceMXN: 250, listingTypeId: "classic", categoryGroupId: "tech", fullWeightKg: 2 });
+  assert.equal(full.b.fixedCostMXN, expected.fixedCostMXN);
+});
+
+test("count strings never print a broken plural like '1 productos'", () => {
+  const es = JSON.parse(readFileSync(join(root, "_locales/es_419/messages.json"), "utf8"));
+  const en = JSON.parse(readFileSync(join(root, "_locales/en/messages.json"), "utf8"));
+  // dashFreeLimit's total only shows when there are more than FREE_ROWS (3).
+  const ok = new Set(["dashFreeLimit"]);
+  for (const [k, v] of Object.entries(es)) if (!ok.has(k)) assert.ok(!/\$\d productos/.test(v.message), `es ${k}`);
+  for (const [k, v] of Object.entries(en)) if (!ok.has(k)) assert.ok(!/\$\d (saved )?products/.test(v.message), `en ${k}`);
+});
+
+test("solveTargetPrice: lands on $299 when the fixed charge drop makes it cover (was $311.77)", () => {
+  const fixed = SOURCE.fixedCostFnFor({ listingTypeId: "classic" });
+  const thresholds = [...new Set([...SOURCE.getFixedCostThresholds(null), 299])].sort((a, b) => a - b);
+  const p = CALC.solveTargetPrice({
+    costMXN: 62, shippingMXN: 0, marginPct: 30, ratePct: 19,
+    fixedCostFn: (x) => fixed(x) + 60, thresholds, minPriceMXN: 35
+  });
+  assert.equal(p, 299);
+});

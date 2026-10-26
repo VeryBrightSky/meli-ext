@@ -457,6 +457,7 @@ globalThis.MST_QUICKVIEW = (() => {
     input.setAttribute("aria-label", T("radarCostLabel"));
     input.addEventListener("change", async () => {
       const v = Math.max(0, Math.min(99, Math.round(Number(input.value) || 0)));
+      input.value = v > 0 ? String(v) : "";
       await chrome.storage.sync.set({ acquisitionPct: v });
       // Verdicts depend on the cost: rebuild the strips and the bar in place.
       SAFE.run("quickview-reinit", () => init().catch((err) => warn("re-init failed:", err)));
@@ -484,6 +485,10 @@ globalThis.MST_QUICKVIEW = (() => {
       chrome.storage.sync.set({ radarTargetPct });
       reapplyRadar();
       refreshExportBtn();
+    });
+    // On commit, show the value actually applied (e.g. 150 → 90).
+    input.addEventListener("change", () => {
+      input.value = String(radarTargetPct);
     });
     field.append(input, el("span", null, "%"));
     row.appendChild(field);
