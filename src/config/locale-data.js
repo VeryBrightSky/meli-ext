@@ -201,7 +201,10 @@ globalThis.MST_MESSAGES = Object.freeze({
     "trialActiveBannerOne": "Tienes PRO gratis: te queda 1 día. Guarda el costo de tus productos y revisa tu Tablero.",
     "trialEndingOne": "Tu prueba PRO termina hoy. Después pierdes el precio objetivo, el Radar y el Tablero.",
     "statusTrialDaysOne": "Prueba PRO: te queda 1 día",
-    "welcomeLeadOne": "Tienes 1 día de Netio PRO gratis. Sin correo, sin tarjeta. Así le sacas provecho desde hoy:"
+    "welcomeLeadOne": "Tienes 1 día de Netio PRO gratis. Sin correo, sin tarjeta. Así le sacas provecho desde hoy:",
+    "btnShare": "Compartir con otro vendedor",
+    "shareText": "Uso Netio para ver mi ganancia real en cada publicación de Mercado Libre: comisión, costo fijo, envío y retenciones, sin salir de la página. Es gratis para Chrome y los primeros 7 días traen PRO: $1",
+    "shareTextProfit": "Mira esto: en una publicación de $1 en Mercado Libre, después de comisión, costo fijo y envío, la ganancia real queda en $2. Lo calculé con Netio, una extensión gratis de Chrome que lo muestra en cada publicación: $3"
   },
   "en": {
     "cardTitle": "Profit calculator",
@@ -403,6 +406,9 @@ globalThis.MST_MESSAGES = Object.freeze({
     "trialActiveBannerOne": "PRO is on for free: 1 day left. Save your product costs and check your Dashboard.",
     "trialEndingOne": "Your PRO trial ends today. After that you lose target price, Radar and Dashboard.",
     "statusTrialDaysOne": "PRO trial: 1 day left",
-    "welcomeLeadOne": "You have 1 day of Netio PRO for free. No email, no card. Get value from it today:"
+    "welcomeLeadOne": "You have 1 day of Netio PRO for free. No email, no card. Get value from it today:",
+    "btnShare": "Share with another seller",
+    "shareText": "I use Netio to see my real profit on every Mercado Libre listing: commission, fixed fee, shipping and withholdings, right on the page. Free for Chrome, and the first 7 days include PRO: $1",
+    "shareTextProfit": "Check this: on a $1 Mercado Libre listing, after commission, fixed fee and shipping, the real profit is $2. Calculated with Netio, a free Chrome extension that shows it on every listing: $3"
   }
 });

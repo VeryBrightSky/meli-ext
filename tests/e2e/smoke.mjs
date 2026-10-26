@@ -170,6 +170,7 @@ try {
   assert.equal(await welcome.$eval("#title", (e) => e.textContent), "Tu PRO está activado");
   assert.ok((await welcome.$eval("#lead", (e) => e.textContent)).includes("7 días"), "welcome lead should show 7 días");
   assert.equal(await welcome.$eval("#go", (a) => a.href), "https://www.mercadolibre.com.mx/");
+  assert.ok((await welcome.$eval("#share", (a) => a.href)).includes("wa.me/?text="), "welcome share link");
   pass("install opens the welcome tab: 'Tu PRO está activado', 7 días, link to Mercado Libre");
   await welcome.close();
   const seed = await browser.newPage();
@@ -318,6 +319,15 @@ try {
   const clip = await page.evaluate(() => navigator.clipboard.readText());
   assert.ok(clip.includes("Recibes aprox.: $694.30"), `clipboard wrong:\n${clip}`);
   pass("copy summary stays FREE");
+
+  // Share button: WhatsApp link carrying the store URL and this listing's real profit.
+  const shareHref = await page.$eval(".mst-share", (a) => a.href);
+  assert.ok(shareHref.startsWith("https://wa.me/?text="), shareHref);
+  const shareText = decodeURIComponent(shareHref.slice("https://wa.me/?text=".length));
+  assert.ok(shareText.includes("chromewebstore.google.com/detail/netio/bjhikillfgbpblogloljjhejogfeajac"), shareText);
+  assert.ok(shareText.includes("$827.00") && shareText.includes("$294.30"), `share text lacks the real numbers: ${shareText}`);
+  assert.equal(await page.$eval(".mst-share", (a) => a.target), "_blank");
+  pass("share button: WhatsApp link with store URL + this listing's price and real profit");
 
   if (process.env.E2E_SHOTS) {
     await page.$eval(".mst-upsell", (e) => (e.hidden = true));

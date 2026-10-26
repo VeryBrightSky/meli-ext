@@ -253,3 +253,16 @@ tr.locked td:first-child {
 #upsell {
   margin-top: 18px;
 }
+
+.share {
+  margin-left: auto;
+  margin-right: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0a5c34;
+  text-decoration: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(0, 166, 80, 0.4);
+  background: #e8f7ee;
+}

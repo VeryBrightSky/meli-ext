@@ -19,6 +19,8 @@ globalThis.EXT_BRAND = Object.freeze({
   // ExtensionPay id (registered at extensionpay.com). Plans configured there:
   // "pro-monthly" ($89 MXN/mes) and "pro-yearly" ($699 MXN/año).
   extpayId: "netio",
+  // Public Chrome Web Store listing (used by the share buttons).
+  storeUrl: "https://chromewebstore.google.com/detail/netio/bjhikillfgbpblogloljjhejogfeajac",
   plans: Object.freeze({ monthly: "pro-monthly", yearly: "pro-yearly" }),
   // Path relative to the extension root; resolve with chrome.runtime.getURL().
   logoPath: "src/assets/icons/icon16.png",

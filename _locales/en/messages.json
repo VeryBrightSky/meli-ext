@@ -598,5 +598,14 @@
   },
   "welcomeLeadOne": {
     "message": "You have 1 day of Netio PRO for free. No email, no card. Get value from it today:"
+  },
+  "btnShare": {
+    "message": "Share with another seller"
+  },
+  "shareText": {
+    "message": "I use Netio to see my real profit on every Mercado Libre listing: commission, fixed fee, shipping and withholdings, right on the page. Free for Chrome, and the first 7 days include PRO: $1"
+  },
+  "shareTextProfit": {
+    "message": "Check this: on a $1 Mercado Libre listing, after commission, fixed fee and shipping, the real profit is $2. Calculated with Netio, a free Chrome extension that shows it on every listing: $3"
   }
 }

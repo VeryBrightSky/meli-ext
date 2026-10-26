@@ -497,6 +497,7 @@ globalThis.MST_CARD = (() => {
     }
 
     patchRow(refs.net, null, fmtRange(b.netMinMXN, b.netMaxMXN), flash);
+    if (refs.shareBtn) refs.shareBtn.href = buildShareUrl();
 
     const hasProfit = b.profitMinMXN !== undefined;
     refs.profit.root.style.display = hasProfit ? "" : "none";
@@ -1164,9 +1165,31 @@ globalThis.MST_CARD = (() => {
     });
     body.appendChild(copyBtn);
 
+    // Share with another seller (WhatsApp is where MX sellers talk). The
+    // message carries the store link and, when a cost is set, this listing's
+    // real profit so the recipient sees what the tool does before installing.
+    refs.shareBtn = el("a", `${PREFIX}-share`, T("btnShare"));
+    refs.shareBtn.target = "_blank";
+    refs.shareBtn.rel = "noopener";
+    refs.shareBtn.href = buildShareUrl();
+    refs.shareBtn.addEventListener("click", () => {
+      refs.shareBtn.href = buildShareUrl();
+      globalThis.MST_GATE.track("click:share");
+    });
+    body.appendChild(refs.shareBtn);
+
     // Upsell panel lives at the bottom of the card; never opens on load.
     const upsell = UPSELL.attach(body);
     openUpsell = (reason, vars) => upsell.open(reason, vars);
+  }
+
+  function buildShareUrl() {
+    const { b } = computeCurrent();
+    const hasProfit = b.profitMinMXN !== undefined && state.productCostMXN > 0;
+    const text = hasProfit
+      ? T("shareTextProfit", [fmtMoney(b.priceMXN), fmtRange(b.profitMinMXN, b.profitMaxMXN), BRAND.storeUrl])
+      : T("shareText", [BRAND.storeUrl]);
+    return `https://wa.me/?text=${encodeURIComponent(text)}`;
   }
 
   function buildSummaryText() {

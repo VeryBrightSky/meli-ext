@@ -598,5 +598,14 @@
   },
   "welcomeLeadOne": {
     "message": "Tienes 1 día de Netio PRO gratis. Sin correo, sin tarjeta. Así le sacas provecho desde hoy:"
+  },
+  "btnShare": {
+    "message": "Compartir con otro vendedor"
+  },
+  "shareText": {
+    "message": "Uso Netio para ver mi ganancia real en cada publicación de Mercado Libre: comisión, costo fijo, envío y retenciones, sin salir de la página. Es gratis para Chrome y los primeros 7 días traen PRO: $1"
+  },
+  "shareTextProfit": {
+    "message": "Mira esto: en una publicación de $1 en Mercado Libre, después de comisión, costo fijo y envío, la ganancia real queda en $2. Lo calculé con Netio, una extensión gratis de Chrome que lo muestra en cada publicación: $3"
   }
 }

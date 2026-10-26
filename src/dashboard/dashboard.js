@@ -14,6 +14,10 @@
   document.title = `${BRAND.name} — ${T("dashTitle")}`;
   document.getElementById("brand-logo").src = chrome.runtime.getURL(BRAND.logoPath);
   document.getElementById("dash-title").textContent = T("dashTitle");
+  const shareBtn = document.getElementById("share-btn");
+  shareBtn.textContent = T("btnShare");
+  shareBtn.href = `https://wa.me/?text=${encodeURIComponent(T("shareText", [BRAND.storeUrl]))}`;
+  shareBtn.addEventListener("click", () => globalThis.MST_GATE.track("click:share"));
 
   const send = (type, payload) =>
     chrome.runtime.sendMessage({ type, payload }).catch(() => null);

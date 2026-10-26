@@ -990,3 +990,22 @@
   color: #0a5c34;
   font-weight: 600;
 }
+
+/* Share with another seller (WhatsApp) */
+.mst-share {
+  display: block;
+  text-align: center;
+  margin-top: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #0a5c34;
+  text-decoration: none;
+  padding: 7px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(0, 166, 80, 0.4);
+  background: #e8f7ee;
+}
+
+.mst-share:hover {
+  background: #d8f1e3;
+}
