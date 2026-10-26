@@ -225,7 +225,10 @@ try {
   pass("breakeven stays FREE: cost 400 + ship 50 → $500.00");
 
   // Post-trial win-back banner is visible (trial ended 2 days ago).
-  assert.equal(await page.$eval(".mst-trialbar", (e) => e.hidden), false);
+  await page.waitForFunction(() => {
+    const b = document.querySelector(".mst-trialbar");
+    return b && !b.hidden && b.offsetHeight > 0;
+  }, { timeout: 5000 });
   assert.ok(
     (await page.$eval(".mst-trialbar", (e) => e.textContent)).includes("Tu prueba PRO terminó"),
     "win-back banner copy missing"
@@ -279,7 +282,6 @@ try {
 
   // MSI teaser: Premium listings show the real profit after 12 MSI (free),
   // the per-term breakdown is PRO.
-  const msiTeaserVisible = () => page.$eval(".mst-row--teaser:nth-of-type(n)", () => true).catch(() => false);
   await page.$$eval(".mst-toggle__btn", (btns) => btns.find((b) => b.textContent === "Premium").click());
   await sleep(300);
   const msiTeaserText = await page.$$eval(".mst-row--teaser", (rows) =>

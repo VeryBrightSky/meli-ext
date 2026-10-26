@@ -534,14 +534,18 @@ globalThis.MST_CARD = (() => {
       // Free: the target price for the default margin exists and is shown
       // blurred; the loss/thin-margin alert names the real number. Both open
       // the contextual upsell with the exact figures for THIS listing.
-      const teaserPct = state.targetMarginPct > 0 ? state.targetMarginPct : DEFAULT_TEASER_MARGIN_PCT;
+      // A margin saved during the trial is honored, but never below the thin
+      // threshold (the alert must always promise MORE than the seller has).
+      const teaserPct = Math.max(state.targetMarginPct || 0, DEFAULT_TEASER_MARGIN_PCT);
       refs.targetTeaser.root.style.display = hasCost ? "" : "none";
       if (hasCost) {
         const hi = solve(quote.pctMax, teaserPct);
         const text = hi !== null ? fmtMoney(hi) : T("targetUnreachable");
         refs.targetTeaser.label.textContent = T("rowTargetTeaser", [String(teaserPct)]);
         refs.targetTeaser.set(text);
-        refs.targetTeaser.vars = [String(teaserPct), text];
+        // No number → the panel falls back to the generic pitch, never
+        // "necesitas vender a Precio inalcanzable".
+        refs.targetTeaser.vars = hi !== null ? [String(teaserPct), text] : [];
       }
       if (hasCost && b.profitMinMXN !== undefined) {
         const losing = b.profitMaxMXN < 0;

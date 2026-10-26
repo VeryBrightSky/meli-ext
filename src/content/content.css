@@ -967,6 +967,15 @@
   margin-left: 8px;
 }
 
+.mst-radar__costfield {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.7);
+  margin-right: 10px;
+}
+
 .mst-radar__cost {
   width: 52px;
   font-family: inherit;

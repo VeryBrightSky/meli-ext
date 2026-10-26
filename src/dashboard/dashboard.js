@@ -53,6 +53,15 @@
   const defaultShipping = DASH.resolveDefaultShipping(sync, all[`${PREFIX}:defaults`]);
 
   let rows = DASH.computeRows(all, PREFIX, defaultShipping);
+  // Free preview shows the same FREE_ROWS products no matter how the table is
+  // sorted afterwards (worst margin first at load), so re-sorting can't be
+  // used to read every row three at a time.
+  const freeIds = new Set(
+    [...rows]
+      .sort((a, b2) => a.b.marginMinPct - b2.b.marginMinPct)
+      .slice(0, FREE_ROWS)
+      .map((r) => r.itemId)
+  );
 
   // --- Render --------------------------------------------------------------------
   document.getElementById("content").hidden = false;
@@ -177,24 +186,26 @@
       limitNote.hidden = true;
     }
 
-    rows.forEach((row, index) => {
+    rows.forEach((row) => {
       const tr = document.createElement("tr");
       // Flag loss-makers (worst-case profit below zero) for visual call-out.
       if (row.b.profitMinMXN < 0) tr.classList.add(`${PREFIX}-row--loss`);
-      const locked = !pro && index >= FREE_ROWS;
+      const locked = !pro && !freeIds.has(row.itemId);
       if (locked) tr.classList.add("locked");
       for (const colDef of COLS) {
         const td = document.createElement("td");
         if (colDef.num) td.className = "num";
         const tone = colDef.tone ? colDef.tone(row) : null;
         if (tone) td.classList.add(tone);
-        if (colDef.key === "title") {
+        if (colDef.key === "title" && !locked) {
           const a = document.createElement("a");
           a.href = row.meta.url;
           a.target = "_blank";
           a.rel = "noopener";
           a.textContent = row.meta.title || row.itemId;
           td.appendChild(a);
+        } else if (colDef.key === "title") {
+          td.textContent = row.meta.title || row.itemId;
         } else if (colDef.editable && !locked) {
           const input = document.createElement("input");
           input.type = "text";

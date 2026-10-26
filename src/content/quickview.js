@@ -405,7 +405,7 @@ globalThis.MST_QUICKVIEW = (() => {
     cta.type = "button";
     cta.addEventListener("click", () => {
       const c = previewCounts();
-      if (upsellOpen) upsellOpen("radar", [String(c.profit)]);
+      if (upsellOpen) upsellOpen("radar", c.profit > 0 ? [String(c.profit)] : []);
     });
     row.appendChild(cta);
     row.appendChild(el("span", `${PREFIX}-radar__more`, ""));
@@ -436,7 +436,7 @@ globalThis.MST_QUICKVIEW = (() => {
   // Inline acquisition-cost input so a PRO/trial user can switch the Radar on
   // from the results page (the options page was the only way before).
   function buildCostField() {
-    const field = el("label", `${PREFIX}-radar__field`);
+    const field = el("label", `${PREFIX}-radar__costfield`);
     field.appendChild(el("span", null, T("radarCostLabel")));
     const input = el("input", `${PREFIX}-radar__cost`);
     input.type = "number";
@@ -446,9 +446,9 @@ globalThis.MST_QUICKVIEW = (() => {
     input.value = acquisitionPct > 0 ? String(acquisitionPct) : "";
     input.placeholder = String(DEFAULT_ASSUMED_COST_PCT);
     input.setAttribute("aria-label", T("radarCostLabel"));
-    input.addEventListener("change", () => {
+    input.addEventListener("change", async () => {
       const v = Math.max(0, Math.min(99, Math.round(Number(input.value) || 0)));
-      chrome.storage.sync.set({ acquisitionPct: v });
+      await chrome.storage.sync.set({ acquisitionPct: v });
       // Verdicts depend on the cost: rebuild the strips and the bar in place.
       init();
     });
@@ -524,7 +524,10 @@ globalThis.MST_QUICKVIEW = (() => {
       } else {
         const upsell = globalThis.MST_UPSELL.attach(bar);
         upsellOpen = (reason, vars) => upsell.open(reason, vars);
-        const open = () => upsellOpen("radar", [String(previewCounts().profit)]);
+        const open = () => {
+          const c = previewCounts();
+          upsellOpen("radar", c.profit > 0 ? [String(c.profit)] : []);
+        };
         btn.classList.add(`${PREFIX}-locked`);
         btn.addEventListener("click", open);
         wrap.appendChild(globalThis.MST_UPSELL.chip(open));

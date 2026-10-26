@@ -140,7 +140,10 @@ globalThis.MST_GATE = (() => {
       const stored = await chrome.storage.local.get([CACHE_KEY, OVERRIDE_KEY, INSTALLED_KEY]);
       cached = stored[CACHE_KEY] ?? null;
       override = stored[OVERRIDE_KEY] === true;
-      installedAt = typeof stored[INSTALLED_KEY] === "number" ? stored[INSTALLED_KEY] : null;
+      const raw = stored[INSTALLED_KEY];
+      // A corrupt (NaN/0) or future-dated stamp is treated as missing and
+      // re-stamped, so no install is ever stuck without its trial.
+      installedAt = Number.isFinite(raw) && raw > 0 && raw <= Date.now() ? raw : null;
       if (installedAt === null) {
         // First run before the service worker stamped it (or a pre-1.4 install
         // updating): the reverse trial starts now.
@@ -152,9 +155,14 @@ globalThis.MST_GATE = (() => {
     }
     // Bound offline staleness: drop a cache older than the TTL so it can't
     // grant Pro indefinitely without ExtPay ever confirming again.
-    if (!isCacheUsable(cached, Date.now())) cached = null;
-
     const now = Date.now();
+    if (!isCacheUsable(cached, now)) cached = null;
+    // An offline cache that carries the ExtPay trial start is re-evaluated,
+    // so a lapsed ExtPay trial can't stay PRO until the cache TTL runs out.
+    if (cached && !cached.paid && cached.trialStartedAt) {
+      cached = { ...cached, ...computeProStatus({ paid: false, trialStartedAt: cached.trialStartedAt }, now) };
+    }
+
     current = override
       ? { pro: true, paid: true, trialActive: false, trialExpired: false, trialDaysLeft: 0, localTrial: false, source: "override" }
       : mergeStatus(resolveStatus(fresh, cached), computeLocalTrial(installedAt, now));

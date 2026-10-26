@@ -22,7 +22,8 @@ const INSTALLED_KEY = `${PREFIX}:installedAt`;
 chrome.runtime.onInstalled.addListener(async () => {
   try {
     const stored = await chrome.storage.local.get(INSTALLED_KEY);
-    if (typeof stored[INSTALLED_KEY] !== "number") {
+    const raw = stored[INSTALLED_KEY];
+    if (!(Number.isFinite(raw) && raw > 0 && raw <= Date.now())) {
       await chrome.storage.local.set({ [INSTALLED_KEY]: Date.now() });
     }
   } catch (err) {
@@ -33,13 +34,15 @@ chrome.runtime.onInstalled.addListener(async () => {
 chrome.runtime.onStartup.addListener(() => refreshBadge());
 
 // Toolbar badge: "PRO" while entitled, "2d" when the trial is about to end,
-// nothing otherwise. No extra permission needed.
-async function refreshBadge() {
+// nothing otherwise. No extra permission needed. Pass the ExtPay user when
+// the caller already fetched it so a page view costs ONE request, not two.
+async function refreshBadge(user) {
   try {
     const stored = await chrome.storage.local.get(INSTALLED_KEY);
     let base = { pro: false, paid: false, trialActive: false, trialExpired: false, trialDaysLeft: 0 };
     try {
-      base = globalThis.MST_GATE.computeProStatus(await extpay.getUser(), Date.now());
+      const u = user === undefined ? await extpay.getUser() : user;
+      base = globalThis.MST_GATE.computeProStatus(u, Date.now());
     } catch {
       // offline: local window still decides
     }
@@ -63,8 +66,10 @@ const handlers = {
   getProStatus: async () => {
     const user = await extpay.getUser(); // throws offline → caller uses cache
     const s = globalThis.MST_GATE.computeProStatus(user, Date.now());
-    refreshBadge();
-    return s;
+    refreshBadge(user);
+    // trialStartedAt rides along so an offline cache can re-evaluate the
+    // ExtPay trial window instead of freezing "pro: true" for 30 days.
+    return { ...s, trialStartedAt: user?.trialStartedAt ?? null };
   },
 
   // payload.plan: ExtPay v3.1 plan nickname → plan-specific checkout page.
@@ -96,7 +101,6 @@ try {
 } catch {
   // onPaid unavailable with a placeholder id
 }
-refreshBadge();
 
 chrome.action.onClicked.addListener(() => {
   chrome.tabs.create({ url: chrome.runtime.getURL(DASHBOARD_URL) });
