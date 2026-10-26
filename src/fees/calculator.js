@@ -83,7 +83,15 @@ globalThis.MST_CALC = (() => {
   // fixed(P) is a step function of P, so iterate to a fixed point (the tiers
   // are few and monotonic; cap the loop defensively). marginPct = 0 gives the
   // break-even price. Returns null when the margin is unreachable.
-  function solveTargetPrice({ costMXN, shippingMXN, marginPct, ratePct, fixedCostFn }) {
+  //
+  // `thresholds` (optional): the prices where fixedCostFn steps. Needed for
+  // the band where the fixed point oscillates across a step (e.g. classic
+  // 10%, base 255–268: with fixed=$37 the price lands ≥$299 where fixed=0,
+  // and with fixed=0 it lands <$299 where fixed=$37). The honest answer there
+  // is the step itself ($299): the smallest price that actually covers
+  // base + fixed(price). Without thresholds the old fixed-point result is
+  // returned.
+  function solveTargetPrice({ costMXN, shippingMXN, marginPct, ratePct, fixedCostFn, thresholds = [] }) {
     const denom = 1 - ratePct / 100 - marginPct / 100;
     if (denom <= 0.001) return null;
     const base = costMXN + (shippingMXN > 0 ? shippingMXN : 0);
@@ -97,7 +105,18 @@ globalThis.MST_CALC = (() => {
       fixed = nextFixed;
       price = (base + fixed) / denom;
     }
-    return round2(price);
+    const feasible = (p) => p * denom + 1e-9 >= base + fixedCostFn(p);
+    if (feasible(price)) return round2(price);
+    // Oscillation across a step: pick the lowest feasible candidate among the
+    // steps above the un-fixed price and the fixed-point attempts.
+    const candidates = [
+      ...thresholds.filter((t) => t > base / denom - 1e-9),
+      price,
+      (base + fixedCostFn(price)) / denom
+    ]
+      .filter((p) => feasible(p))
+      .sort((a, b) => a - b);
+    return candidates.length ? round2(candidates[0]) : round2(price);
   }
 
   // Sweet-spot detector: fees are discontinuous (fixed-charge tiers at
@@ -105,13 +124,20 @@ globalThis.MST_CALC = (() => {
   // the net payout. Scan thresholds within `maxIncreaseRatio` above the
   // current price and return the one with the best positive net gain.
   // Shipping/cost are constant across the comparison and cancel out.
+  // Only a step where the FIXED charge actually drops counts: raising the
+  // price always raises the gross, so without that guard a Premium listing
+  // (no fixed charge) or a classic price just under a step-UP ($99, $149)
+  // would be told to raise the price for "free money" that is nothing but the
+  // higher price itself.
   function findSweetSpot({ priceMXN, ratePct, fixedCostFn, thresholds, maxIncreaseRatio = 0.2 }) {
     if (!(priceMXN > 0)) return null;
     const net = (p) => p * (1 - ratePct / 100) - fixedCostFn(p);
     const limit = priceMXN * (1 + maxIncreaseRatio);
+    const fixedNow = fixedCostFn(priceMXN);
     let best = null;
     for (const t of thresholds) {
       if (t <= priceMXN || t > limit) continue;
+      if (!(fixedCostFn(t) < fixedNow)) continue;
       const gain = round2(net(t) - net(priceMXN));
       if (gain > 0 && (best === null || gain > best.netGainMXN)) {
         best = { targetPriceMXN: t, netGainMXN: gain };

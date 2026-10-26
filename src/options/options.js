@@ -116,9 +116,21 @@ async function loadSubscriptionStatus() {
 }
 loadSubscriptionStatus();
 
+// Reset removes ONLY Netio's own data. Never storage.clear(): ExtPay keeps
+// the seller's payment key in storage.sync (clearing it drops a paying user
+// to free until they log in again), and mst:installedAt must survive so a
+// reset is not a free trial restart.
+const KEEP_LOCAL = new Set([`${BRAND.cssPrefix}:installedAt`, `${BRAND.cssPrefix}:metrics`]);
+async function removeOwnKeys(area, extraKeys = []) {
+  const all = await area.get(null);
+  const mine = Object.keys(all).filter(
+    (k) => (k.startsWith(`${BRAND.cssPrefix}:`) && !KEEP_LOCAL.has(k)) || extraKeys.includes(k)
+  );
+  if (mine.length) await area.remove(mine);
+}
 resetBtn.addEventListener("click", async () => {
-  await chrome.storage.local.clear();
-  await chrome.storage.sync.clear();
+  await removeOwnKeys(chrome.storage.local);
+  await removeOwnKeys(chrome.storage.sync, [...Object.keys(DEFAULT_SETTINGS), "msiRates", "msiTerm", "reputationId", "freeShipping", "usesFull"]);
   await chrome.storage.sync.set(DEFAULT_SETTINGS);
   await load();
   resetStatus.textContent = T("optResetDone");

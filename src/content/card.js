@@ -23,6 +23,7 @@ globalThis.MST_CARD = (() => {
     categoryGroupId: null,
     categoryAutoDetected: false,
     shippingCostMXN: 0,
+    shippingAutofilled: false,
     productCostMXN: 0,
     targetMarginPct: 0,
     salesPerMonth: 0,
@@ -194,7 +195,8 @@ globalThis.MST_CARD = (() => {
         `${PREFIX}:cost:${state.itemId}`,
         `${PREFIX}:catpick:${state.itemId}`,
         `${PREFIX}:sales:${state.itemId}`,
-        `${PREFIX}:weight:${state.itemId}`
+        `${PREFIX}:weight:${state.itemId}`,
+        `${PREFIX}:type:${state.itemId}`
       );
     }
     const [stored, settings] = await Promise.all([
@@ -237,6 +239,10 @@ globalThis.MST_CARD = (() => {
     if (settings.defaultListingType !== "auto") {
       state.listingTypeId = settings.defaultListingType === "premium" ? "premium" : "classic";
     }
+    // The seller's own toggle for this listing beats both the options
+    // default and the page guess.
+    const savedType = stored[`${PREFIX}:type:${state.itemId}`];
+    if (savedType === "premium" || savedType === "classic") state.listingTypeId = savedType;
     // Manual category pick saved for this listing beats auto-detection.
     const savedPick = stored[`${PREFIX}:catpick:${state.itemId}`];
     if (savedPick && SOURCE.listCategoryGroups().some((g) => g.id === savedPick)) {
@@ -308,7 +314,7 @@ globalThis.MST_CARD = (() => {
       priceMXN: state.priceMXN,
       ratePct: quote.pctMax,
       fixedCostFn,
-      thresholds: SOURCE.getFixedCostThresholds()
+      thresholds: SOURCE.getFixedCostThresholds(fullWeightKg())
     });
     refs.sweetspot.style.display = spot ? "" : "none";
     if (spot) {
@@ -520,7 +526,8 @@ globalThis.MST_CARD = (() => {
         shippingMXN: effectiveShipping,
         marginPct,
         ratePct,
-        fixedCostFn
+        fixedCostFn,
+        thresholds: SOURCE.getFixedCostThresholds(fullWeightKg())
       });
 
     refs.breakeven.root.style.display = hasCost ? "" : "none";
@@ -690,6 +697,9 @@ globalThis.MST_CARD = (() => {
       btn.type = "button";
       btn.addEventListener("click", () => {
         state.listingTypeId = id;
+        if (state.itemId) {
+          chrome.storage.local.set({ [`${PREFIX}:type:${state.itemId}`]: id });
+        }
         update();
       });
       refs.toggleButtons[id] = btn;
@@ -780,7 +790,10 @@ globalThis.MST_CARD = (() => {
     msiRateInput.setAttribute("aria-label", T("msiRateAria"));
     const applyRate = () => {
       const pct = CALC.parseMoney(msiRateInput.value);
-      state.msiRates[String(state.msiTerm)] = pct; // seller's value wins + persists
+      // A real value wins and persists; blank/0 means "use the reference
+      // again" rather than a saved 0% that would hide the MSI cost forever.
+      if (pct > 0) state.msiRates[String(state.msiTerm)] = Math.min(pct, 99);
+      else delete state.msiRates[String(state.msiTerm)];
       persistMsi();
       update();
     };
@@ -884,10 +897,18 @@ globalThis.MST_CARD = (() => {
     weightSel.addEventListener("change", () => {
       const kg = Number.parseFloat(weightSel.value);
       state.weightKg = Number.isFinite(kg) && kg > 0 ? kg : 0;
-      if (state.weightKg > 0 && state.priceMXN >= SOURCE.freeShippingThresholdMXN) {
+      // Autofill the estimated shipping only when the seller hasn't typed
+      // one (empty, or a value this select filled earlier): a manual value
+      // or a saved default always wins.
+      if (
+        state.weightKg > 0 &&
+        state.priceMXN >= SOURCE.freeShippingThresholdMXN &&
+        (!(state.shippingCostMXN > 0) || state.shippingAutofilled)
+      ) {
         const cost = globalThis.MST_SHIPPING.costForWeight(state.weightKg);
         if (cost !== null) {
           state.shippingCostMXN = cost;
+          state.shippingAutofilled = true;
           refs.shippingInput.syncFromState();
         }
       }
@@ -959,6 +980,7 @@ globalThis.MST_CARD = (() => {
       () => state.shippingCostMXN,
       (v) => {
         state.shippingCostMXN = v;
+        state.shippingAutofilled = false; // typed by the seller: never overwritten
         persistInputs();
         update();
       }
@@ -1172,12 +1194,24 @@ globalThis.MST_CARD = (() => {
       lines.push(`${T("rowShipping")}: ${fmtCharge(b.shippingCostMXN)}`);
     }
     lines.push(`${T("rowNet")}: ${fmtRange(b.netMinMXN, b.netMaxMXN)}`);
+    // What the card shows, the summary shows: withholdings when enabled,
+    // break-even when a cost is set.
+    if (state.showWithholdings) {
+      const w = CALC.computeWithholdings(state.priceMXN, SOURCE.withholdings);
+      lines.push(`${T("rowIvaWithheld")}: ${fmtCharge(w.ivaMXN)}`);
+      lines.push(`${T("rowIsrWithheld")}: ${fmtCharge(w.isrMXN)}`);
+      lines.push(
+        `${T("rowNetAfterWithholdings")}: ${fmtRange(CALC.round2(b.netMinMXN - w.totalMXN), CALC.round2(b.netMaxMXN - w.totalMXN))}`
+      );
+    }
     if (b.profitMinMXN !== undefined) {
       lines.push(`${T("rowProductCost")}: ${fmtMoney(b.productCostMXN)}`);
       lines.push(
         `${T("rowProfit")}: ${fmtRange(b.profitMinMXN, b.profitMaxMXN)} ` +
           `(${fmtPctRange(b.marginMinPct, b.marginMaxPct)})`
       );
+      const be = refs.breakeven?.value?.textContent;
+      if (be) lines.push(`${T("rowBreakeven")}: ${be}`);
     }
     lines.push(`${T("badgeEstimate")} · ${SOURCE.meta.retrievedAt} · ${BRAND.name}`);
     return lines.join("\n");

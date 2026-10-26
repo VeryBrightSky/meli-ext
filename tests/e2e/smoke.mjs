@@ -537,6 +537,143 @@ try {
   if (process.env.E2E_SHOTS) {
     await (await page.$("#mst-card-root")).screenshot({ path: join(process.env.E2E_SHOTS, "card-pro.png") });
   }
+
+  // ====================== PHASE 3b: every remaining control =================
+  console.log("\nPHASE 3b — EVERY CONTROL (MSI box, selects, persistence, reset)");
+  const selectByLabel = (label) => `.mst-card select[aria-label="${label}"]`;
+  const setSelect = async (label, value) => {
+    await page.$eval(selectByLabel(label), (el, v) => {
+      el.value = v;
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+    }, value);
+    await sleep(300);
+  };
+
+  // MSI box (Pro): opens, term change, own rate persists, blank restores reference.
+  await page.click(".mst-msi-toggle");
+  await sleep(250);
+  assert.ok(await page.$eval(".mst-msi", (e) => e.style.display !== "none"), "MSI box should open");
+  await setSelect("Número de meses", "12");
+  assert.ok(await page.$eval(".mst-msi__ref", (e) => e.style.display !== "none"), "reference note expected");
+  assert.equal(await page.evaluate(rowValue("sin intereses (estimado)")), "−$107.51"); // 827 × 13%
+  pass("MSI box opens; 12 meses at the 13% reference → −$107.51");
+  const rate = await page.$(".mst-msi__rate");
+  await rate.focus();
+  await rate.evaluate((el) => el.select());
+  await rate.type("7", { delay: 20 });
+  await page.keyboard.press("Enter");
+  await sleep(300);
+  assert.equal(await page.$eval(".mst-msi__ref", (e) => e.style.display), "none", "own rate hides the reference note");
+  assert.equal(await page.evaluate(rowValue("sin intereses (estimado)")), "−$57.89"); // 827 × 7%
+  pass("own MSI rate 7% → −$57.89 and the reference note hides");
+  await rate.focus();
+  await rate.evaluate((el) => el.select());
+  await page.keyboard.press("Backspace");
+  await page.keyboard.press("Enter");
+  await sleep(300);
+  assert.ok(await page.$eval(".mst-msi__ref", (e) => e.style.display !== "none"), "blank rate must restore the reference");
+  assert.equal(await page.evaluate(rowValue("sin intereses (estimado)")), "−$107.51");
+  pass("blank MSI rate restores the reference (no persisted 0%)");
+  await page.click(".mst-msi-toggle");
+  await sleep(200);
+
+  // Weight select never overwrites a typed shipping value; fills it when empty.
+  assert.equal(await page.$$eval(".mst-card input.mst-input", (i) => i[1].value), "50.00");
+  await setSelect("Peso (para estimar el envío)", "1");
+  assert.equal(await page.$$eval(".mst-card input.mst-input", (i) => i[1].value), "50.00");
+  pass("weight select keeps the seller's typed shipping ($50.00)");
+  await typeInto(page, 1, "0");
+  await setSelect("Peso (para estimar el envío)", "0.5");
+  assert.equal(await page.$$eval(".mst-card input.mst-input", (i) => i[1].value), "56.00");
+  await setSelect("Peso (para estimar el envío)", "1");
+  assert.equal(await page.$$eval(".mst-card input.mst-input", (i) => i[1].value), "59.60");
+  pass("weight select autofills shipping when empty and keeps tracking weight until the seller types (0.5 kg $56.00 → 1 kg $59.60)");
+  await typeInto(page, 1, "50");
+
+  // Category select changes the commission.
+  assert.equal(await page.evaluate(rowValue("Comisión")), "−$82.70");
+  const catOptions = await page.$$eval(selectByLabel("Categoría") + " option", (os) => os.map((o) => o.value));
+  const other = catOptions.find((v) => v && v !== "tech");
+  await setSelect("Categoría", other);
+  assert.notEqual(await page.evaluate(rowValue("Comisión")), "−$82.70");
+  pass(`category select → commission recomputed (${other})`);
+  await setSelect("Categoría", "tech");
+  assert.equal(await page.evaluate(rowValue("Comisión")), "−$82.70");
+
+  // Reputation subsidy row appears with free shipping + a green reputation.
+  await page.click(".mst-free-toggle");
+  await sleep(200);
+  await setSelect("Reputación del vendedor", "verde");
+  assert.equal(await page.evaluate(rowValue("Descuento en envío por reputación")), "−$25.00"); // 50% of 50, shown as a reduction
+  pass("reputation verde + envío gratis → subsidy row −$25.00");
+  await setSelect("Reputación del vendedor", "none");
+  await page.click(".mst-free-toggle");
+  await sleep(200);
+
+  // Listing type toggle persists per item across reloads.
+  await page.$$eval(".mst-toggle__btn", (btns) => btns.find((b) => b.textContent === "Premium").click());
+  await sleep(300);
+  await page.goto(PRODUCT_URL, { waitUntil: "load" });
+  await page.waitForSelector("#mst-card-root", { visible: true, timeout: 20000 });
+  await sleep(600);
+  assert.equal(
+    await page.$$eval(".mst-toggle__btn", (btns) => btns.find((b) => b.textContent === "Premium").getAttribute("aria-pressed")),
+    "true"
+  );
+  pass("Clásica/Premium choice persists for the listing after reload");
+  await page.$$eval(".mst-toggle__btn", (btns) => btns.find((b) => b.textContent === "Clásica").click());
+  await sleep(300);
+
+  // Options "Reset": removes Netio data, keeps ExtPay keys and the install stamp.
+  const opts = await browser.newPage();
+  await opts.goto(`chrome-extension://${extId}/src/options/options.html`, { waitUntil: "load" });
+  await opts.evaluate(async () => {
+    await chrome.storage.sync.set({ extensionpay_sentinel: "keep-me" });
+  });
+  const before = await opts.evaluate(async () => (await chrome.storage.local.get(["mst:installedAt", "mst:cost:MLM12345678"])));
+  assert.ok(before["mst:cost:MLM12345678"] > 0, "precondition: saved cost");
+  await opts.click("#reset-btn");
+  await sleep(500);
+  const after = await opts.evaluate(async () => ({
+    local: await chrome.storage.local.get(["mst:installedAt", "mst:cost:MLM12345678", "mst:proOverride"]),
+    sync: await chrome.storage.sync.get(["extensionpay_sentinel", "cardEnabled"])
+  }));
+  assert.equal(after.local["mst:installedAt"], before["mst:installedAt"], "install stamp must survive reset");
+  assert.equal(after.local["mst:cost:MLM12345678"], undefined, "saved cost must be removed");
+  assert.equal(after.local["mst:proOverride"], undefined, "override is Netio data → removed");
+  assert.equal(after.sync.extensionpay_sentinel, "keep-me", "ExtPay keys must survive reset");
+  assert.equal(after.sync.cardEnabled, true, "defaults restored");
+  pass("options Reset removes only Netio data (ExtPay keys + install stamp kept, no trial restart)");
+  // Re-seed what later phases rely on.
+  await opts.evaluate(async () => {
+    await chrome.storage.local.set({ "mst:proOverride": true, "mst:sales:MLM12345678": 10 });
+    await chrome.storage.sync.set({ acquisitionPct: 60, defaultShippingMXN: 50 });
+  });
+  await opts.close();
+  await page.bringToFront();
+  await page.goto(PRODUCT_URL, { waitUntil: "load" });
+  await page.waitForSelector("#mst-card-root", { visible: true, timeout: 20000 });
+  await sleep(500);
+  await typeInto(page, 1, "50");
+  await typeInto(page, 2, "400");
+
+  // Dashboard: header sort + editable sales persist.
+  const dash2 = await browser.newPage();
+  await dash2.goto(`chrome-extension://${extId}/src/dashboard/dashboard.html`, { waitUntil: "load" });
+  await dash2.waitForFunction(() => !document.getElementById("content")?.hidden, { timeout: 10000 });
+  await dash2.$$eval("#head-row th", (ths) => ths.find((t) => t.textContent.startsWith("Precio de venta")).click());
+  await sleep(200);
+  assert.ok((await dash2.$$eval("#head-row th", (ths) => ths.map((t) => t.textContent))).some((t) => t.includes("Precio de venta ↓")));
+  await dash2.$eval("#rows input", (i) => {
+    i.value = "25";
+    i.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await sleep(400);
+  assert.equal(await dash2.evaluate(async () => (await chrome.storage.local.get("mst:sales:MLM12345678"))["mst:sales:MLM12345678"]), 25);
+  await dash2.evaluate(async () => chrome.storage.local.set({ "mst:sales:MLM12345678": 10 }));
+  pass("dashboard: column header sorts, sales input persists (25) to storage");
+  await dash2.close();
+
   console.log("\nPHASE 4 — SEARCH, PRO");
   const search = tap(await browser.newPage(), "search");
   await search.bringToFront();

@@ -100,7 +100,7 @@ const handlers = {
   // payload.plan: ExtPay v3.1 plan nickname → plan-specific checkout page.
   openPaymentPage: async (payload) => extpay.openPaymentPage(payload?.plan),
   // Trial starts when the user opts in here — never on install.
-  openTrialPage: async () => extpay.openTrialPage("7 días"),
+  openTrialPage: async () => extpay.openTrialPage("7 dias"),
   openLoginPage: async () => extpay.openLoginPage(),
 
   openDashboard: async () => {

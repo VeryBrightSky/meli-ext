@@ -85,8 +85,13 @@ globalThis.MST_FEE_SOURCE = (() => {
     withholdings: table.withholdings,
     shippingSubsidy: table.shippingSubsidy,
     msiReference: table.msiReference,
-    // Prices where the fixed charge steps (sweet-spot candidates).
-    getFixedCostThresholds: () => table.fixedCost.tiers.map((t) => t.maxPriceExclusive),
+    // Prices where the fixed charge steps (sweet-spot / solver candidates).
+    // Full sellers pay the Full service-cost tiers (99/199/299), not the
+    // classic fixed-charge tiers (99/149/299).
+    getFixedCostThresholds: (fullWeightKg = null) =>
+      fullWeightKg !== null
+        ? [...globalThis.MST_SHIPPING_TABLE.fullServiceCost.priceTiersMaxExclusive]
+        : table.fixedCost.tiers.map((t) => t.maxPriceExclusive),
     listCategoryGroups,
     matchCategory
   });

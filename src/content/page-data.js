@@ -130,7 +130,15 @@ globalThis.MST_PAGE = (() => {
   // help page). MSI on the page is therefore a strong Premium signal — its
   // absence is weaker, so callers treat this as a default, not a fact.
   function guessListingType() {
-    const text = document.body.innerText;
+    // Scope the signal to the price/payment area: MELI prints "meses sin
+    // intereses" in site-wide banners and footers, so a body-wide scan would
+    // call almost every listing Premium.
+    const scope =
+      document.querySelector(
+        ".ui-pdp-price, .ui-pdp-payment, #payment_methods, .ui-pdp-price__second-line, [class*='ui-pdp-price']"
+      )?.closest(".ui-pdp-container__row, .ui-pdp-price, .ui-pdp-payment") ??
+      document.querySelector(".ui-pdp-price, .ui-pdp-payment, #payment_methods");
+    const text = (scope ?? document.body).innerText || "";
     if (/meses sin intereses/i.test(text)) return "premium";
     return "classic";
   }

@@ -450,7 +450,7 @@ globalThis.MST_QUICKVIEW = (() => {
       const v = Math.max(0, Math.min(99, Math.round(Number(input.value) || 0)));
       await chrome.storage.sync.set({ acquisitionPct: v });
       // Verdicts depend on the cost: rebuild the strips and the bar in place.
-      init();
+      SAFE.run("quickview-reinit", () => init().catch((err) => warn("re-init failed:", err)));
     });
     field.appendChild(input);
     return field;

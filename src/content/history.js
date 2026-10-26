@@ -12,16 +12,37 @@ globalThis.MST_HISTORY = (() => {
 
   const key = (itemId) => `${PREFIX}:hist:${itemId}`;
 
+  // Bound the number of items kept: one key per visited listing, forever,
+  // would grow storage.local without limit. Oldest-visited histories are
+  // pruned once the index passes MAX_ITEMS.
+  const MAX_ITEMS = 300;
+  const INDEX_KEY = `${PREFIX}:hist-index`;
+
   async function record(itemId, priceMXN) {
     if (!itemId || !(priceMXN > 0)) return;
     const k = key(itemId);
-    const stored = await chrome.storage.local.get(k);
+    const stored = await chrome.storage.local.get([k, INDEX_KEY]);
     const points = Array.isArray(stored[k]) ? stored[k] : [];
     const last = points[points.length - 1];
     const now = Date.now();
-    if (last && last.p === priceMXN && now - last.t < DEDUPE_MS) return;
-    points.push({ p: priceMXN, t: now });
-    await chrome.storage.local.set({ [k]: points.slice(-MAX_POINTS) });
+    const index = stored[INDEX_KEY] && typeof stored[INDEX_KEY] === "object" ? stored[INDEX_KEY] : {};
+    index[itemId] = now;
+    const updates = { [INDEX_KEY]: index };
+    const ids = Object.keys(index);
+    const toRemove = [];
+    if (ids.length > MAX_ITEMS) {
+      ids.sort((a, b2) => index[a] - index[b2]);
+      for (const old of ids.slice(0, ids.length - MAX_ITEMS)) {
+        delete index[old];
+        toRemove.push(key(old));
+      }
+    }
+    if (!(last && last.p === priceMXN && now - last.t < DEDUPE_MS)) {
+      points.push({ p: priceMXN, t: now });
+      updates[k] = points.slice(-MAX_POINTS);
+    }
+    await chrome.storage.local.set(updates);
+    if (toRemove.length) await chrome.storage.local.remove(toRemove);
   }
 
   async function get(itemId) {

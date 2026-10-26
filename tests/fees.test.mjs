@@ -285,15 +285,50 @@ test("sweet spot: losing or out-of-window tier crossings do not nudge", () => {
   assert.equal(CALC.findSweetSpot({ ...args, priceMXN: 150 }), null);
 });
 
-test("sweet spot: $140 → $149 marginally wins (+$1.10 despite higher tier)", () => {
-  // crossing the $30→$37 step at $149: (149−140)·0.9 − (37−30) = 8.10 − 7 = 1.10
-  const spot = CALC.findSweetSpot({
-    priceMXN: 140,
+test("sweet spot: a step UP in the fixed charge is never a nudge ($140 → $149, Premium)", () => {
+  // Crossing $149 raises the fixed charge $30→$37. The +$1.10 that used to be
+  // reported was just the higher price, not a fee win — a seller can charge
+  // more at any price. Only steps where the fixed charge DROPS count.
+  assert.equal(
+    CALC.findSweetSpot({ priceMXN: 140, ratePct: 10, fixedCostFn: SOURCE.getFixedCost, thresholds: SOURCE.getFixedCostThresholds() }),
+    null
+  );
+  // Premium has no fixed charge at all → never a sweet spot.
+  const premium = SOURCE.fixedCostFnFor({ listingTypeId: "premium" });
+  assert.equal(
+    CALC.findSweetSpot({ priceMXN: 85, ratePct: 14.5, fixedCostFn: premium, thresholds: SOURCE.getFixedCostThresholds() }),
+    null
+  );
+});
+
+test("sweet spot: Full tiers (99/199/299) are the candidates in Full mode", () => {
+  assert.deepEqual(SOURCE.getFixedCostThresholds(1), [99, 199, 299]);
+  // 1kg @ $190 Full: service cost $38 (tier 99–198.99) → at $199 it is $39 (step up) → no nudge;
+  // at $280 → $299 drops to 0 → nudge (tested above). $150 → 199 is +$1 cost, no nudge.
+  const fn = SOURCE.fixedCostFnFor({ listingTypeId: "classic", fullWeightKg: 1 });
+  assert.equal(
+    CALC.findSweetSpot({ priceMXN: 190, ratePct: 10, fixedCostFn: fn, thresholds: SOURCE.getFixedCostThresholds(1) }),
+    null
+  );
+});
+
+test("solveTargetPrice: oscillation across the $299 step snaps to $299 (never under-states)", () => {
+  // Classic 10%: base 260 → fixed-point oscillates (260/0.9=288.9 <299 → +37 → 330 ≥299 → fixed 0 → 288.9 …)
+  // The honest answer is the step itself: $299 covers 260 + 0 at 10%.
+  const p = CALC.solveTargetPrice({
+    costMXN: 260,
+    shippingMXN: 0,
+    marginPct: 0,
     ratePct: 10,
     fixedCostFn: SOURCE.getFixedCost,
     thresholds: SOURCE.getFixedCostThresholds()
   });
-  assert.deepEqual(spot, { targetPriceMXN: 149, netGainMXN: 1.1 });
+  assert.equal(p, 299);
+  // Every price returned must actually cover base + fixed(price) at the margin.
+  for (const base of [230, 250, 255, 262, 268, 270, 290, 300]) {
+    const q = CALC.solveTargetPrice({ costMXN: base, shippingMXN: 0, marginPct: 0, ratePct: 10, fixedCostFn: SOURCE.getFixedCost, thresholds: SOURCE.getFixedCostThresholds() });
+    assert.ok(q * 0.9 + 0.01 >= base + SOURCE.getFixedCost(q), `base ${base}: price ${q} does not cover ${base} + ${SOURCE.getFixedCost(q)}`);
+  }
 });
 
 test("sweet spot: Full mode uses the service-cost discontinuities", () => {

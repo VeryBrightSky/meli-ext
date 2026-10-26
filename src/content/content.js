@@ -459,6 +459,9 @@
 
     const card = SAFE.run("card-build", buildCard, null);
     if (!card) return;
+    // Last check before touching the DOM: a navigation or entitlement change
+    // during the awaits above must not leave two cards on the page.
+    if (isStale(gen) || document.getElementById(CARD_ID)) return;
     found.el.insertAdjacentElement("afterend", card);
     log("card injected ✔");
     logCardVisibilityReport(document.getElementById(CARD_ID));
@@ -525,9 +528,9 @@
   // Content scripts can't intercept the page's history.pushState (isolated
   // world), so detect URL changes with a cheap 1s href poll + popstate.
   // On change: tear everything down, wait for the new view to render, re-route.
+  let renavTimer = null;
   function startUrlWatcher() {
     let lastHref = location.href;
-    let renavTimer = null;
 
     const onNavigated = SAFE.wrap("spa-nav", () => {
       if (location.href === lastHref) return;
@@ -562,13 +565,13 @@
     try {
       chrome.runtime.onMessage.addListener((message) => {
         if (message?.type !== "proChanged") return;
-        const gen = ++generation;
+        ++generation;
         log("entitlement changed → rebuilding");
+        clearTimeout(renavTimer);
         runCleanups();
         removeInjectedUi();
         pageData = null;
         route({ initial: false }).catch((err) => warn("route after proChanged failed:", err));
-        void gen;
       });
     } catch {
       // runtime unavailable (e.g. extension reloaded) — next navigation re-routes

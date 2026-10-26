@@ -28,6 +28,14 @@
         "https://www.mercadolibre.com.mx/*",
         "https://listado.mercadolibre.com.mx/*"
       ],
+      "exclude_matches": [
+        "https://www.mercadolibre.com.mx/ayuda/*",
+        "https://www.mercadolibre.com.mx/perfil/*",
+        "https://www.mercadolibre.com.mx/gz/*",
+        "https://www.mercadolibre.com.mx/navigation/*",
+        "https://www.mercadolibre.com.mx/mis-compras/*",
+        "https://www.mercadolibre.com.mx/suscripciones/*"
+      ],
       "js": [
         "src/config/branding.js",
         "src/content/safe.js",
