@@ -52,7 +52,7 @@ test("i18n substitutes $1/$2 and unescapes $$", () => {
   assert.equal(es.applySubs("a $1 b $2", ["X", "Y"]), "a X b Y");
   assert.equal(es.applySubs("precio < $$299", []), "precio < $299");
   assert.equal(es.t("rowCommission", ["10%"]), "Comisión por venta (10%)");
-  assert.equal(es.t("upsellMonthly"), "Activar PRO · $89 MXN/mes"); // $$89 → $89
+  assert.equal(es.t("upsellMonthly"), "Activar PRO · $89 al mes"); // $$89 → $89
   assert.equal(es.applySubs("$1 missing", []), " missing"); // absent sub → empty
 });
 

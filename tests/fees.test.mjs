@@ -169,7 +169,8 @@ test("solveTargetPrice: breakeven (margin 0)", () => {
 });
 
 test("solveTargetPrice: fixed-cost tier pulled in for low prices", () => {
-  // cost 30, rate 10%: naive P = 33.33 (<99 → +$25 fixed) → (30+25)/0.9 = 61.11
+  // cost 30, rate 10%: naive P = 33.33 (<99 → +$25 fixed) → (30+25)/0.9 = 61.111…
+  // rounded UP to 61.12 (61.11 × 0.9 = 54.999, half a cent short of break-even)
   const p = CALC.solveTargetPrice({
     costMXN: 30,
     shippingMXN: 0,
@@ -177,7 +178,7 @@ test("solveTargetPrice: fixed-cost tier pulled in for low prices", () => {
     ratePct: 10,
     fixedCostFn: SOURCE.getFixedCost
   });
-  assert.equal(p, 61.11);
+  assert.equal(p, 61.12);
 });
 
 test("solveTargetPrice: unreachable margin returns null", () => {
@@ -232,7 +233,7 @@ test("exact display numbers: breakeven $500.00, target $642.86 (10% classic, cos
 
 test("exact tier-crossing: solution migrates $25 tier -> $30 tier", () => {
   // cost 70 @ 10%: naive 77.78 (+$25 tier) -> 105.56 crosses into the $30
-  // tier -> converges at (70+30)/0.9 = 111.11
+  // tier -> converges at (70+30)/0.9 = 111.111… -> rounded up to 111.12
   const p = CALC.solveTargetPrice({
     costMXN: 70,
     shippingMXN: 0,
@@ -240,8 +241,8 @@ test("exact tier-crossing: solution migrates $25 tier -> $30 tier", () => {
     ratePct: 10,
     fixedCostFn: SOURCE.getFixedCost
   });
-  assert.equal(p, 111.11);
-  assert.equal(UI.fmtMoney(p), "$111.11");
+  assert.equal(p, 111.12);
+  assert.equal(UI.fmtMoney(p), "$111.12");
 });
 
 test("exact unreachable margin: 16% rate + 85% margin -> null (UI shows 'Margen inalcanzable')", () => {
@@ -505,8 +506,11 @@ test("gate: offline Pro cache expires past the TTL (bounded staleness)", () => {
   assert.equal(GATE.isCacheUsable({ pro: true, fetchedAt: now - DAY }, now), true);
   // stale cache past the window → not usable (no unbounded entitlement)
   assert.equal(GATE.isCacheUsable({ pro: true, fetchedAt: now - 31 * DAY }, now), false);
-  // legacy cache with no timestamp → usable (write must not self-revoke)
-  assert.equal(GATE.isCacheUsable({ pro: true }, now), true);
+  // legacy cache with no timestamp → usable only when it was a PAID
+  // entitlement (write must not self-revoke a payer; an unverifiable legacy
+  // trial cache must not grant PRO forever)
+  assert.equal(GATE.isCacheUsable({ pro: true, paid: true }, now), true);
+  assert.equal(GATE.isCacheUsable({ pro: true, paid: false }, now), false);
   // no cache → not usable
   assert.equal(GATE.isCacheUsable(null, now), false);
 });
@@ -743,4 +747,46 @@ test("gate: mergeStatus — paid wins, ExtPay trial counts, local trial fills in
   // never-installed-stamp + never paid → plain free, no expiry prompt
   const plain = GATE.mergeStatus(base({}), { active: false, expired: false, daysLeft: 0, daysSinceEnd: 0 });
   assert.equal(plain.trialExpired, false);
+});
+
+test("parseMoney: MELI copy-paste with split cents, MX$ prefix, negatives", () => {
+  assert.equal(CALC.parseMoney("$ 870 33"), 870.33);
+  assert.equal(CALC.parseMoney("$870\n33"), 870.33);
+  assert.equal(CALC.parseMoney("MX$1,299.00"), 1299);
+  assert.equal(CALC.parseMoney("$1,299"), 1299);
+  assert.equal(CALC.parseMoney("1.299,50"), 1299.5);
+  assert.equal(CALC.parseMoney("-50"), 0);
+  assert.equal(CALC.parseMoney("−50"), 0);
+  assert.equal(CALC.parseMoney(""), 0);
+});
+
+test("solveTargetPrice: never below the $35 listing minimum, always reaches the margin", () => {
+  const p = CALC.solveTargetPrice({ costMXN: 1, shippingMXN: 0, marginPct: 0, ratePct: 16, fixedCostFn: () => 0, minPriceMXN: 35 });
+  assert.equal(p, 35);
+  // cost 1, margin 5%, rate 16%: must not show 4.98%
+  const q = CALC.solveTargetPrice({ costMXN: 1, shippingMXN: 0, marginPct: 5, ratePct: 16, fixedCostFn: SOURCE.getFixedCost, thresholds: SOURCE.getFixedCostThresholds() });
+  const profit = q * (1 - 0.16) - SOURCE.getFixedCost(q) - 1;
+  assert.ok(profit / q >= 0.05 - 1e-9, `margin ${(profit / q) * 100}% < 5% at ${q}`);
+});
+
+test("solveTargetPrice: shipping that switches on at $299 is charged at the returned price", () => {
+  // Free shipping becomes the seller's cost at >= $299 (subsidy gone below it).
+  const ship = (p) => (p >= 299 ? 60 : 120);
+  const fn = (p) => SOURCE.getFixedCost(p) + ship(p);
+  for (const cost of [50, 100, 150, 200, 250]) {
+    const p = CALC.solveTargetPrice({ costMXN: cost, shippingMXN: 0, marginPct: 0, ratePct: 10, fixedCostFn: fn, thresholds: SOURCE.getFixedCostThresholds() });
+    const profit = p * 0.9 - fn(p) - cost;
+    assert.ok(profit >= -0.005, `cost ${cost}: break-even ${p} still loses ${profit}`);
+  }
+});
+
+test("sweet spot: crossing $299 into paid free shipping is not a gain", () => {
+  // classic 16% (unknown-category worst case) at $281.05: fixed $37 drops at $299,
+  // but the seller now pays $52.40 shipping → 17.95×0.84 + 37 − 52.40 = −$0.32
+  const spot = CALC.findSweetSpot({
+    priceMXN: 281.05, ratePct: 16, fixedCostFn: SOURCE.getFixedCost,
+    thresholds: SOURCE.getFixedCostThresholds(),
+    shippingFn: (p) => (p >= 299 ? 52.4 : 0)
+  });
+  assert.equal(spot, null);
 });

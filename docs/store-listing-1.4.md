@@ -1,10 +1,10 @@
 # Chrome Web Store listing — v1.4 (paste into the dashboard)
 
-Title (unchanged): `Netio: Calculadora de Ganancias para Mercado Libre`
+Title (manifest name, set by the build): `Netio: Calculadora de Comisiones y Ganancias Mercado Libre México`
 
 ## Descripción corta (≤132)
 
-`Ganancia real, precio mínimo y precio objetivo en cada publicación de Mercado Libre México. PRO gratis 7 días al instalar.`
+`Ve tu ganancia real en cada publicación: comisión, costo fijo, envío, Full y retenciones 2026 (IVA 8%, ISR 2.5%). PRO gratis 7 días.`
 
 ## Descripción larga — Español
 
@@ -17,7 +17,7 @@ retenciones 2026 y tu ganancia neta, sin hojas de cálculo.
 **Gratis, siempre:**
 - Comisión estimada por categoría (Clásica y Premium) y costo fijo
 - Tu costo de envío, Mercado Envíos Full y subsidio por reputación
-- Retenciones 2026 (IVA 8% / ISR 2.5%) con RFC
+- Retenciones 2026 actualizadas (IVA 8% / ISR 2.5%) con RFC
 - Ganancia y margen por venta, precio mínimo para no perder
 - Aviso en rojo cuando una publicación te hace perder dinero
 - Resumen de neto en cada resultado de búsqueda
@@ -32,8 +32,9 @@ retenciones 2026 y tu ganancia neta, sin hojas de cálculo.
   que pierden arriba
 - Probar precios sin tocar tu publicación
 
-**Privacidad primero:** sin cuentas, sin servidores, sin recopilación de
-datos. Todo se guarda solo en tu navegador.
+**Privacidad:** no necesitas cuenta para usar Netio. Tus costos y productos
+nunca salen de tu navegador. Los pagos de PRO los procesa ExtensionPay con
+Stripe (al pagar solo te pide tu correo).
 
 Las cifras son estimaciones basadas en las tarifas publicadas por Mercado
 Libre (fecha citada en cada tarjeta). El porcentaje exacto depende de tu
@@ -59,7 +60,9 @@ Clásica vs Premium side by side; Profitability Radar on search pages (green,
 yellow, red by your cost, profitable-only filter, CSV export); Profit
 Dashboard ranking all your products with loss-makers on top; what-if pricing.
 
-**Privacy first:** no accounts, no servers, no data collection.
+**Privacy:** no account needed to use Netio. Your costs and products never
+leave your browser. PRO payments are processed by ExtensionPay via Stripe
+(paying only asks for your email).
 
 ## Distribution setting (important)
 
@@ -73,3 +76,13 @@ they also drag the install/uninstall and rating signals.
 `v1.4: PRO gratis 7 días al instalar. Aviso en rojo cuando pierdes dinero,
 precio objetivo y Radar de Rentabilidad visibles en cada publicación y
 búsqueda, Tablero con vista previa gratis, calculadora de MSI.`
+
+## Privacy practices tab (must match the policy)
+
+- Personally identifiable information: **Yes, email**, collected only by the
+  payment processor (ExtensionPay) when the user pays. Not sold, not used for
+  anything else.
+- Financial/payment information: handled by Stripe via ExtensionPay; Netio
+  never sees card data.
+- Website content / browsing: **No** (pages are read locally to compute fees;
+  nothing is transmitted).

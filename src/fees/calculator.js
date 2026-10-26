@@ -12,7 +12,14 @@ globalThis.MST_CALC = (() => {
   function parseMoney(raw) {
     if (typeof raw === "number") return Number.isFinite(raw) && raw >= 0 ? round2(raw) : 0;
     if (typeof raw !== "string") return 0;
-    let s = raw.trim().replace(/[$\s]/g, "");
+    let s = raw.trim();
+    // A price copied from MELI arrives as "$ 870 33" / "$870\n33": the cents
+    // live in a separate <sup>. Re-join them as decimals before stripping.
+    s = s.replace(/^(?:MX)?\$?\s*(\d[\d.,]*)\s+(\d{2})$/, "$1.$2");
+    // Negative input is never a valid amount here.
+    if (/^[-−]/.test(s)) return 0;
+    // Drop currency symbols/prefixes ("MX$", "$") and whitespace.
+    s = s.replace(/[^\d.,]/g, "");
     if (!s) return 0;
     const lastComma = s.lastIndexOf(",");
     const lastDot = s.lastIndexOf(".");
@@ -91,7 +98,12 @@ globalThis.MST_CALC = (() => {
   // is the step itself ($299): the smallest price that actually covers
   // base + fixed(price). Without thresholds the old fixed-point result is
   // returned.
-  function solveTargetPrice({ costMXN, shippingMXN, marginPct, ratePct, fixedCostFn, thresholds = [] }) {
+  // Prices are rounded UP to the cent so the displayed price always reaches
+  // the margin (round-to-nearest could land 0.5¢ short), and never below
+  // `minPriceMXN` (MELI's listing minimum) when given.
+  const ceil2 = (n) => Math.ceil(n * 100 - 1e-6) / 100;
+
+  function solveTargetPrice({ costMXN, shippingMXN, marginPct, ratePct, fixedCostFn, thresholds = [], minPriceMXN = 0 }) {
     const denom = 1 - ratePct / 100 - marginPct / 100;
     if (denom <= 0.001) return null;
     const base = costMXN + (shippingMXN > 0 ? shippingMXN : 0);
@@ -106,17 +118,31 @@ globalThis.MST_CALC = (() => {
       price = (base + fixed) / denom;
     }
     const feasible = (p) => p * denom + 1e-9 >= base + fixedCostFn(p);
-    if (feasible(price)) return round2(price);
+    const finish = (p) => {
+      let out = ceil2(Math.max(p, minPriceMXN));
+      // The step at the minimum (or rounding) can still leave it short;
+      // walk up a cent at a time (bounded) until it truly covers.
+      for (let i = 0; i < 5 && !feasible(out); i++) out = ceil2(out + 0.01);
+      return out;
+    };
+    if (feasible(price)) return finish(price);
     // Oscillation across a step: pick the lowest feasible candidate among the
-    // steps above the un-fixed price and the fixed-point attempts.
+    // steps above the un-fixed price and the fixed-point attempts. Every
+    // candidate re-evaluates fixedCostFn at its own price, so a price-dependent
+    // cost (fixed charge, Full service cost, shipping that flips at $299) is
+    // always charged at the price actually returned.
     const candidates = [
       ...thresholds.filter((t) => t > base / denom - 1e-9),
       price,
       (base + fixedCostFn(price)) / denom
-    ]
-      .filter((p) => feasible(p))
-      .sort((a, b) => a - b);
-    return candidates.length ? round2(candidates[0]) : round2(price);
+    ];
+    // Also try solving inside each step band directly.
+    for (const t of [0, ...thresholds]) {
+      const p = (base + fixedCostFn(t)) / denom;
+      if (p >= t) candidates.push(p);
+    }
+    const ok = candidates.filter((p) => feasible(p)).sort((a, b) => a - b);
+    return ok.length ? finish(ok[0]) : finish(price);
   }
 
   // Sweet-spot detector: fees are discontinuous (fixed-charge tiers at
@@ -129,9 +155,12 @@ globalThis.MST_CALC = (() => {
   // (no fixed charge) or a classic price just under a step-UP ($99, $149)
   // would be told to raise the price for "free money" that is nothing but the
   // higher price itself.
-  function findSweetSpot({ priceMXN, ratePct, fixedCostFn, thresholds, maxIncreaseRatio = 0.2 }) {
+  // `shippingFn(p)` (optional): what the SELLER pays to ship at price p.
+  // Crossing $299 makes free shipping mandatory, so a step that drops the
+  // fixed charge can still lose money once the seller starts paying shipping.
+  function findSweetSpot({ priceMXN, ratePct, fixedCostFn, thresholds, maxIncreaseRatio = 0.2, shippingFn = () => 0 }) {
     if (!(priceMXN > 0)) return null;
-    const net = (p) => p * (1 - ratePct / 100) - fixedCostFn(p);
+    const net = (p) => p * (1 - ratePct / 100) - fixedCostFn(p) - shippingFn(p);
     const limit = priceMXN * (1 + maxIncreaseRatio);
     const fixedNow = fixedCostFn(priceMXN);
     let best = null;

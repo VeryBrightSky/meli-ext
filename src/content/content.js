@@ -530,11 +530,14 @@
   // On change: tear everything down, wait for the new view to render, re-route.
   let renavTimer = null;
   function startUrlWatcher() {
-    let lastHref = location.href;
+    // A hash change (#reviews, #gallery) is not a navigation: compare
+    // without the fragment so the card isn't torn down mid-session.
+    const pageKey = () => location.origin + location.pathname + location.search;
+    let lastHref = pageKey();
 
     const onNavigated = SAFE.wrap("spa-nav", () => {
-      if (location.href === lastHref) return;
-      lastHref = location.href;
+      if (pageKey() === lastHref) return;
+      lastHref = pageKey();
       const gen = ++generation;
       log("SPA navigation detected →", location.href);
       runCleanups();

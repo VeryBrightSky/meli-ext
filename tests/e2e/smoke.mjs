@@ -133,6 +133,15 @@ const rowValue = (label) => `
   })()
 `;
 
+// The fee breakdown is a collapsed <details>; open it before interacting
+// with rows inside it (withholdings, Full, reputation, free shipping…).
+async function openBreakdown(page) {
+  await page.$eval("details.mst-breakdown", (d) => {
+    d.open = true;
+  });
+  await sleep(100);
+}
+
 async function typeInto(page, index, text) {
   // .mst-input only — the card also contains checkbox toggles.
   const inputs = await page.$$(".mst-card input.mst-input");
@@ -210,6 +219,15 @@ try {
   await page.waitForSelector("#mst-card-root", { visible: true, timeout: 20000 });
   pass("card injects and is visible");
 
+  // Answer-first summary + collapsed breakdown.
+  assert.equal(await page.$eval(".mst-summary__net", (e) => e.textContent), "Te quedan $744.30 por venta");
+  assert.equal(await page.$eval("details.mst-breakdown", (d) => d.open), false, "breakdown collapsed by default");
+  assert.ok(
+    await page.$eval("details.mst-breakdown", (d) => d.textContent.includes("Comisión por venta")),
+    "commission row lives inside the breakdown"
+  );
+  pass("summary leads with 'Te quedan $744.30 por venta'; fee breakdown collapsed by default");
+
   // Spanish UI must render Spanish (regression: chrome.i18n served English).
   assert.equal(await page.$eval(".mst-title", (e) => e.textContent), "Calculadora de ganancias");
   pass("Spanish locale renders Spanish UI (Calculadora de ganancias)");
@@ -225,6 +243,7 @@ try {
 
   // Retenciones is FREE (accuracy feature), default off (row hidden/empty).
   assert.equal(await page.evaluate(rowValue("IVA retenido")), "");
+  await openBreakdown(page);
   await page.click(".mst-withholdings-toggle");
   await sleep(300);
   assert.equal(await page.evaluate(rowValue("IVA retenido")), "−$57.03");
@@ -287,11 +306,19 @@ try {
   await sleep(200);
   assert.equal(await page.$eval(".mst-upsell", (e) => e.hidden), false);
   const upsellText = await page.$eval(".mst-upsell", (e) => e.textContent);
-  assert.ok(upsellText.includes("tienes que venderlo en $750.00"), `contextual headline missing: ${upsellText}`);
-  assert.ok(upsellText.includes("$89 MXN/mes"), "upsell missing monthly price");
-  assert.ok(upsellText.includes("$699 MXN/año"), "upsell missing yearly price");
-  assert.ok(upsellText.includes("ahorra 35%"), "upsell missing yearly savings");
-  pass("teaser click opens contextual upsell ('tienes que venderlo en $750.00') with MXN pricing");
+  assert.ok(upsellText.includes("Ya calculamos a qué precio venderlo para ganar 30%"), `contextual headline missing: ${upsellText}`);
+  // The blurred number must NOT be revealed in clear text by the panel.
+  assert.ok(!upsellText.includes("$750.00"), "panel must not leak the blurred target price");
+  assert.ok(upsellText.includes("$89 al mes"), "upsell missing monthly price");
+  assert.ok(upsellText.includes("$699 al año"), "upsell missing yearly price");
+  assert.ok(upsellText.includes("equivale a $58 al mes"), "upsell missing yearly monthly-equivalent");
+  // Panel opens next to the clicked teaser, not at the bottom of the card.
+  assert.equal(
+    await page.$eval(".mst-upsell", (p) => p.previousElementSibling?.classList.contains("mst-row--teaser")),
+    true,
+    "upsell should open right after the clicked teaser"
+  );
+  pass("teaser click opens the upsell beside it, without leaking the blurred price ($89/mes, $699/año ≈ $58/mes)");
 
   // MSI teaser: Premium listings show the real profit after 12 MSI (free),
   // the per-term breakdown is PRO.
@@ -320,14 +347,40 @@ try {
   assert.ok(clip.includes("Recibes aprox.: $694.30"), `clipboard wrong:\n${clip}`);
   pass("copy summary stays FREE");
 
+  // Summary shows the real profit once a cost is set.
+  assert.ok((await page.$eval(".mst-summary__profit", (e) => e.textContent)).startsWith("Ganancia $294.30"));
+
   // Share button: WhatsApp link carrying the store URL and this listing's real profit.
   const shareHref = await page.$eval(".mst-share", (a) => a.href);
   assert.ok(shareHref.startsWith("https://wa.me/?text="), shareHref);
   const shareText = decodeURIComponent(shareHref.slice("https://wa.me/?text=".length));
-  assert.ok(shareText.includes("chromewebstore.google.com/detail/netio/bjhikillfgbpblogloljjhejogfeajac"), shareText);
+  assert.ok(shareText.includes("chromewebstore.google.com/detail/netio/bjhikillfgbpblogloljjhejogfeajac?utm_source=whatsapp"), shareText);
   assert.ok(shareText.includes("$827.00") && shareText.includes("$294.30"), `share text lacks the real numbers: ${shareText}`);
   assert.equal(await page.$eval(".mst-share", (a) => a.target), "_blank");
   pass("share button: WhatsApp link with store URL + this listing's price and real profit");
+
+  // Review ask: hidden until 3 listings have a saved cost, then shown once.
+  assert.equal(await page.$(".mst-review"), null, "no review ask after 1 listing");
+  // Seed from an extension page (the page's main world has no chrome.storage).
+  const seedPage = async (fn) => {
+    const ext = await browser.newPage();
+    await ext.goto(`chrome-extension://${extId}/src/options/options.html`, { waitUntil: "load" });
+    await ext.evaluate(fn);
+    await ext.close();
+    await page.bringToFront();
+  };
+  await seedPage(() => chrome.storage.local.set({ "mst:cost:MLM1": 10, "mst:cost:MLM2": 20 }));
+  await page.reload({ waitUntil: "load" });
+  await page.waitForSelector("#mst-card-root", { visible: true, timeout: 20000 });
+  await page.waitForSelector(".mst-review", { timeout: 5000 });
+  assert.ok((await page.$eval(".mst-review__link", (a) => a.href)).endsWith("/reviews"));
+  await page.click(".mst-review__close");
+  await page.reload({ waitUntil: "load" });
+  await page.waitForSelector("#mst-card-root", { visible: true, timeout: 20000 });
+  await sleep(500);
+  assert.equal(await page.$(".mst-review"), null, "dismissed review ask stays gone");
+  pass("review ask appears after 3 used listings, links to reviews, dismiss is permanent");
+  await seedPage(() => chrome.storage.local.remove(["mst:cost:MLM1", "mst:cost:MLM2"]));
 
   if (process.env.E2E_SHOTS) {
     await page.$eval(".mst-upsell", (e) => (e.hidden = true));
@@ -490,6 +543,7 @@ try {
   // Mercado Envíos Full: under-$299 fixed charge becomes the weight/price
   // service cost (default weight ≤0.3 kg, tier $199–298.99 → $35) and the
   // sweet spot recomputes against the Full discontinuity.
+  await openBreakdown(page);
   await page.click(".mst-full-toggle");
   await sleep(300);
   assert.equal(await page.evaluate(rowValue("Costo del servicio Full")), "−$35.00");
@@ -517,9 +571,12 @@ try {
   assert.deepEqual(compareVals, ["$694.30", "$657.08 – $673.62", "$20.68 – $37.22"]);
   pass("compare: Clásica $694.30 / Premium $657.08–$673.62 / MSI $20.68–$37.22");
 
+  // PRO shows the target price by default at 30% as soon as a cost exists.
+  assert.equal(await page.evaluate(rowValue("Precio para ganar 30%")), "$750.00");
+  pass("PRO target price visible by default at 30% margin ($750.00)");
   // inputs (pro): 0 price, 1 shipping, 2 cost, 3 ventas, 4 margin
   await typeInto(page, 4, "20");
-  assert.equal(await page.evaluate(rowValue("Precio objetivo")), "$642.86");
+  assert.equal(await page.evaluate(rowValue("Precio para ganar 20%")), "$642.86");
   await typeInto(page, 3, "10");
   assert.equal(await page.evaluate(rowValue("Ganancia mensual")), "$2,943.00");
   pass("Pro solver $642.86 + ventas 10 → ganancia mensual $2,943.00");
@@ -611,6 +668,7 @@ try {
   assert.equal(await page.evaluate(rowValue("Comisión")), "−$82.70");
 
   // Reputation subsidy row appears with free shipping + a green reputation.
+  await openBreakdown(page);
   await page.click(".mst-free-toggle");
   await sleep(200);
   await setSelect("Reputación del vendedor", "verde");

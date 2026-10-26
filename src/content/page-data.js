@@ -7,11 +7,16 @@ globalThis.MST_PAGE = (() => {
   const TAG = `[${globalThis.EXT_BRAND.name}]`;
 
   function extractItemId() {
-    const { pathname } = window.location;
+    const { pathname, search } = window.location;
     const catalog = pathname.match(/\/p\/(MLM\d+)/);
     if (catalog) return catalog[1];
+    // Unified product pages: /up/MLMU123…
+    const up = pathname.match(/\/up\/(MLMU\d+)/);
+    if (up) return up[1];
     const item = pathname.match(/MLM-?(\d+)/);
     if (item) return `MLM${item[1]}`;
+    const q = new URLSearchParams(search).get("pdp_filters")?.match(/item_id[:%3A]+(MLM\d+)/i);
+    if (q) return q[1];
     return null;
   }
 
@@ -129,17 +134,24 @@ globalThis.MST_PAGE = (() => {
   // Premium listings can offer meses sin intereses; Clásica cannot (official
   // help page). MSI on the page is therefore a strong Premium signal — its
   // absence is weaker, so callers treat this as a default, not a fact.
-  function guessListingType() {
-    // Scope the signal to the price/payment area: MELI prints "meses sin
-    // intereses" in site-wide banners and footers, so a body-wide scan would
-    // call almost every listing Premium.
+  // MSI wording seen on MX listings: "12 meses sin intereses",
+  // "Mismo precio en 12 meses de $X", "Mismo precio 6 cuotas de…", "MSI".
+  const MSI_RE = /meses sin intereses|mismo precio(?: en)? \d+ (?:meses|cuotas)|\bmsi\b/i;
+
+  function guessListingType(anchorEl) {
+    // Scope the signal to the price/payment area of the VISIBLE price (the
+    // anchor): MELI prints "meses sin intereses" in site-wide banners and a
+    // hidden sticky-header price block, so a body-wide or first-match scan
+    // would call almost every listing Premium.
     const scope =
-      document.querySelector(
-        ".ui-pdp-price, .ui-pdp-payment, #payment_methods, .ui-pdp-price__second-line, [class*='ui-pdp-price']"
-      )?.closest(".ui-pdp-container__row, .ui-pdp-price, .ui-pdp-payment") ??
+      anchorEl?.closest(".ui-pdp-container__row, .ui-pdp-price, .ui-pdp-payment") ??
+      anchorEl ??
       document.querySelector(".ui-pdp-price, .ui-pdp-payment, #payment_methods");
-    const text = (scope ?? document.body).innerText || "";
-    if (/meses sin intereses/i.test(text)) return "premium";
+    let text = (scope ?? document.body).innerText || "";
+    // The installment line often sits in the next sibling block.
+    const next = scope?.nextElementSibling;
+    if (next) text += " " + (next.innerText || "");
+    if (MSI_RE.test(text)) return "premium";
     return "classic";
   }
 
@@ -149,7 +161,7 @@ globalThis.MST_PAGE = (() => {
       price: extractPrice(anchorEl),
       breadcrumbs: extractBreadcrumbs(),
       structuredCategory: extractStructuredCategory(),
-      listingTypeGuess: guessListingType()
+      listingTypeGuess: guessListingType(anchorEl)
     };
     console.log(TAG, "page data:", {
       itemId: data.itemId,

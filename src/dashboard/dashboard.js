@@ -16,7 +16,7 @@
   document.getElementById("dash-title").textContent = T("dashTitle");
   const shareBtn = document.getElementById("share-btn");
   shareBtn.textContent = T("btnShare");
-  shareBtn.href = `https://wa.me/?text=${encodeURIComponent(T("shareText", [BRAND.storeUrl]))}`;
+  shareBtn.href = `https://wa.me/?text=${encodeURIComponent(T("shareText", [BRAND.shareUrl("dashboard")]))}`;
   shareBtn.addEventListener("click", () => globalThis.MST_GATE.track("click:share"));
 
   const send = (type, payload) =>
@@ -114,7 +114,9 @@
   // Portfolio summary: per-SKU intelligence over the already-computed rows.
   function renderPortfolio() {
     const box = document.getElementById("portfolio");
-    const s = DASH.portfolioSummary(rows);
+    // Free mode summarizes only the products it shows, so locked rows can't
+    // leak through the "best/worst" chips or the totals.
+    const s = DASH.portfolioSummary(pro ? rows : rows.filter((r) => freeIds.has(r.itemId)));
     box.replaceChildren();
 
     const h = document.createElement("h2");
@@ -210,7 +212,7 @@
           td.appendChild(a);
         } else if (colDef.key === "title") {
           td.textContent = row.meta.title || row.itemId;
-        } else if (colDef.editable && !locked) {
+        } else if (colDef.editable && pro) {
           const input = document.createElement("input");
           input.type = "text";
           input.inputMode = "numeric";
@@ -236,7 +238,7 @@
     });
 
     // Grand totals: monthly projected profit across all rows + product count.
-    const tot = DASH.totals(rows);
+    const tot = DASH.totals(pro ? rows : rows.filter((r) => freeIds.has(r.itemId)));
     const tfoot = document.getElementById("totals-row");
     tfoot.replaceChildren();
     const labelTd = document.createElement("td");
@@ -263,13 +265,37 @@
       globalThis.MST_GATE.track("open:dashboard-csv");
       return;
     }
-    const esc = (v) => (/[",\n;]/.test(String(v)) ? `"${String(v).replaceAll('"', '""')}"` : String(v));
+    // Text cells: a seller-controlled title starting with = + - @ would run as
+    // a formula in Excel, so it gets a leading apostrophe. Money/percent
+    // columns are exported as raw numbers (worst case), which spreadsheets
+    // can sum; formatted ranges like "-$12.00 – $3.00" broke into #NAME?.
+    const esc = (v) => {
+      let t = String(v ?? "");
+      if (/^[=+\-@\t\r]/.test(t)) t = `'${t}`;
+      return /[",\r\n;]/.test(t) ? `"${t.replaceAll('"', '""')}"` : t;
+    };
+    const RAW = {
+      price: (r) => r.meta.priceMXN,
+      commission: (r) => r.b.commissionMaxMXN,
+      shipping: (r) => r.b.shippingCostMXN,
+      net: (r) => r.b.netMinMXN,
+      cost: (r) => r.cost,
+      profit: (r) => r.b.profitMinMXN,
+      margin: (r) => r.b.marginMinPct,
+      sales: (r) => r.sales,
+      monthly: (r) => (r.sales > 0 ? CALC.round2(r.b.profitMinMXN * r.sales) : "")
+    };
     const lines = [COLS.map((c) => esc(c.label)).join(",")];
     for (const row of rows) {
       lines.push(
-        COLS.map((c) =>
-          esc(c.editable ? row.sales : c.value(row))
-        ).join(",")
+        COLS.map((c) => {
+          const raw = RAW[c.key];
+          if (raw) {
+            const n = raw(row);
+            return n === "" || n === undefined || n === null ? "" : String(n);
+          }
+          return esc(c.value(row));
+        }).join(",")
       );
     }
     const blob = new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });

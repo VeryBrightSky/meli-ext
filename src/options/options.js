@@ -104,7 +104,8 @@ async function loadSubscriptionStatus() {
 
   // Local-only funnel counters for the developer (no network, nothing sent).
   const metricsEl = document.getElementById("metrics");
-  if (metricsEl) {
+  const debug = new URLSearchParams(location.search).has("debug");
+  if (metricsEl && debug) {
     const stored = await chrome.storage.local.get(globalThis.MST_GATE.METRICS_KEY);
     const m = stored[globalThis.MST_GATE.METRICS_KEY] ?? {};
     const parts = Object.entries(m)

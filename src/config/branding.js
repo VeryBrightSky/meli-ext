@@ -10,10 +10,10 @@ globalThis.EXT_BRAND = Object.freeze({
   // Store-listing name (manifest "name" in release builds): descriptive and
   // keyword-matched to what sellers search on the Chrome Web Store. The
   // toolbar/short name stays "Netio" via manifest short_name.
-  storeName: "Netio: Calculadora de Ganancias para Mercado Libre",
+  storeName: "Netio: Calculadora de Comisiones y Ganancias Mercado Libre México",
   // Name used in manifest.json dev builds.
   manifestName: "Netio (dev)",
-  version: "1.4.0",
+  version: "1.4.1",
   description:
     "Calculadora de comisiones, ganancias y precios para vendedores de Mercado Libre México.",
   // ExtensionPay id (registered at extensionpay.com). Plans configured there:
@@ -21,6 +21,12 @@ globalThis.EXT_BRAND = Object.freeze({
   extpayId: "netio",
   // Public Chrome Web Store listing (used by the share buttons).
   storeUrl: "https://chromewebstore.google.com/detail/netio/bjhikillfgbpblogloljjhejogfeajac",
+  // Store link for a share from `where` (card | welcome | dashboard). The UTM
+  // tags show up in the Chrome Web Store dashboard, so shares are measurable.
+  shareUrl(where) {
+    return `${this.storeUrl}?utm_source=whatsapp&utm_medium=share&utm_campaign=${where}`;
+  },
+  storeReviewsUrl: "https://chromewebstore.google.com/detail/netio/bjhikillfgbpblogloljjhejogfeajac/reviews",
   plans: Object.freeze({ monthly: "pro-monthly", yearly: "pro-yearly" }),
   // Path relative to the extension root; resolve with chrome.runtime.getURL().
   logoPath: "src/assets/icons/icon16.png",

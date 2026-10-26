@@ -85,10 +85,13 @@ globalThis.MST_QUICKVIEW = (() => {
     const text = item.innerText;
     return {
       priceMXN: extractPrice(item),
-      freeShipping: /env[ií]o gratis/i.test(text),
+      // "Envío gratis" and the newer "Llega gratis hoy/mañana".
+      freeShipping: /(?:env[ií]o|llega) gratis/i.test(text),
       // MSI is a Premium-only feature; absence is a weak signal, so this is a
       // labeled guess in the UI.
-      listingTypeGuess: /meses sin intereses|\bmsi\b/i.test(text) ? "premium" : "classic",
+      listingTypeGuess: /meses sin intereses|mismo precio(?: en)? \d+ (?:meses|cuotas)|\bmsi\b/i.test(text)
+        ? "premium"
+        : "classic",
       seller: item.querySelector('[class*="seller"]')?.textContent.trim() || null
     };
   }
@@ -118,7 +121,10 @@ globalThis.MST_QUICKVIEW = (() => {
   // raise the target margin or filter to winners only. Free = plain net strips.
   let radarTargetPct = RADAR.DEFAULT_TARGET_PCT;
   let onlyProfitable = false;
-  const radarActive = () => GATE.isPro() && acquisitionPct > 0;
+  // PRO (incl. the trial) always gets the Radar: with no cost set it uses the
+  // same 60% assumption as the free preview, labeled and editable inline.
+  const radarActive = () => GATE.isPro();
+  const costPct = () => (acquisitionPct > 0 ? acquisitionPct : DEFAULT_ASSUMED_COST_PCT);
 
   // Free preview of the Radar: verdicts are computed for every result with an
   // assumed cost (the seller's own setting if any, else 60% of price), the
@@ -138,7 +144,7 @@ globalThis.MST_QUICKVIEW = (() => {
     return RADAR.evaluate({
       priceMXN: data.priceMXN,
       netMXN: b.netMinMXN,
-      acquisitionPct: radarActive() ? acquisitionPct : previewPct(),
+      acquisitionPct: costPct(),
       targetMarginPct: radarTargetPct
     });
   }
@@ -240,11 +246,11 @@ globalThis.MST_QUICKVIEW = (() => {
     panel.appendChild(
       panelRow(T("stripNetBeforeShipping"), UI.fmtRange(b.netMinMXN, b.netMaxMXN))
     );
-    if (globalThis.MST_GATE.isPro() && acquisitionPct > 0) {
-      const cost = CALC.round2((data.priceMXN * acquisitionPct) / 100);
+    if (globalThis.MST_GATE.isPro()) {
+      const cost = CALC.round2((data.priceMXN * costPct()) / 100);
       panel.appendChild(
         panelRow(
-          T("researchProfit", [String(acquisitionPct)]),
+          T("researchProfit", [String(costPct())]),
           UI.fmtRange(CALC.round2(b.netMinMXN - cost), CALC.round2(b.netMaxMXN - cost))
         )
       );
@@ -266,9 +272,12 @@ globalThis.MST_QUICKVIEW = (() => {
 
   // --- CSV export -----------------------------------------------------------
 
+  // Titles are seller-controlled: a leading = + - @ would run as a formula in
+  // Excel/Sheets, so prefix it with an apostrophe (shown as text).
   function csvEscape(value) {
-    const s = String(value ?? "");
-    return /[",\n;]/.test(s) ? `"${s.replaceAll('"', '""')}"` : s;
+    let s = String(value ?? "");
+    if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
+    return /[",\r\n;]/.test(s) ? `"${s.replaceAll('"', '""')}"` : s;
   }
 
   function buildCsv() {
@@ -516,11 +525,15 @@ globalThis.MST_QUICKVIEW = (() => {
       wrap.append(logo, btn);
       if (GATE.isPro()) {
         btn.addEventListener("click", downloadCsv);
-        if (acquisitionPct > 0) {
-          wrap.appendChild(
-            el("span", `${PREFIX}-export__research`, T("researchActive", [String(acquisitionPct)]))
-          );
-        }
+        wrap.appendChild(
+          el(
+            "span",
+            `${PREFIX}-export__research`,
+            acquisitionPct > 0
+              ? T("researchActive", [String(acquisitionPct)])
+              : T("researchAssumed", [String(DEFAULT_ASSUMED_COST_PCT)])
+          )
+        );
       } else {
         const upsell = globalThis.MST_UPSELL.attach(bar);
         upsellOpen = (reason, vars) => upsell.open(reason, vars);
@@ -540,13 +553,6 @@ globalThis.MST_QUICKVIEW = (() => {
       bar.classList.add(`${PREFIX}-export--radar`);
       if (radarActive()) {
         bar.appendChild(buildRadarRow());
-      } else if (GATE.isPro()) {
-        // Entitled but no cost yet: the row with the inline input, so the
-        // Radar is one keystroke away instead of buried in options.
-        const row = el("div", `${PREFIX}-radar`);
-        row.appendChild(buildCostField());
-        row.appendChild(el("span", `${PREFIX}-radar__more`, T("radarSetCost")));
-        bar.appendChild(row);
       } else {
         bar.insertBefore(buildPreviewRow(), upsellPanelOf(bar));
       }
@@ -623,7 +629,12 @@ globalThis.MST_QUICKVIEW = (() => {
 
   // Full teardown for SPA navigation: stop observing, remove every injected
   // node, reset per-page state. Idempotent — safe to call twice.
+  // Bumped by destroy(): an init() that resumes after an await from a torn-
+  // down route must not scan or attach an observer nobody will disconnect.
+  let initToken = 0;
+
   function destroy() {
+    initToken++;
     observer?.disconnect();
     observer = null;
     clearTimeout(observerTimer);
@@ -660,12 +671,14 @@ globalThis.MST_QUICKVIEW = (() => {
 
   async function init() {
     destroy(); // re-init after SPA navigation starts clean
+    const myToken = initToken;
     freeVerdictsShown = 0;
     upsellOpen = null;
     const settings = await chrome.storage.sync.get({
       acquisitionPct: 0,
       radarTargetPct: RADAR.DEFAULT_TARGET_PCT
     });
+    if (myToken !== initToken) return; // torn down while awaiting
     acquisitionPct = CALC.parseMoney(settings.acquisitionPct);
     radarTargetPct = Math.max(0, Math.min(90, Math.round(Number(settings.radarTargetPct) || 0)));
     // Category browse pages have a breadcrumb; keyword searches usually don't.

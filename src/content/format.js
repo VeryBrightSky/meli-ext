@@ -30,6 +30,8 @@ globalThis.MST_UI = (() => {
   // Negative amounts (commission, fixed cost): "−$2.88" / "−$2.88 – −$5.77".
   function fmtCharge(min, max = min) {
     const mxn = formatter();
+    // A zero charge is not a charge: "$0.00", never "−$0.00".
+    if (min === 0 && max === 0) return mxn.format(0);
     return min === max
       ? `−${mxn.format(min)}`
       : `−${mxn.format(min)} – −${mxn.format(max)}`;

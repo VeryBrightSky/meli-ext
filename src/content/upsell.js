@@ -22,7 +22,7 @@ globalThis.MST_UPSELL = (() => {
   //   upsell.<reason>.lead / upsell.<reason>.body (vars = $1, $2 …)
   // Fallback is the generic product-page pitch.
   const KNOWN = new Set(["generic", "target", "sweetspot", "breakeven", "loss", "msi", "radar", "dashboard", "whatif", "compare", "expired"]);
-  const NEEDS_VARS = { target: 2, sweetspot: 1, loss: 2, msi: 2, radar: 1 };
+  const NEEDS_VARS = { target: 1, sweetspot: 1, loss: 2, msi: 2, radar: 1 };
 
   // One panel per container (card body / export bar parent).
   function buildPanel() {
@@ -36,10 +36,16 @@ globalThis.MST_UPSELL = (() => {
     const note = el("p", `${PREFIX}-upsell__note`, T("upsellNote"));
     // After a plan click the checkout opens in a new tab; say so here and
     // promise the live update (content.js rebuilds on the SW's proChanged).
-    const opened = (plan) => {
-      GATE.openUpgrade(plan);
-      note.textContent = T("upsellOpened");
-      note.classList.add(`${PREFIX}-upsell__note--active`);
+    const opened = async (plan) => {
+      const res = await GATE.openUpgrade(plan);
+      // Only claim the checkout opened when it did (offline → key creation fails).
+      if (res?.ok) {
+        note.textContent = T("upsellOpened");
+        note.classList.add(`${PREFIX}-upsell__note--active`);
+      } else {
+        note.textContent = T("upsellOpenFailed");
+        note.classList.remove(`${PREFIX}-upsell__note--active`);
+      }
     };
     const monthlyBtn = el("button", `${PREFIX}-upsell__cta`, T("upsellMonthly"));
     monthlyBtn.type = "button";
@@ -53,15 +59,35 @@ globalThis.MST_UPSELL = (() => {
     close.addEventListener("click", () => {
       panel.hidden = true;
     });
-    panel.append(title, lead, body, price, actions, note, close);
+    panel.append(title, lead, body, actions, note, close);
     return { panel, lead, body };
   }
 
   // Returns { panel, open(reason, vars), close } — caller appends panel.
+  // The panel opens right after the row/strip/banner the seller clicked
+  // (tracked in the capture phase), not at the bottom of a 1,000px card.
+  const ANCHOR_SEL = [
+    "row", "alert", "trialbar", "sweetspot", "dashlink", "radar", "export__main", "summary", "breakdown"
+  ].map((c) => `.${PREFIX}-${c}`).join(",");
+
   function attach(container) {
     const { panel, lead, body } = buildPanel();
     container.appendChild(panel);
+    let lastClick = null;
+    container.addEventListener("click", (e) => {
+      lastClick = e.target instanceof Element ? e.target : null;
+    }, true);
+    const placeNear = () => {
+      let anchor = lastClick?.closest(ANCHOR_SEL);
+      // Rows inside the collapsed breakdown anchor to the breakdown itself.
+      const det = anchor?.closest(`.${PREFIX}-breakdown`);
+      if (det) anchor = det;
+      if (anchor && container.contains(anchor) && anchor !== panel && !panel.contains(anchor)) {
+        anchor.after(panel);
+      }
+    };
     const open = (reason = "generic", vars = []) => {
+      placeNear();
       let key = KNOWN.has(reason) ? reason : "generic";
       // A reason whose headline needs numbers falls back to the generic pitch
       // when the caller has none (e.g. no product cost entered yet).
@@ -173,6 +199,17 @@ globalThis.MST_UPSELL = (() => {
         n <= 3
           ? (n === 1 ? T("trialEndingOne") : T("trialEnding", [String(n)]))
           : T("trialActiveBanner", [String(n)]);
+      // In the last days, make the loss concrete: the seller's own products.
+      if (n <= 3) {
+        chrome.storage.local.get(null).then((all) => {
+          const saved = Object.keys(all).filter((k) => k.startsWith(`${PREFIX}:cost:`) && Number(all[k]) > 0).length;
+          if (saved > 0) {
+            text.textContent = n === 1
+              ? T("trialEndingProductsOne", [String(saved)])
+              : T("trialEndingProducts", [String(n), String(saved)]);
+          }
+        }).catch(() => {});
+      }
       btn.textContent = T("trialKeep");
       btn.addEventListener("click", () => GATE.openUpgrade(BRAND.plans.monthly));
     } else if (status.trialExpired && (status.trialDaysSinceEnd ?? 0) <= 14) {
@@ -180,7 +217,8 @@ globalThis.MST_UPSELL = (() => {
       root.dataset.tone = "expired";
       text.textContent = T("trialExpiredBanner");
       btn.textContent = T("trialReactivate");
-      btn.addEventListener("click", () => onOpen("expired"));
+      // Straight to the plan picker; no detour through a panel at the bottom.
+      btn.addEventListener("click", () => GATE.openUpgrade());
     }
     if (!stateKey) return root;
 

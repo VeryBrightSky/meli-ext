@@ -90,6 +90,21 @@ cpSync(join(root, "_locales"), join(dist, "_locales"), { recursive: true });
 console.log("dist/ ready (load unpacked from repo root or dist/)");
 
 if (release) {
+  // The QA override (storage "mst:proOverride") is for e2e only; strip it
+  // from the store build so it can't be flipped from DevTools for free PRO.
+  const gatePath = join(dist, "src/pro/gate.js");
+  const gateSrc = readFileSync(gatePath, "utf8");
+  const stripped = gateSrc.replace(
+    "override = stored[OVERRIDE_KEY] === true;",
+    "override = false; // QA override stripped in release builds"
+  );
+  if (stripped === gateSrc) {
+    console.error("FATAL: could not strip the QA override from gate.js");
+    process.exit(1);
+  }
+  writeFileSync(gatePath, stripped);
+  console.log("release: QA override stripped from gate.js");
+
   const zipPath = join(root, `${BRAND.name.toLowerCase().replaceAll(" ", "-")}-${BRAND.version}.zip`);
   rmSync(zipPath, { force: true });
   try {

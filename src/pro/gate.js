@@ -27,7 +27,8 @@ globalThis.MST_GATE = (() => {
     if (user.trialStartedAt) {
       const startedAt = new Date(user.trialStartedAt).getTime();
       if (Number.isFinite(startedAt)) {
-        const elapsed = nowMs - startedAt;
+        // Clamp: a client clock behind the server must not yield "8 days".
+        const elapsed = Math.max(0, nowMs - startedAt);
         trialActive = elapsed < TRIAL_MS;
         trialExpired = !trialActive && !paid;
         if (trialActive) trialDaysLeft = Math.max(1, Math.ceil((TRIAL_MS - elapsed) / 86400000));
@@ -47,9 +48,13 @@ globalThis.MST_GATE = (() => {
   // forever. A legacy cache with no timestamp is treated as usable — the write
   // that first stamps fetchedAt must never revoke an entitlement mid-session.
   const CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+  const STATUS_TIMEOUT_MS = 1500;
   function isCacheUsable(cached, nowMs) {
     if (!cached) return false;
-    if (typeof cached.fetchedAt !== "number") return true;
+    // A legacy (pre-1.4) cache without a timestamp is honored only if it was a
+    // PAID entitlement; an unstamped trial cache can't be re-verified, so it
+    // is dropped rather than kept forever.
+    if (typeof cached.fetchedAt !== "number") return cached.paid === true;
     return nowMs - cached.fetchedAt <= CACHE_TTL_MS;
   }
 
@@ -126,9 +131,14 @@ globalThis.MST_GATE = (() => {
     const OVERRIDE_KEY = `${PREFIX}:proOverride`;
     const INSTALLED_KEY = `${PREFIX}:installedAt`;
 
+    // ExtPay must never block the card: a slow or unreachable server falls
+    // back to the cache after STATUS_TIMEOUT_MS and free features render now.
     let fresh = null;
     try {
-      const res = await chrome.runtime.sendMessage({ type: "getProStatus" });
+      const res = await Promise.race([
+        chrome.runtime.sendMessage({ type: "getProStatus" }),
+        new Promise((r) => setTimeout(() => r(null), STATUS_TIMEOUT_MS))
+      ]);
       if (res?.ok) fresh = res.data;
     } catch {
       // service worker / ExtPay unreachable
@@ -144,6 +154,22 @@ globalThis.MST_GATE = (() => {
       // A corrupt (NaN/0) or future-dated stamp is treated as missing and
       // re-stamped, so no install is ever stuck without its trial.
       installedAt = Number.isFinite(raw) && raw > 0 && raw <= Date.now() ? raw : null;
+      // The trial start is mirrored in storage.sync; the earlier of the two
+      // wins, so clearing local storage can't restart the trial. (ExtPay's own
+      // install time is NOT used: for pre-1.4 users it is months old and
+      // would cancel the 7 days they are promised on update.)
+      try {
+        const sync = await chrome.storage.sync.get(INSTALLED_KEY);
+        const mirror = sync?.[INSTALLED_KEY];
+        const okMirror = Number.isFinite(mirror) && mirror > 0 && mirror <= Date.now();
+        if (okMirror) installedAt = installedAt === null ? mirror : Math.min(installedAt, mirror);
+        if (installedAt !== null && (!okMirror || mirror !== installedAt)) {
+          chrome.storage.sync.set({ [INSTALLED_KEY]: installedAt });
+          chrome.storage.local.set({ [INSTALLED_KEY]: installedAt });
+        }
+      } catch {
+        // sync storage unavailable — local stamp only
+      }
       if (installedAt === null) {
         // First run before the service worker stamped it (or a pre-1.4 install
         // updating): the reverse trial starts now.
@@ -175,7 +201,7 @@ globalThis.MST_GATE = (() => {
   const isPro = () => current.pro;
   const status = () => current;
   const send = (type, payload) =>
-    chrome.runtime.sendMessage({ type, payload }).catch(() => {});
+    chrome.runtime.sendMessage({ type, payload }).catch(() => ({ ok: false }));
   // plan: ExtPay plan nickname ("pro-monthly" / "pro-yearly"); omit for the
   // generic choose-plan page.
   const openUpgrade = (plan) => {

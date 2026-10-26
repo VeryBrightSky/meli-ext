@@ -64,6 +64,8 @@ globalThis.MST_CARD = (() => {
   // Free-tier teaser defaults: the margin the blurred target price is solved
   // for, and the margin below which the "thin" alert fires.
   const DEFAULT_TEASER_MARGIN_PCT = 30;
+  // The seller's margin if set, else the default (PRO target price + teaser).
+  const effectiveMargin = () => (state.targetMarginPct > 0 ? state.targetMarginPct : DEFAULT_TEASER_MARGIN_PCT);
   const THIN_MARGIN_PCT = 10;
 
   // Live references into the current card DOM, repopulated on each build().
@@ -253,6 +255,23 @@ globalThis.MST_CARD = (() => {
 
   // --- Update (no DOM rebuilding) ---------------------------------------------
 
+  // What the seller pays to ship at price p. The reputation discount only
+  // applies to free-shipping items at/above $299, so this is a step function
+  // of price, and the reverse solver must evaluate it at the price it returns.
+  function shipAt(p, { forceFree = false, fallbackKg = 0 } = {}) {
+    const subsidyPct =
+      SOURCE.shippingSubsidy.levels.find((l) => l.id === state.reputationId)?.subsidyPct || 0;
+    let full = state.shippingCostMXN;
+    if (!(full > 0) && fallbackKg > 0) full = globalThis.MST_SHIPPING.costForWeight(fallbackKg) ?? 0;
+    return CALC.subsidizedShipping({
+      fullShippingMXN: full,
+      priceMXN: p,
+      freeShipping: forceFree || state.freeShipping,
+      subsidyPct,
+      thresholdMXN: SOURCE.shippingSubsidy.thresholdMXN
+    });
+  }
+
   function computeCurrent() {
     const quote = SOURCE.getQuote({
       priceMXN: state.priceMXN,
@@ -310,11 +329,21 @@ globalThis.MST_CARD = (() => {
     // Sweet spot (worst-case rate so the promised gain is conservative).
     // Pro: actionable (click applies the price). Free: the gain is shown for
     // real, the price is what PRO unlocks.
+    // Crossing $299 makes free shipping mandatory: from there the seller pays
+    // shipping (their typed cost, else an estimate for the chosen weight or
+    // the smallest bracket), so a fixed-charge drop that shipping eats is not
+    // a sweet spot.
+    const threshold = SOURCE.freeShippingThresholdMXN;
+    const shipNow = effectiveShipping;
     const spot = CALC.findSweetSpot({
       priceMXN: state.priceMXN,
       ratePct: quote.pctMax,
       fixedCostFn,
-      thresholds: SOURCE.getFixedCostThresholds(fullWeightKg())
+      thresholds: SOURCE.getFixedCostThresholds(fullWeightKg()),
+      shippingFn: (p) =>
+        p >= threshold && state.priceMXN < threshold
+          ? shipAt(p, { forceFree: true, fallbackKg: state.weightKg > 0 ? state.weightKg : 0.3 })
+          : shipNow
     });
     refs.sweetspot.style.display = spot ? "" : "none";
     if (spot) {
@@ -498,6 +527,19 @@ globalThis.MST_CARD = (() => {
 
     patchRow(refs.net, null, fmtRange(b.netMinMXN, b.netMaxMXN), flash);
     if (refs.shareBtn) refs.shareBtn.href = buildShareUrl();
+    refs.summaryNet.textContent = T("summaryNet", [fmtRange(b.netMinMXN, b.netMaxMXN)]);
+    if (b.profitMinMXN !== undefined) {
+      const losing = b.profitMaxMXN < 0;
+      refs.summaryProfit.hidden = false;
+      refs.summaryProfit.textContent = losing
+        ? T("summaryLoss", [fmtRange(-b.profitMaxMXN, -b.profitMinMXN)])
+        : T("summaryProfit", [fmtRange(b.profitMinMXN, b.profitMaxMXN), fmtPctRange(b.marginMinPct, b.marginMaxPct)]);
+      refs.summaryProfit.dataset.tone = losing ? "loss" : "profit";
+    } else {
+      refs.summaryProfit.hidden = false;
+      refs.summaryProfit.textContent = T("summaryNoCost");
+      refs.summaryProfit.dataset.tone = "hint";
+    }
 
     const hasProfit = b.profitMinMXN !== undefined;
     refs.profit.root.style.display = hasProfit ? "" : "none";
@@ -518,17 +560,20 @@ globalThis.MST_CARD = (() => {
     // Breakeven + target price (reverse calculator). Range rates produce a
     // price range; the WORST case (pctMax) is the safe number to act on.
     const hasCost = state.productCostMXN > 0;
+    // Shipping is folded into the step function (the reputation discount
+    // switches on at $299), so the solver charges it at the price it returns.
+    const solveThresholds = [
+      ...new Set([...SOURCE.getFixedCostThresholds(fullWeightKg()), SOURCE.shippingSubsidy.thresholdMXN])
+    ].sort((a, c) => a - c);
     const solve = (ratePct, marginPct) =>
       CALC.solveTargetPrice({
         costMXN: state.productCostMXN,
-        // Subsidized shipping so break-even / target price stay consistent with
-        // the displayed net (approximated at the current price near the $299
-        // subsidy threshold).
-        shippingMXN: effectiveShipping,
+        shippingMXN: 0,
         marginPct,
         ratePct,
-        fixedCostFn,
-        thresholds: SOURCE.getFixedCostThresholds(fullWeightKg())
+        fixedCostFn: (p) => fixedCostFn(p) + shipAt(p),
+        thresholds: solveThresholds,
+        minPriceMXN: SOURCE.minPriceMXN ?? 0
       });
 
     refs.breakeven.root.style.display = hasCost ? "" : "none";
@@ -573,12 +618,16 @@ globalThis.MST_CARD = (() => {
     }
 
     if (pro) {
+      // The target price is the feature the trial sells: it shows by default
+      // at 30% (or the seller's own margin) as soon as a cost is entered.
+      const margin = effectiveMargin();
       refs.targetMarginRow.style.display = hasCost ? "" : "none";
-      const hasTarget = hasCost && state.targetMarginPct > 0;
+      const hasTarget = hasCost && margin > 0;
       refs.target.root.style.display = hasTarget ? "" : "none";
       if (hasTarget) {
-        const lo = solve(quote.pctMin, state.targetMarginPct);
-        const hi = solve(quote.pctMax, state.targetMarginPct);
+        refs.target.label.textContent = T("rowTargetPriceFor", [String(margin)]);
+        const lo = solve(quote.pctMin, margin);
+        const hi = solve(quote.pctMax, margin);
         patchRow(
           refs.target,
           null,
@@ -646,16 +695,46 @@ globalThis.MST_CARD = (() => {
 
     const header = el("div", `${PREFIX}-header`);
     header.appendChild(el("h2", `${PREFIX}-title`, T("cardTitle")));
-    if (gateStatus.trialActive && gateStatus.localTrial) {
-      const trial = el("span", `${PREFIX}-badge ${PREFIX}-badge--trial`,
-        gateStatus.trialDaysLeft === 1 ? T("badgeTrialOne") : T("badgeTrial", [String(gateStatus.trialDaysLeft)]));
-      header.appendChild(trial);
-    }
     const badge = el("span", `${PREFIX}-badge`, T("badgeEstimate"));
     badge.setAttribute("title", T("badgeTooltip", [SOURCE.meta.retrievedAt]));
     badge.tabIndex = 0;
     header.appendChild(badge);
     body.appendChild(header);
+
+    // Answer first: what the seller keeps, before any breakdown.
+    refs.summary = el("div", `${PREFIX}-summary`);
+    refs.summaryNet = el("div", `${PREFIX}-summary__net`, "");
+    refs.summaryProfit = el("div", `${PREFIX}-summary__profit`, "");
+    refs.summaryProfit.hidden = true;
+    refs.summary.append(refs.summaryNet, refs.summaryProfit);
+    body.appendChild(refs.summary);
+
+    // Review ask: only after the seller has used Netio on 3+ listings (saved
+    // a cost), once, dismissible forever. Ratings drive Chrome Web Store
+    // ranking and no MX competitor has more than a handful.
+    const REVIEW_KEY = `${PREFIX}:reviewAsk`;
+    chrome.storage.local.get(null).then((all) => {
+      if (all[REVIEW_KEY]) return;
+      const used = Object.keys(all).filter((k) => k.startsWith(`${PREFIX}:cost:`) && Number(all[k]) > 0).length;
+      if (used < 3) return;
+      const ask = el("div", `${PREFIX}-review`);
+      const link = el("a", `${PREFIX}-review__link`, T("reviewAsk"));
+      link.href = BRAND.storeReviewsUrl;
+      link.target = "_blank";
+      link.rel = "noopener";
+      const close = el("button", `${PREFIX}-review__close`, "×");
+      close.type = "button";
+      close.setAttribute("aria-label", T("upsellClose"));
+      const done = (how) => {
+        ask.remove();
+        chrome.storage.local.set({ [REVIEW_KEY]: how });
+        globalThis.MST_GATE.track(`review:${how}`);
+      };
+      link.addEventListener("click", () => done("clicked"));
+      close.addEventListener("click", () => done("dismissed"));
+      ask.append(link, close);
+      refs.summary.after(ask);
+    }).catch(() => {});
 
     // What-if price: editable, pre-filled from the page; reset link restores.
     const priceRow = el("div", `${PREFIX}-row`);
@@ -687,7 +766,7 @@ globalThis.MST_CARD = (() => {
     body.appendChild(priceRow);
 
     // Listing type toggle.
-    const typeRow = el("div", `${PREFIX}-row`);
+    const typeRow = el("div", `${PREFIX}-row ${PREFIX}-row--controls`);
     typeRow.appendChild(el("span", `${PREFIX}-row__label`, T("rowListingType")));
     const toggle = el("div", `${PREFIX}-toggle`);
     toggle.setAttribute("role", "group");
@@ -1083,7 +1162,7 @@ globalThis.MST_CARD = (() => {
       const marginRow = el("div", `${PREFIX}-row`);
       marginRow.appendChild(el("span", `${PREFIX}-row__label`, T("rowTargetMargin")));
       refs.marginInput = moneyInput(
-        () => state.targetMarginPct,
+        () => effectiveMargin(),
         (v) => {
           state.targetMarginPct = Math.min(v, 99);
           persistInputs();
@@ -1176,9 +1255,42 @@ globalThis.MST_CARD = (() => {
       refs.shareBtn.href = buildShareUrl();
       globalThis.MST_GATE.track("click:share");
     });
-    body.appendChild(refs.shareBtn);
+    refs.summary.appendChild(refs.shareBtn);
 
-    // Upsell panel lives at the bottom of the card; never opens on load.
+    // Fee breakdown: collapsed by default so the card answers first and
+    // explains on demand. The seller's choice (open/closed) is remembered.
+    const details = el("details", `${PREFIX}-breakdown`);
+    details.appendChild(el("summary", `${PREFIX}-breakdown__toggle`, T("breakdownToggle")));
+    const moveIntoDetails = [
+      refs.categorySelect?.closest(`.${PREFIX}-row`),
+      refs.hint,
+      refs.commission?.root,
+      refs.fixed?.root,
+      refs.effective?.root,
+      refs.weightSelect?.closest(`.${PREFIX}-row`),
+      refs.fullToggle?.closest(`.${PREFIX}-row`),
+      refs.reputationSelect?.closest(`.${PREFIX}-row`),
+      refs.freeShippingToggle?.closest(`.${PREFIX}-row`),
+      refs.shippingSubsidy?.root,
+      refs.withholdingsToggle?.closest(`.${PREFIX}-row`),
+      refs.iva?.root,
+      refs.isr?.root,
+      refs.netAfter?.root,
+      refs.withholdingsHint
+    ].filter(Boolean);
+    const shipRowEl = refs.shippingInput.closest(`.${PREFIX}-row`);
+    shipRowEl.before(details);
+    for (const node of moveIntoDetails) details.appendChild(node);
+    refs.breakdown = details;
+    chrome.storage.sync.get({ breakdownOpen: false }).then((v) => {
+      if (v.breakdownOpen) details.open = true;
+    }).catch(() => {});
+    details.addEventListener("toggle", () => {
+      chrome.storage.sync.set({ breakdownOpen: details.open }).catch(() => {});
+    });
+
+    // Upsell panel; never opens on load. It is moved next to whatever the
+    // seller clicked (see upsell.js) so it never appears 900px away.
     const upsell = UPSELL.attach(body);
     openUpsell = (reason, vars) => upsell.open(reason, vars);
   }
@@ -1187,8 +1299,8 @@ globalThis.MST_CARD = (() => {
     const { b } = computeCurrent();
     const hasProfit = b.profitMinMXN !== undefined && state.productCostMXN > 0;
     const text = hasProfit
-      ? T("shareTextProfit", [fmtMoney(b.priceMXN), fmtRange(b.profitMinMXN, b.profitMaxMXN), BRAND.storeUrl])
-      : T("shareText", [BRAND.storeUrl]);
+      ? T("shareTextProfit", [fmtMoney(b.priceMXN), fmtRange(b.profitMinMXN, b.profitMaxMXN), BRAND.shareUrl("card")])
+      : T("shareText", [BRAND.shareUrl("card")]);
     return `https://wa.me/?text=${encodeURIComponent(text)}`;
   }
 
@@ -1311,7 +1423,12 @@ globalThis.MST_CARD = (() => {
       return card;
     }
 
-    state.priceMXN = pageData.price.value;
+    // A re-injection of the SAME listing (MELI re-render) keeps a PRO
+    // seller's what-if price; a new listing or an unchanged price resets it.
+    const sameItem = pageData.itemId !== null && pageData.itemId === state.itemId;
+    if (!sameItem || state.priceMXN === state.pagePriceMXN || !(state.priceMXN > 0)) {
+      state.priceMXN = pageData.price.value;
+    }
     state.pagePriceMXN = pageData.price.value;
     state.itemId = pageData.itemId;
     state.listingTypeId = pageData.listingTypeGuess;

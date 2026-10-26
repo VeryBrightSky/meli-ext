@@ -183,7 +183,7 @@
     "message": "Stop guessing the price"
   },
   "upsellBody": {
-    "message": "PRO tells you the exact price to hit the margin you want, what each interest-free installment term costs you, and paints every search result green or red. All local, no accounts."
+    "message": "PRO tells you the price to sell at for the margin you want, what each interest-free installment term costs you, and paints every search result green or red. No account needed to use Netio; your costs never leave your browser."
   },
   "upsellPricing": {
     "message": "$$89 MXN/mo (under $$3 a day) or $$699 MXN/yr (save 35%). No lock-in."
@@ -318,10 +318,10 @@
     "message": "Shipping subsidy (est.)"
   },
   "upsellMonthly": {
-    "message": "Activate PRO · $$89 MXN/mo"
+    "message": "Activate PRO · $$89 a month"
   },
   "upsellYearly": {
-    "message": "$$699 MXN/yr (save 35%)"
+    "message": "$$699 a year (works out to $$58 a month)"
   },
   "dashTotalsLabel": {
     "message": "Totals ($1 products)"
@@ -411,7 +411,7 @@
     "message": "Margin"
   },
   "upsellNote": {
-    "message": "Cancel anytime. Secure payment via Stripe."
+    "message": "Cancel anytime. Paying only asks for your email; Stripe processes the payment."
   },
   "upsellClose": {
     "message": "Not now"
@@ -420,13 +420,13 @@
     "message": "Stop guessing the price"
   },
   "upsellBody_generic": {
-    "message": "PRO tells you the exact price to hit the margin you want, what each interest-free installment term costs you, and paints every search result green or red. All local, no accounts."
+    "message": "PRO tells you the price to sell at for the margin you want, what each interest-free installment term costs you, and paints every search result green or red. No account needed to use Netio; your costs never leave your browser."
   },
   "upsellLead_target": {
-    "message": "To earn $1% on this product you need to sell at $2"
+    "message": "We already calculated the price to earn $1% on this product"
   },
   "upsellBody_target": {
-    "message": "PRO computes that price on every listing, with commission, fixed fee and your shipping already deducted. Change the margin and see the price instantly."
+    "message": "With PRO you see that price on every listing, with commission, fixed fee and your shipping included. Change the margin and the price updates instantly."
   },
   "upsellLead_breakeven": {
     "message": "Below one exact price, every sale costs you money"
@@ -444,7 +444,7 @@
     "message": "You lose $1 per sale at this price"
   },
   "upsellBody_loss": {
-    "message": "PRO gives you the break-even price and the price to earn $2%, with commission, fixed fee and shipping included. One pricing mistake costs more than a month of PRO."
+    "message": "PRO tells you the price to earn $2%, with commission, fixed fee and shipping included. Right now you lose $1 per sale; PRO costs $$89 a month."
   },
   "upsellLead_msi": {
     "message": "With $1 interest-free months your profit drops to $2"
@@ -480,7 +480,7 @@
     "message": "Your PRO trial has ended"
   },
   "upsellBody_expired": {
-    "message": "Target price, Radar, Dashboard and installments are still here. Reactivate them for under $$3 a day."
+    "message": "Your costs are still saved. Reactivate target price, Radar and Dashboard for $$89 a month."
   },
   "alertCta": {
     "message": "See price"
@@ -591,7 +591,7 @@
     "message": "PRO is on for free: 1 day left. Save your product costs and check your Dashboard."
   },
   "trialEndingOne": {
-    "message": "Your PRO trial ends today. After that you lose target price, Radar and Dashboard."
+    "message": "Your PRO trial ends in less than 24 hours. After that you lose target price, Radar and Dashboard."
   },
   "statusTrialDaysOne": {
     "message": "PRO trial: 1 day left"
@@ -600,12 +600,45 @@
     "message": "You have 1 day of Netio PRO for free. No email, no card. Get value from it today:"
   },
   "btnShare": {
-    "message": "Share with another seller"
+    "message": "Send this to another seller"
   },
   "shareText": {
     "message": "I use Netio to see my real profit on every Mercado Libre listing: commission, fixed fee, shipping and withholdings, right on the page. Free for Chrome, and the first 7 days include PRO: $1"
   },
   "shareTextProfit": {
     "message": "Check this: on a $1 Mercado Libre listing, after commission, fixed fee and shipping, the real profit is $2. Calculated with Netio, a free Chrome extension that shows it on every listing: $3"
+  },
+  "rowTargetPriceFor": {
+    "message": "Price to earn $1%"
+  },
+  "summaryNet": {
+    "message": "You keep $1 per sale"
+  },
+  "summaryProfit": {
+    "message": "Profit $1 · $2"
+  },
+  "summaryLoss": {
+    "message": "You lose $1 per sale"
+  },
+  "summaryNoCost": {
+    "message": "Enter your product cost to see your profit."
+  },
+  "breakdownToggle": {
+    "message": "See fees and shipping breakdown"
+  },
+  "upsellOpenFailed": {
+    "message": "We couldn't open checkout. Check your connection and try again."
+  },
+  "trialEndingProducts": {
+    "message": "In $1 days you lose the target price for your $2 saved products."
+  },
+  "trialEndingProductsOne": {
+    "message": "In less than 24 hours you lose the target price for your $1 saved products."
+  },
+  "researchAssumed": {
+    "message": "Assumed cost: $1% of price. Change it to your real cost."
+  },
+  "reviewAsk": {
+    "message": "Is Netio useful? A review helps us reach more sellers ★"
   }
 }

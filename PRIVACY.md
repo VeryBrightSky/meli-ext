@@ -18,8 +18,11 @@ Esta extensión **no recopila, transmite ni vende ningún dato personal**.
 - **Permisos:** `storage` (guardar tus ajustes), acceso a
   `mercadolibre.com.mx` (mostrar las tarjetas) y `extensionpay.com`
   (verificación de pagos).
-- **Pagos (Netio PRO):** la extensión no hace peticiones de red, excepto la
-  verificación de tu suscripción con ExtensionPay cuando usas funciones PRO.
+- **Pagos (Netio PRO):** la única conexión de red de la extensión es con
+  ExtensionPay, para verificar el estado de tu suscripción (como máximo una
+  vez cada 5 minutos mientras usas Mercado Libre, y solo si alguna vez
+  abriste el pago). No se envía ningún dato de tus productos ni de tu
+  navegación.
   Los pagos los procesa ExtensionPay mediante Stripe; nosotros nunca vemos ni
   almacenamos datos de tarjetas. ExtensionPay recibe tu correo electrónico (si
   inicias una prueba o pagas) y el estado de tu suscripción. Consulta su
@@ -44,8 +47,10 @@ This extension **does not collect, transmit, or sell any personal data**.
 - **Permissions:** `storage` (saving your settings), access to
   `mercadolibre.com.mx` (rendering the cards) and `extensionpay.com`
   (payment verification).
-- **Payments (Netio PRO):** the extension makes no network requests except
-  verifying your subscription with ExtensionPay when you use Pro features.
+- **Payments (Netio PRO):** the extension's only network connection is to
+  ExtensionPay, to verify your subscription status (at most once every 5
+  minutes while you use Mercado Libre, and only if you ever opened checkout).
+  No product or browsing data is sent.
   Payments are processed by ExtensionPay via Stripe; we never see or store
   card data. ExtensionPay receives your email (if you start a trial or pay)
   and your subscription status. See their policy:

@@ -183,7 +183,7 @@
     "message": "Deja de adivinar el precio"
   },
   "upsellBody": {
-    "message": "PRO te dice a qué precio vender para ganar el margen que quieres, cuánto te cuesta cada plazo de meses sin intereses y pinta en verde o rojo cada resultado de búsqueda. Todo en tu navegador, sin crear cuenta."
+    "message": "PRO te dice a qué precio vender para ganar el margen que quieres, cuánto te cuesta cada plazo de meses sin intereses y pinta en verde o rojo cada resultado de búsqueda. No necesitas cuenta para usar Netio; tus costos nunca salen de tu navegador."
   },
   "upsellPricing": {
     "message": "$$89 MXN/mes (menos de $$3 al día) o $$699 MXN/año (ahorra 35%). Sin permanencia."
@@ -318,10 +318,10 @@
     "message": "Descuento en envío por reputación (estimado)"
   },
   "upsellMonthly": {
-    "message": "Activar PRO · $$89 MXN/mes"
+    "message": "Activar PRO · $$89 al mes"
   },
   "upsellYearly": {
-    "message": "$$699 MXN/año (ahorra 35%)"
+    "message": "$$699 al año (equivale a $$58 al mes)"
   },
   "dashTotalsLabel": {
     "message": "Totales ($1 productos)"
@@ -411,7 +411,7 @@
     "message": "Margen"
   },
   "upsellNote": {
-    "message": "Cancela cuando quieras. Pago seguro con Stripe."
+    "message": "Cancela cuando quieras. Al pagar solo te pedimos tu correo; el pago lo procesa Stripe."
   },
   "upsellClose": {
     "message": "Ahora no"
@@ -420,13 +420,13 @@
     "message": "Deja de adivinar el precio"
   },
   "upsellBody_generic": {
-    "message": "PRO te dice a qué precio vender para ganar el margen que quieres, cuánto te cuesta cada plazo de meses sin intereses y pinta en verde o rojo cada resultado de búsqueda. Todo en tu navegador, sin crear cuenta."
+    "message": "PRO te dice a qué precio vender para ganar el margen que quieres, cuánto te cuesta cada plazo de meses sin intereses y pinta en verde o rojo cada resultado de búsqueda. No necesitas cuenta para usar Netio; tus costos nunca salen de tu navegador."
   },
   "upsellLead_target": {
-    "message": "Para ganar $1% en este producto tienes que venderlo en $2"
+    "message": "Ya calculamos a qué precio venderlo para ganar $1%"
   },
   "upsellBody_target": {
-    "message": "PRO calcula ese precio en cada publicación, con la comisión, el costo fijo y tu envío ya descontados. Cambia el margen y ve el precio al instante."
+    "message": "Con PRO ves ese precio en cada publicación, ya con comisión, costo fijo y tu envío. Cambia el margen y el precio se ajusta al instante."
   },
   "upsellLead_breakeven": {
     "message": "Debajo de cierto precio, cada venta te cuesta dinero"
@@ -444,7 +444,7 @@
     "message": "Pierdes $1 por venta a este precio"
   },
   "upsellBody_loss": {
-    "message": "PRO te da el precio mínimo para no perder y el precio para ganar $2%, ya con comisión, costo fijo y envío descontados. Un solo error de precio te cuesta más que un mes de PRO."
+    "message": "PRO te dice a qué precio venderlo para ganar $2%, ya con comisión, costo fijo y envío. Hoy pierdes $1 en cada venta; PRO cuesta $$89 al mes."
   },
   "upsellLead_msi": {
     "message": "Con $1 meses sin intereses tu ganancia baja a $2"
@@ -480,7 +480,7 @@
     "message": "Tu prueba PRO terminó"
   },
   "upsellBody_expired": {
-    "message": "Precio objetivo, Radar, Tablero y meses sin intereses siguen aquí. Reactívalos por menos de $$3 al día."
+    "message": "Tus costos siguen guardados. Reactiva el precio objetivo, el Radar y el Tablero por $$89 al mes."
   },
   "alertCta": {
     "message": "Ver precio"
@@ -591,7 +591,7 @@
     "message": "Tienes PRO gratis: te queda 1 día. Guarda el costo de tus productos y revisa tu Tablero."
   },
   "trialEndingOne": {
-    "message": "Tu prueba PRO termina hoy. Después pierdes el precio objetivo, el Radar y el Tablero."
+    "message": "Tu prueba PRO termina en menos de 24 horas. Después pierdes el precio objetivo, el Radar y el Tablero."
   },
   "statusTrialDaysOne": {
     "message": "Prueba PRO: te queda 1 día"
@@ -600,12 +600,45 @@
     "message": "Tienes 1 día de Netio PRO gratis. Sin correo, sin tarjeta. Así le sacas provecho desde hoy:"
   },
   "btnShare": {
-    "message": "Compartir con otro vendedor"
+    "message": "Mándale este cálculo a otro vendedor"
   },
   "shareText": {
     "message": "Uso Netio para ver mi ganancia real en cada publicación de Mercado Libre: comisión, costo fijo, envío y retenciones, sin salir de la página. Es gratis para Chrome y los primeros 7 días traen PRO: $1"
   },
   "shareTextProfit": {
     "message": "Mira esto: en una publicación de $1 en Mercado Libre, después de comisión, costo fijo y envío, la ganancia real queda en $2. Lo calculé con Netio, una extensión gratis de Chrome que lo muestra en cada publicación: $3"
+  },
+  "rowTargetPriceFor": {
+    "message": "Precio para ganar $1%"
+  },
+  "summaryNet": {
+    "message": "Te quedan $1 por venta"
+  },
+  "summaryProfit": {
+    "message": "Ganancia $1 · $2"
+  },
+  "summaryLoss": {
+    "message": "Pierdes $1 por venta"
+  },
+  "summaryNoCost": {
+    "message": "Escribe el costo de tu producto para ver tu ganancia."
+  },
+  "breakdownToggle": {
+    "message": "Ver desglose de cargos y envío"
+  },
+  "upsellOpenFailed": {
+    "message": "No pudimos abrir el pago. Revisa tu conexión e inténtalo de nuevo."
+  },
+  "trialEndingProducts": {
+    "message": "En $1 días pierdes el precio objetivo de tus $2 productos guardados."
+  },
+  "trialEndingProductsOne": {
+    "message": "En menos de 24 horas pierdes el precio objetivo de tus $1 productos guardados."
+  },
+  "researchAssumed": {
+    "message": "Costo supuesto: $1% del precio. Cámbialo con tu costo real."
+  },
+  "reviewAsk": {
+    "message": "¿Te sirve Netio? Una reseña nos ayuda a llegar a más vendedores ★"
   }
 }

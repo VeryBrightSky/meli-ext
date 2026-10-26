@@ -266,3 +266,20 @@ tr.locked td:first-child {
   border: 1px solid rgba(0, 166, 80, 0.4);
   background: #e8f7ee;
 }
+
+/* v1.4.1: the table scrolls inside its card instead of spilling out */
+#content {
+  overflow-x: auto;
+}
+
+td,
+th {
+  white-space: nowrap;
+}
+
+/* One clear primary action in the upsell */
+.actions #monthly-btn {
+  background: #3483fa;
+  border-color: #3483fa;
+  color: #fff;
+}

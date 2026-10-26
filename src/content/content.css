@@ -1009,3 +1009,217 @@
 .mst-share:hover {
   background: #d8f1e3;
 }
+
+/* --- v1.4.1: narrow-column layout (MELI's buy-box column is ~326px) ------- */
+
+/* Rows wrap instead of truncating: a long label gets two lines, a long value
+   (ranges) drops to its own right-aligned line. Nothing is ever clipped. */
+.mst-row {
+  flex-wrap: wrap;
+  row-gap: 2px;
+}
+
+.mst-row__label {
+  flex: 1 1 120px;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+.mst-row__value {
+  margin-left: auto;
+}
+
+/* Listing type: label on its own line, then the switch and the two buttons. */
+.mst-row--controls {
+  row-gap: 6px;
+  justify-content: flex-start;
+}
+
+.mst-row--controls > .mst-row__label {
+  flex: 1 0 100%;
+}
+
+.mst-row--controls .mst-toggle {
+  flex: 0 0 auto;
+}
+
+.mst-row--controls .mst-compare-toggle,
+.mst-row--controls .mst-msi-toggle {
+  white-space: nowrap;
+  margin-left: 6px;
+}
+
+/* Trial banner: text gets the full width, button below, close in the corner. */
+.mst-trialbar {
+  flex-wrap: wrap;
+  position: relative;
+  padding-right: 28px;
+}
+
+.mst-trialbar__text {
+  flex: 1 1 100%;
+}
+
+.mst-trialbar__close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+}
+
+/* Expired is not an error: neutral blue, not alarm red. */
+.mst-trialbar[data-tone="expired"] {
+  background: #e3edfb;
+  border-color: rgba(52, 131, 250, 0.35);
+}
+
+/* MSI columns stack in the narrow column so the payout is never cut off. */
+.mst-msi__cols {
+  flex-direction: column;
+}
+
+.mst-msi__line {
+  white-space: normal;
+  overflow: visible;
+}
+
+/* Locked controls look premium, not broken: full opacity + a PRO tag. */
+.mst-locked {
+  opacity: 1;
+}
+
+.mst-compare-toggle.mst-locked::after,
+.mst-msi-toggle.mst-locked::after {
+  content: "PRO";
+  margin-left: 5px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  padding: 1px 5px;
+  border-radius: 6px;
+  background: #2d3277;
+  color: #fff;
+}
+
+/* PRO chips in Netio navy, so they never read as an official MELI badge. */
+.mst-prochip {
+  background: #2d3277;
+  color: #fff;
+}
+
+.mst-prochip:hover {
+  filter: brightness(1.15);
+}
+
+/* The teased number must not be readable through the blur. */
+.mst-blur,
+.mst-row--teaser:hover .mst-blur {
+  filter: blur(6px);
+}
+
+.mst-copy:focus:not(:focus-visible) {
+  background: #fff;
+}
+
+/* Answer-first summary */
+.mst-summary {
+  margin: 2px 0 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #f5f7fb;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.mst-summary__net {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: rgba(0, 0, 0, 0.9);
+  font-variant-numeric: tabular-nums;
+}
+
+.mst-summary__profit {
+  margin-top: 3px;
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.mst-summary__profit[data-tone="profit"] {
+  color: #00a650;
+}
+
+.mst-summary__profit[data-tone="loss"] {
+  color: #d63b2f;
+}
+
+.mst-summary__profit[data-tone="hint"] {
+  color: rgba(0, 0, 0, 0.55);
+  font-weight: 400;
+  font-size: 12.5px;
+}
+
+.mst-summary__profit[hidden] {
+  display: none;
+}
+
+.mst-summary .mst-share {
+  margin-top: 8px;
+}
+
+/* Collapsible fee breakdown */
+.mst-breakdown {
+  margin: 4px 0 8px;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  padding: 6px 0;
+}
+
+.mst-breakdown__toggle {
+  cursor: pointer;
+  font-size: 13px;
+  color: #3483fa;
+  list-style: revert;
+  padding: 2px 0;
+}
+
+.mst-breakdown[open] > .mst-breakdown__toggle {
+  margin-bottom: 6px;
+}
+
+.mst-breakdown > .mst-row,
+.mst-breakdown > .mst-hint {
+  margin-top: 6px;
+}
+
+/* One-time review ask */
+.mst-review {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: -4px 0 10px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: #fff8e1;
+  font-size: 12px;
+}
+
+.mst-review__link {
+  flex: 1 1 auto;
+  color: rgba(0, 0, 0, 0.8);
+  text-decoration: none;
+}
+
+.mst-review__link:hover {
+  text-decoration: underline;
+}
+
+.mst-review__close {
+  font-family: inherit;
+  border: none;
+  background: transparent;
+  color: rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+}

@@ -108,3 +108,30 @@ body {
   font-size: 11px;
   color: rgba(0, 0, 0, 0.5);
 }
+
+.sub-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sub-actions button {
+  font-family: inherit;
+  font-size: 13px;
+  padding: 7px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.17);
+  border-radius: 6px;
+  background: #fff;
+  color: #3483fa;
+  cursor: pointer;
+}
+
+.sub-actions button:first-child {
+  background: #3483fa;
+  border-color: #3483fa;
+  color: #fff;
+}
+
+.sub-actions button:hover {
+  filter: brightness(0.97);
+}
