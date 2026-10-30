@@ -173,7 +173,7 @@ async function loadTelemetry() {
       .join(" · ");
     document.getElementById("telemetry-debug").textContent =
       `${T("optTelemetryDebug")}: ${mode} · host ${d.host ?? "-"}${d.qa ? " (QA override)" : ""}` +
-      ` · queue ${d.queue} · last send ${last} · id ${d.iid ? d.iid.slice(0, 8) : "-"}` +
+      ` · queue ${d.queue} · last send ${last} · install id ${d.iid ?? "-"}` +
       (counts ? ` · ${counts}` : "");
   }
   renderDebug();

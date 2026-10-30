@@ -148,14 +148,26 @@ const share = (list, test) => {
   return { hit, total };
 };
 
+// Minimum denominator for a rule to be allowed to speak (below it a "rate" is
+// one or two people).
+export const MIN_RULE_N = 20;
+
 // Rule-based findings, plain English, each with the numbers behind it.
 // Level: high (act now), medium (look into it), info (context).
-export function diagnose(report) {
+// Every rule needs at least MIN_RULE_N in its own denominator, and with fewer
+// than SMALL_SAMPLE installs nothing may be above "info".
+// cohort "new": only the funnel is cohort-specific; segments, counters,
+// errors and the diag counts always cover ALL installs, so mixing them with
+// the cohort funnel would produce nonsense like "40 of 6". In that mode only
+// the funnel-only rules run.
+export function diagnose(report, { cohort = "all" } = {}) {
   const R = report;
   const F = R.funnel;
   const out = [];
   const add = (id, level, text, numbers) => out.push({ id, level, text, numbers });
   const installs = F.installed;
+  const ok = (n) => n >= MIN_RULE_N;
+  const allMode = cohort !== "new";
 
   if (installs === 0) {
     add("no_data", "info", "No installs in this range yet. Nothing to diagnose.", "installs 0");
@@ -168,26 +180,35 @@ export function diagnose(report) {
       `${installs} installs, need about ${SMALL_SAMPLE}+ for stable rates`
     );
   }
-
-  const lang = share(R.lang, (x) => x.k !== "es");
-  if (lang.total > 0 && lang.hit / lang.total >= 0.25) {
+  if (!allMode) {
     add(
-      "non_es", "medium",
-      "A big share of installs use a browser language other than Spanish. They are probably not Mexican sellers.",
-      `${lang.hit} of ${lang.total} installs (${rateText(lang.hit, lang.total)})`
+      "cohort_note", "info",
+      "New-installs view: only funnel-based findings are shown. Switch to all installs for language, platform, error and paywall findings.",
+      `${installs} new installs`
     );
   }
-  const cros = share(R.platform, (x) => x.k === "cros");
-  if (cros.total > 0 && cros.hit / cros.total >= 0.15) {
-    add(
-      "chromebooks", "medium",
-      "Many installs are on ChromeOS. That is often school Chromebooks, not people selling on Mercado Libre.",
-      `${cros.hit} of ${cros.total} installs (${rateText(cros.hit, cros.total)})`
-    );
+
+  if (allMode) {
+    const lang = share(R.lang, (x) => x.k !== "es");
+    if (ok(lang.total) && lang.hit / lang.total >= 0.25) {
+      add(
+        "non_es", "medium",
+        "A big share of installs use a browser language other than Spanish. They are probably not Mexican sellers.",
+        `${lang.hit} of ${lang.total} installs (${rateText(lang.hit, lang.total)})`
+      );
+    }
+    const cros = share(R.platform, (x) => x.k === "cros");
+    if (ok(cros.total) && cros.hit / cros.total >= 0.15) {
+      add(
+        "chromebooks", "medium",
+        "Many installs are on ChromeOS. That is often school Chromebooks, not people selling on Mercado Libre.",
+        `${cros.hit} of ${cros.total} installs (${rateText(cros.hit, cros.total)})`
+      );
+    }
   }
 
   const noCard = installs - F.card_seen;
-  if (installs >= 5 && noCard / installs >= 0.3) {
+  if (ok(installs) && noCard / installs >= 0.3) {
     add(
       "no_card", noCard / installs >= 0.5 ? "high" : "medium",
       "Many installs never saw the card. Either they never opened a Mercado Libre Mexico product page, or the card did not show up.",
@@ -195,18 +216,8 @@ export function diagnose(report) {
     );
   }
 
-  const am = R.summary.anchorsMissing;
-  const cardsAll = R.summary.cards + am;
-  if (cardsAll >= 10 && am / cardsAll >= 0.1) {
-    add(
-      "anchors", am / cardsAll >= 0.25 ? "high" : "medium",
-      "On a noticeable share of product pages the card could not find the price block. The page layout may have changed.",
-      `${am} of ${cardsAll} product pages (${rateText(am, cardsAll)})`
-    );
-  }
-
   const cardNoCost = Math.max(0, F.card_seen - F.cost_entered);
-  if (F.card_seen >= 5 && cardNoCost / F.card_seen >= 0.5) {
+  if (ok(F.card_seen) && cardNoCost / F.card_seen >= 0.5) {
     add(
       "card_no_cost", "high",
       "People saw the card but did not type a product cost. The card may not make it obvious what to do next, or the net number alone was enough for them.",
@@ -214,64 +225,77 @@ export function diagnose(report) {
     );
   }
 
-  const trialNow = R.trialState.find((x) => x.k === "trial")?.n ?? 0;
-  const cnp = R.diag.costNoPaywall;
-  if (F.cost_entered >= 5 && cnp / F.cost_entered >= 0.4) {
-    add(
-      "cost_no_paywall", "info",
-      "Many people who entered a cost never saw a paywall. That is expected while the 7-day trial is running, because PRO is unlocked then.",
-      `${cnp} of ${F.cost_entered} cost-entering installs (${rateText(cnp, F.cost_entered)}); ${trialNow} installs are still in trial`
-    );
-  }
-
-  const pnc = R.diag.paywallNoCheckout;
-  if (F.paywall_seen >= 5 && pnc / F.paywall_seen >= 0.8) {
-    add(
-      "paywall_no_checkout", "high",
-      "Almost everyone who saw a paywall did not click buy. The offer, the price, or the timing is not landing.",
-      `${pnc} of ${F.paywall_seen} installs that saw a paywall (${rateText(pnc, F.paywall_seen)})`
-    );
-  }
-
-  const cf = R.diag.checkoutFailedInstalls;
-  if (cf > 0) {
-    add(
-      "checkout_failed", F.checkout_click > 0 && cf / F.checkout_click >= 0.2 ? "high" : "medium",
-      "Some people clicked buy but the checkout page could not open (payment provider unreachable or blocked).",
-      `${cf} installs hit a checkout failure (${R.diag.checkoutFailedEvents} events) out of ${F.checkout_click} that clicked buy`
-    );
-  }
-
-  const cnpaid = R.diag.checkoutNoPaid;
-  if (F.checkout_click >= 3 && cnpaid / F.checkout_click >= 0.7) {
-    add(
-      "checkout_no_paid", "medium",
-      "Most people who clicked buy have not paid. They may have left on the payment page, or the payment was not detected.",
-      `${cnpaid} of ${F.checkout_click} installs that clicked buy (${rateText(cnpaid, F.checkout_click)})`
-    );
-  }
-
-  if (R.diag.expired >= 3 && R.diag.expiredNoCost / R.diag.expired >= 0.5) {
-    add(
-      "expired_no_engage", "high",
-      "Trials ended for people who never really used the product (no cost ever entered). They never got the value, so a paywall cannot convert them.",
-      `${R.diag.expiredNoCost} of ${R.diag.expired} expired trials never entered a cost (${rateText(R.diag.expiredNoCost, R.diag.expired)})`
-    );
-  }
-
-  for (const e of R.errors) {
-    if (e.installs >= 3) {
+  if (allMode) {
+    const am = R.summary.anchorsMissing;
+    const cardsAll = R.summary.cards + am;
+    if (ok(cardsAll) && am / cardsAll >= 0.1) {
       add(
-        `error_${e.k}`, "medium",
-        `Error "${e.k}" is hitting several installs.`,
-        `${e.installs} installs, ${e.n} events`
+        "anchors", am / cardsAll >= 0.25 ? "high" : "medium",
+        "On a noticeable share of product pages the card could not find the price block. The page layout may have changed.",
+        `${am} of ${cardsAll} product pages (${rateText(am, cardsAll)})`
       );
+    }
+
+    const trialNow = R.trialState.find((x) => x.k === "trial")?.n ?? 0;
+    const cnp = R.diag.costNoPaywall;
+    if (ok(F.cost_entered) && cnp / F.cost_entered >= 0.4) {
+      add(
+        "cost_no_paywall", "info",
+        "Many people who entered a cost never saw a paywall. That is expected while the 7-day trial is running, because PRO is unlocked then.",
+        `${cnp} of ${F.cost_entered} cost-entering installs (${rateText(cnp, F.cost_entered)}); ${trialNow} installs are still in trial`
+      );
+    }
+
+    const pnc = R.diag.paywallNoCheckout;
+    if (ok(F.paywall_seen) && pnc / F.paywall_seen >= 0.8) {
+      add(
+        "paywall_no_checkout", "high",
+        "Almost everyone who saw a paywall did not click buy. The offer, the price, or the timing is not landing.",
+        `${pnc} of ${F.paywall_seen} installs that saw a paywall (${rateText(pnc, F.paywall_seen)})`
+      );
+    }
+
+    const cf = R.diag.checkoutFailedInstalls;
+    if (cf > 0) {
+      add(
+        "checkout_failed", ok(F.checkout_click) && cf / F.checkout_click >= 0.2 ? "high" : "medium",
+        "Some people clicked buy but the checkout page could not open (payment provider unreachable or blocked).",
+        `${cf} installs hit a checkout failure (${R.diag.checkoutFailedEvents} events) out of ${F.checkout_click} that clicked buy`
+      );
+    }
+
+    const cnpaid = R.diag.checkoutNoPaid;
+    if (ok(F.checkout_click) && cnpaid / F.checkout_click >= 0.7) {
+      add(
+        "checkout_no_paid", "medium",
+        "Most people who clicked buy have not paid. They may have left on the payment page, or the payment was not detected.",
+        `${cnpaid} of ${F.checkout_click} installs that clicked buy (${rateText(cnpaid, F.checkout_click)})`
+      );
+    }
+
+    if (ok(R.diag.expired) && R.diag.expiredNoCost / R.diag.expired >= 0.5) {
+      add(
+        "expired_no_engage", "high",
+        "Trials ended for people who never really used the product (no cost ever entered). They never got the value, so a paywall cannot convert them.",
+        `${R.diag.expiredNoCost} of ${R.diag.expired} expired trials never entered a cost (${rateText(R.diag.expiredNoCost, R.diag.expired)})`
+      );
+    }
+
+    for (const e of R.errors) {
+      if (e.installs >= 3) {
+        add(
+          `error_${e.k}`, "medium",
+          `Error "${e.k}" is hitting several installs.`,
+          `${e.installs} installs, ${e.n} events`
+        );
+      }
     }
   }
 
-  if (out.every((f) => f.level === "info") && installs >= SMALL_SAMPLE) {
+  if (out.every((f) => f.level === "info") && !isSmallSample(installs)) {
     add("clean", "info", "No rule fired. Nothing stands out as broken.", `${installs} installs`);
   }
+  if (isSmallSample(installs)) for (const f of out) f.level = "info";
   return out;
 }
 
@@ -327,8 +351,9 @@ export function reportText(report, { cohort = "all" } = {}) {
     line("shares and reviews", `share clicks ${R.shares.shareClicks}, review asks shown ${R.shares.reviewShown}, clicked ${R.shares.reviewClicked}, dismissed ${R.shares.reviewDismissed}`)
   );
   L.push("");
+  if (cohort === "new") L.push("(new-installs view: segments, counters, errors and uninstall rows above cover ALL installs)");
   L.push("DIAGNOSIS");
-  const findings = diagnose({ ...R, funnel: F });
+  const findings = diagnose({ ...R, funnel: F }, { cohort });
   for (const f of findings) L.push(`- [${f.level}] ${f.text} (${f.numbers})`);
   return L.join("\n");
 }

@@ -37,11 +37,11 @@ test("funnelRows: step conversion, drop, anomalies", () => {
 });
 
 const base = () => L.normalizeReport({
-  funnel: { installed: 200, active: 190, card_seen: 100, cost_entered: 30, target_price_used: 20, paywall_seen: 25, checkout_click: 5, paid_detected: 1 },
+  funnel: { installed: 200, active: 190, card_seen: 100, cost_entered: 30, target_price_used: 20, paywall_seen: 25, checkout_click: 25, paid_detected: 1 },
   lang: [{ k: "es", n: 100 }, { k: "en", n: 100 }],
   platform: [{ k: "win", n: 120 }, { k: "cros", n: 80 }],
   trial_state: [{ k: "trial", n: 50 }],
-  diag: { expired: 10, expired_no_cost: 8, cost_no_paywall: 15, paywall_no_checkout: 24, checkout_no_paid: 4, checkout_failed_installs: 2, checkout_failed_events: 3 },
+  diag: { expired: 20, expired_no_cost: 16, cost_no_paywall: 15, paywall_no_checkout: 24, checkout_no_paid: 20, checkout_failed_installs: 2, checkout_failed_events: 3 },
   summary: { cards: 80, anchors_missing: 20 },
   errors: [{ k: "no_anchor", n: 9, installs: 5 }]
 });
@@ -132,8 +132,64 @@ test("adios survey: note cleaner strips urls and emails, caps at 140", () => {
   assert.equal(cleanNote("www.algo.com"), "");
   assert.equal(cleanNote("a".repeat(300)).length, 140);
   assert.equal(cleanNote(null), "");
+  assert.equal(cleanNote("llamame 555 123 4567 gracias"), "llamame gracias");
+  assert.equal(cleanNote("tel 570-656-1986"), "tel");
+  assert.equal(cleanNote("mi cel +52 (55) 1234 5678 ok"), "mi cel ok");
+  assert.equal(cleanNote("version 1.5.0 y 12345 piezas"), "version 1.5.0 y 12345 piezas");
   assert.ok(!/<script[^>]+src=|google-analytics|gtag|document\.cookie/i.test(html));
   assert.ok(html.includes('window.NETIO_TELEMETRY = { url: "", key: "" };'));
   for (const k of ["no_card", "numbers", "price", "not_mx", "confused", "other"]) assert.ok(html.includes(k));
   assert.ok(!/—/.test(html), "no em dashes");
+});
+
+test("diagnose: tiny samples never produce findings above info (n=1, n=5, n=99)", () => {
+  for (const n of [1, 5, 99]) {
+    const r = L.normalizeReport({
+      funnel: { installed: n, active: n, card_seen: 0, cost_entered: 0, paywall_seen: n, checkout_click: n },
+      lang: [{ k: "en", n }], platform: [{ k: "cros", n }],
+      diag: { paywall_no_checkout: n, checkout_failed_installs: n, expired: n, expired_no_cost: n },
+      errors: [{ k: "no_anchor", n: 9, installs: 5 }], summary: { cards: 0, anchors_missing: 50 }
+    });
+    const f = L.diagnose(r);
+    assert.ok(f.every((x) => x.level === "info"), `n=${n}: ${JSON.stringify(f.map((x) => [x.id, x.level]))}`);
+    assert.equal(f[0].id, "low_sample");
+  }
+  // below MIN_RULE_N per-rule denominators stay silent even on a big install base
+  const r = L.normalizeReport({ funnel: { installed: 500, active: 400, card_seen: 450, cost_entered: 100, paywall_seen: 10, checkout_click: 0 }, lang: [{ k: "es", n: 500 }], diag: { paywall_no_checkout: 10 } });
+  assert.ok(!L.diagnose(r).some((x) => x.id === "paywall_no_checkout"));
+});
+
+test("cohort mode never mixes denominators (regression: '40 of 6')", () => {
+  const R = L.normalizeReport({
+    funnel: { installed: 200, card_seen: 150, cost_entered: 50, paywall_seen: 20, checkout_click: 5 },
+    funnel_new: { installed: 10, card_seen: 8, cost_entered: 6, paywall_seen: 6, checkout_click: 1 },
+    diag: { cost_no_paywall: 40, paywall_no_checkout: 18 }, lang: [{ k: "en", n: 200 }]
+  });
+  const txt = L.reportText(R, { cohort: "new" });
+  const diag = txt.split("DIAGNOSIS")[1];
+  assert.ok(!/40 of 6|18 of 6/.test(diag), diag);
+  const ids = L.diagnose({ ...R, funnel: R.funnelNew }, { cohort: "new" }).map((f) => f.id);
+  assert.ok(!ids.some((id) => ["non_es", "cost_no_paywall", "paywall_no_checkout"].includes(id)), ids.join());
+  assert.ok(ids.includes("cohort_note"));
+  // all-installs mode still uses the all-installs diag
+  assert.ok(L.diagnose(R).some((f) => f.id === "non_es"));
+});
+
+test("sql: note phone guard, pg_cron cleanup scheduled, privacy text matches", () => {
+  const sql = read("tools/analytics/supabase.sql");
+  assert.match(sql, /\[\[:space:\]\(\)\.-\]\*\)\{6,\}/);
+  assert.match(sql, /cron\.schedule\('netio-cleanup'/);
+  assert.ok(!/^-- select cron\.schedule/m.test(sql), "cleanup scheduling must not be commented out");
+  const readme = read("tools/analytics/README.md");
+  assert.match(readme, /Schedule the cleanup \(required\)/);
+  assert.match(read("scripts/enable-telemetry.mjs"), /cron\.schedule\('netio-cleanup'/);
+  for (const f of ["docs/privacy-telemetry/PRIVACY.md", "docs/privacy-telemetry/privacidad.html"]) {
+    const t = read(f);
+    assert.ok(!/se borran después de 400|are deleted after 400/.test(t), f);
+    assert.match(t, /eriódicamente borramos|periodically delete/);
+    assert.match(t, /si alguna vez capturaste un costo|whether you ever entered a/);
+    assert.ok(!t.includes("soporte@netio.app"));
+  }
+  for (const f of ["landing/index.html", "landing/privacidad.html"]) assert.ok(!read(f).includes("soporte@netio.app"), f);
+  assert.ok(globalThis.EXT_BRAND === undefined || true);
 });

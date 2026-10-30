@@ -47,14 +47,14 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       new Function(readFileSync(join(root, "src/config/branding.js"), "utf8"))();
       return globalThis.EXT_BRAND;
     })();
-    const zipName = `${brand.name.toLowerCase()}-${brand.version}.zip`;
+    const zipName = `${brand.name.toLowerCase()}-${brand.version}-telemetry.zip`;
     const baked = readFileSync(join(root, "dist/src/config/telemetry-config.js"), "utf8");
     if (!baked.includes(url)) throw new Error("the built extension does not contain the backend URL");
 
+    // The build already wrote release/<name>-telemetry.zip (never the root zip).
     const out = join(root, "release");
-    rmSync(out, { recursive: true, force: true });
-    mkdirSync(out, { recursive: true });
-    cpSync(join(root, zipName), join(out, zipName));
+    if (!existsSync(join(out, zipName))) throw new Error(`${zipName} was not produced`);
+    for (const f of ["landing", "PRIVACY.md", "store-listing-privacy.md"]) rmSync(join(out, f), { recursive: true, force: true });
     cpSync(join(root, "landing"), join(out, "landing"), { recursive: true });
     writeFileSync(
       join(out, "landing/adios.html"),
@@ -81,7 +81,12 @@ DONE. Everything to publish is in ${out}
      - paste the disclosure text from release/store-listing-privacy.md
      - certify: not sold, not used for unrelated purposes, not used for credit.
 4. Update the store description privacy paragraph (text in release/store-listing-privacy.md).
-5. Open tools/analytics/index.html in your browser and enter the URL, anon key and admin secret.
+5. REQUIRED, or the "we delete events older than 400 days" promise is false: schedule the
+   cleanup in Supabase. Dashboard > Database > Extensions > enable "pg_cron", then in the SQL
+   editor run:
+     select cron.schedule('netio-cleanup', '17 3 * * 0', $$select public.netio_cleanup()$$);
+   and confirm with: select jobname, schedule from cron.job;
+6. Open tools/analytics/index.html in your browser and enter the URL, anon key and admin secret.
 `);
   } catch (err) {
     console.error(`enable-telemetry failed: ${err.message}`);

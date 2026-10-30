@@ -661,8 +661,5 @@
   },
   "welcomeNoteTelemetry": {
     "message": "Tus costos y productos se guardan en tu navegador; no vemos tus precios ni las páginas que visitas. Solo enviamos contadores anónimos de uso (puedes desactivarlos) y el pago de PRO pasa por ExtensionPay."
-  },
-  "withholdingsRfcNote": {
-    "message": "Las tasas suponen que tienes RFC registrado. Sin RFC la retención puede ser mayor."
   }
 }

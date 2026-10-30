@@ -49,7 +49,7 @@
         <button type="button" class="send" id="send" disabled data-t="send">Enviar</button>
         <button type="button" class="lang" id="lang">English</button>
       </div>
-      <p class="fine" data-t="fine">No pedimos tu correo ni guardamos cookies. Quitamos enlaces y correos del texto antes de enviarlo.</p>
+      <p class="fine" data-t="fine">No pedimos tu correo ni guardamos cookies. Quitamos enlaces, correos y números de teléfono del texto antes de enviarlo.</p>
     </section>
     <section id="thanks" hidden>
       <h1 data-t="thanksTitle">Gracias</h1>
@@ -72,6 +72,7 @@
         .replace(/\S+@\S+/g, " ")
         .replace(/\S*[a-z0-9-]+\.(com|mx|net|org|io|app|co)\b\S*/gi, " ")
         .replace(/@/g, " ")
+        .replace(/\+?[0-9](?:[\s().-]*[0-9]){5,}/g, " ")
         .replace(/[\u0000-\u001f\u007f]/g, " ")
         .replace(/\s+/g, " ")
         .trim();
@@ -85,7 +86,7 @@
         lead: "¿Qué pasó? Un toque nos ayuda a mejorar Netio. Es anónimo.",
         noteLabel: "¿Algo más? (opcional, máximo 140 caracteres)",
         send: "Enviar",
-        fine: "No pedimos tu correo ni guardamos cookies. Quitamos enlaces y correos del texto antes de enviarlo.",
+        fine: "No pedimos tu correo ni guardamos cookies. Quitamos enlaces, correos y números de teléfono del texto antes de enviarlo.",
         thanksTitle: "Gracias",
         thanksBody: "Tu respuesta nos ayuda a mejorar. Si cambias de opinión, Netio sigue en la Chrome Web Store.",
         other: "English",
@@ -103,7 +104,7 @@
         lead: "What happened? One tap helps us improve Netio. It is anonymous.",
         noteLabel: "Anything else? (optional, 140 characters max)",
         send: "Send",
-        fine: "We do not ask for your email or store cookies. Links and emails are removed from the text before sending.",
+        fine: "We do not ask for your email or store cookies. Links, emails and phone numbers are removed from the text before sending.",
         thanksTitle: "Thank you",
         thanksBody: "Your answer helps us improve. If you change your mind, Netio is still on the Chrome Web Store.",
         other: "Español",

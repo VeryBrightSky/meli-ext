@@ -30,5 +30,5 @@ email) and you can turn them off in the options.
 Certify all three: not sold to third parties, not used for unrelated purposes,
 not used for creditworthiness or lending.
 
-Privacy policy URL: https://netio.app/privacidad.html (the telemetry version in
+Privacy policy URL: https://netiox.netlify.app/privacidad.html (the telemetry version in
 this folder, uploaded before you submit).

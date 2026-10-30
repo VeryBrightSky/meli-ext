@@ -122,10 +122,10 @@ test("daily summary aggregation props are clamped and products = distinct count"
 });
 
 test("uninstall url: id only when enabled", () => {
-  const on = C.buildUninstallUrl("https://netio.app/", { installId: UUID, extVersion: "1.5.0", days: 4, cost: true, paywall: false, enabled: true });
-  assert.equal(on, `https://netio.app/adios.html?i=${UUID}&v=1.5.0&d=4&c=1&p=0`);
-  const off = C.buildUninstallUrl("https://netio.app", { installId: UUID, extVersion: "1.5.0", days: 4, cost: true, paywall: true, enabled: false });
-  assert.equal(off, "https://netio.app/adios.html?v=1.5.0");
+  const on = C.buildUninstallUrl("https://netiox.netlify.app/", { installId: UUID, extVersion: "1.5.0", days: 4, cost: true, paywall: false, enabled: true });
+  assert.equal(on, `https://netiox.netlify.app/adios.html?i=${UUID}&v=1.5.0&d=4&c=1&p=0`);
+  const off = C.buildUninstallUrl("https://netiox.netlify.app", { installId: UUID, extVersion: "1.5.0", days: 4, cost: true, paywall: true, enabled: false });
+  assert.equal(off, "https://netiox.netlify.app/adios.html?v=1.5.0");
   assert.ok(on.length < 1000);
 });
 
@@ -173,7 +173,7 @@ function makeSW({ config = { url: "https://t.supabase.co", key: "anon" }, storag
     randomUUID: () => UUID,
     randomId: () => `id${++n}`,
     timers: { set: () => 1, clear: () => {} },
-    landingUrl: "https://netio.app",
+    landingUrl: "https://netiox.netlify.app",
     setUninstallURL: async (u) => uninstall.push(u),
     getTrialState: async () => trial
   });
@@ -359,7 +359,7 @@ test("uninstall survey url set when configured; opted-out url has no install id"
   assert.ok(uninstall.at(-1).includes(`i=${UUID}`));
   assert.ok(uninstall.at(-1).includes("c=1"));
   await sw.setEnabled(false);
-  assert.equal(uninstall.at(-1), "https://netio.app/adios.html?v=1.5.0");
+  assert.equal(uninstall.at(-1), "https://netiox.netlify.app/adios.html?v=1.5.0");
 });
 
 test("update from an older version backfills first_cost_entered for existing sellers", async () => {
@@ -405,4 +405,12 @@ test("version 1.5.0 is consistent across branding, package and manifest", () => 
   assert.equal(man.version, "1.5.0");
   assert.deepEqual(man.permissions, ["storage"]);
   assert.deepEqual(man.host_permissions, ["https://extensionpay.com/*"]);
+});
+
+test("landing base is the real site and the options debug line shows the full install id", () => {
+  new Function(readFileSync(join(root, "src/config/branding.js"), "utf8"))();
+  assert.equal(globalThis.EXT_BRAND.landingUrl, "https://netiox.netlify.app");
+  assert.ok(readFileSync(join(root, "src/options/options.js"), "utf8").includes("install id ${d.iid ?? \"-\"}"));
+  const b = readFileSync(join(root, "scripts/build.mjs"), "utf8");
+  assert.ok(b.includes("-telemetry.zip") && b.includes('join(root, "release"'), "keyed zip goes to release/ only");
 });

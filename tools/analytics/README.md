@@ -14,14 +14,21 @@ in one page only you can open. Until step 5 the extension sends nothing.
    Until you do this, the report refuses to run.
 4. **Copy the URL and anon key.** Project Settings > API: copy "Project URL"
    and the "anon public" key. Never use the service_role key.
-5. **Build the telemetry release.** In the repo run
+5. **Schedule the cleanup (required).** The privacy policy promises that old
+   events are deleted. In Supabase open Database > Extensions and enable
+   `pg_cron`, then run `supabase.sql` again (it schedules a weekly
+   `netio_cleanup()`), and check with
+   `select jobname, schedule from cron.job;` (you should see `netio-cleanup`).
+   Without this step the promise is false.
+6. **Build the telemetry release.** In the repo run
    `node scripts/enable-telemetry.mjs <url> <anon-key>`. It builds the zip and
-   a `release/` folder, and prints the Chrome Web Store checklist.
-6. **Publish.** Upload `release/landing/` to your landing site first (the
+   a `release/` folder (the zip is `release/netio-1.5.0-telemetry.zip`; the zip in
+   the repo root never contains the key), and prints the Chrome Web Store checklist.
+7. **Publish.** Upload `release/landing/` to your landing site first (the
    privacy page and the uninstall page must be live), then upload
-   `release/netio-1.5.0.zip` to the Chrome Web Store and fill the Privacy
+   `release/netio-1.5.0-telemetry.zip` to the Chrome Web Store and fill the Privacy
    practices tab as the script printed.
-7. **Open the dashboard.** Open `tools/analytics/index.html` in your browser
+8. **Open the dashboard.** Open `tools/analytics/index.html` in your browser
    (double click). Enter URL, anon key and admin secret, press Load. Tick
    "Demo" to see the layout with fake data. "Copy report" puts a plain-text
    summary on your clipboard; it contains no secrets, so you can paste it to
@@ -41,5 +48,5 @@ Things to know
   Project Settings and keep the public privacy text in step with what you see.
 - To delete one person's data on request:
   `delete from public.events where install_id = 'THEIR-ID';`
-- Old rows: run `select public.netio_cleanup();` now and then (deletes > 400 days).
+- Old rows: the weekly job from step 5 deletes events older than 400 days; you can also run `select public.netio_cleanup();` by hand.
 - After editing `lib.mjs` run `node tools/analytics/sync-lib.mjs` to refresh `index.html`.

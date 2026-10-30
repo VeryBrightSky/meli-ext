@@ -139,7 +139,15 @@ if (release) {
   writeFileSync(telPath, telStripped);
   console.log("release: analytics QA override stripped from telemetry-sw.js");
 
-  const zipPath = join(root, `${BRAND.name.toLowerCase().replaceAll(" ", "-")}-${BRAND.version}.zip`);
+  // A build with a backend baked in is written ONLY to release/ under a
+  // different name, so the plain dormant zip in the repo root is never
+  // replaced by (or confused with) one that carries the analytics key.
+  const baseName = `${BRAND.name.toLowerCase().replaceAll(" ", "-")}-${BRAND.version}`;
+  let zipPath = join(root, `${baseName}.zip`);
+  if (tUrl && tKey) {
+    mkdirSync(join(root, "release"), { recursive: true });
+    zipPath = join(root, "release", `${baseName}-telemetry.zip`);
+  }
   rmSync(zipPath, { force: true });
   try {
     execFileSync("zip", ["-r", zipPath, "."], { cwd: dist });

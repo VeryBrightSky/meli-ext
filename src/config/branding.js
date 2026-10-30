@@ -28,7 +28,7 @@ globalThis.EXT_BRAND = Object.freeze({
   },
   // Where the public landing pages live (privacy policy, uninstall survey).
   // Must serve privacidad.html and adios.html from this base; no trailing slash.
-  landingUrl: "https://netio.app",
+  landingUrl: "https://netiox.netlify.app",
   storeReviewsUrl: "https://chromewebstore.google.com/detail/netio/bjhikillfgbpblogloljjhejogfeajac/reviews",
   plans: Object.freeze({ monthly: "pro-monthly", yearly: "pro-yearly" }),
   // Path relative to the extension root; resolve with chrome.runtime.getURL().

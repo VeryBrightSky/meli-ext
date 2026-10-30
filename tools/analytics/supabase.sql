@@ -32,7 +32,10 @@ begin
     if jsonb_typeof(kv.value) = 'string' then
       s := kv.value #>> '{}';
       if ev = 'uninstall_reason' and kv.key = 'note' then
-        if length(s) > 140 or s ~* '(https?:|www\.|@|[a-z0-9-]+\.(com|mx|net|org|io|app|co)\M)' then
+        -- no links, emails, or phone-like runs (6+ digits, even with spaces/dashes)
+        if length(s) > 140
+           or s ~* '(https?:|www\.|@|[a-z0-9-]+\.(com|mx|net|org|io|app|co)\M)'
+           or s ~ '([0-9][[:space:]().-]*){6,}' then
           return false;
         end if;
       elsif s !~ '^[a-z0-9._:+-]{1,24}$' then
@@ -298,4 +301,18 @@ begin
 end
 $$;
 revoke all on function public.netio_cleanup() from public, anon, authenticated;
--- select cron.schedule('netio-cleanup', '17 3 * * 0', $$select public.netio_cleanup()$$);
+
+-- REQUIRED for the privacy promise "we periodically delete events older than
+-- 400 days": schedule the cleanup weekly with pg_cron. On Supabase enable the
+-- extension first (Dashboard > Database > Extensions > pg_cron); this block
+-- schedules it when pg_cron is available and says so when it is not.
+do $$
+begin
+  if exists (select 1 from pg_extension where extname = 'pg_cron') then
+    perform cron.schedule('netio-cleanup', '17 3 * * 0', 'select public.netio_cleanup()');
+    raise notice 'netio-cleanup scheduled (weekly)';
+  else
+    raise warning 'pg_cron is NOT enabled: enable it, then run this file again (README step 5)';
+  end if;
+end
+$$;

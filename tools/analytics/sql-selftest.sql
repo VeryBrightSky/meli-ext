@@ -24,7 +24,8 @@ insert into public.events (install_id, event, props, ext_version, lang, chrome_m
  ('33333333-3333-4333-8333-333333333333','active_day','{"days_since_install":9,"trial_state":"expired","pro":false}','1.5.0','es',141,'mac'),
  ('33333333-3333-4333-8333-333333333333','trial_expired_seen','{}','1.5.0','es',141,'mac'),
  (null,'uninstall_reason','{"reason":"no_card","note":"no vi nada","days_used":2,"cost_entered":0,"saw_paywall":0}','1.5.0','es',null,'other'),
- (null,'uninstall_reason','{"reason":"price","days_used":8}','1.5.0','es',null,'other');
+ (null,'uninstall_reason','{"reason":"price","days_used":8}','1.5.0','es',null,'other'),
+ (null,'uninstall_reason','{"reason":"other","note":"version 1.5.0 y 12345 piezas"}','1.5.0','es',null,'other');
 reset role;
 
 -- bad rows must ALL be rejected
@@ -44,6 +45,9 @@ insert into bad values
  ($$insert into public.events(install_id,event,props,ext_version,lang,chrome_major,platform) values ('11111111-1111-4111-8111-111111111111','install','{}','1.5.0','es',0,'win')$$),
  ($$insert into public.events(install_id,event,props,ext_version,lang,platform) values ('11111111-1111-4111-8111-111111111111','install','[]','1.5.0','es','win')$$),
  ($$insert into public.events(ts,install_id,event,ext_version,lang,platform) values ('2001-01-01','11111111-1111-4111-8111-111111111111','install','1.5.0','es','win')$$),
+ ($$insert into public.events(install_id,event,props,ext_version,lang,platform) values (null,'uninstall_reason','{"note":"llamame 555 123 4567"}','1.5.0','es','other')$$),
+ ($$insert into public.events(install_id,event,props,ext_version,lang,platform) values (null,'uninstall_reason','{"note":"5551234567"}','1.5.0','es','other')$$),
+ ($$insert into public.events(install_id,event,props,ext_version,lang,platform) values (null,'uninstall_reason','{"note":"tel 570-656-198"}','1.5.0','es','other')$$),
  ($$select * from public.events$$),
  ($$delete from public.events$$),
  ($$update public.events set event='install'$$),

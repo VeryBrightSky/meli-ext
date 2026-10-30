@@ -622,7 +622,6 @@ globalThis.MST_CARD = (() => {
     refs.isr.root.style.display = showW ? "" : "none";
     refs.netAfter.root.style.display = showW ? "" : "none";
     refs.withholdingsHint.style.display = showW ? "" : "none";
-    refs.withholdingsRfc.style.display = showW ? "" : "none";
     if (showW) {
       const w = CALC.computeWithholdings(state.priceMXN, SOURCE.withholdings);
       patchRow(refs.iva, null, fmtCharge(w.ivaMXN), flash);
@@ -1254,9 +1253,6 @@ globalThis.MST_CARD = (() => {
     body.appendChild(refs.netAfter.root);
     refs.withholdingsHint = el("div", `${PREFIX}-hint`, T("withholdingsHint"));
     body.appendChild(refs.withholdingsHint);
-    // The rates above assume an RFC registered with Mercado Libre.
-    refs.withholdingsRfc = el("div", `${PREFIX}-hint`, T("withholdingsRfcNote"));
-    body.appendChild(refs.withholdingsRfc);
 
     // Sweet-spot nudge: clicking applies the suggested what-if price.
     refs.sweetspot = el("button", `${PREFIX}-sweetspot`, "");
@@ -1441,8 +1437,7 @@ globalThis.MST_CARD = (() => {
       refs.iva?.root,
       refs.isr?.root,
       refs.netAfter?.root,
-      refs.withholdingsHint,
-      refs.withholdingsRfc
+      refs.withholdingsHint
     ].filter(Boolean);
     const shipRowEl = refs.shippingInput.closest(`.${PREFIX}-row`);
     shipRowEl.before(details);

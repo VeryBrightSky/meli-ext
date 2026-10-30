@@ -661,8 +661,5 @@
   },
   "welcomeNoteTelemetry": {
     "message": "Your costs and products are saved in your browser; we never see your prices or the pages you visit. We only send anonymous usage counters (you can turn them off) and the PRO payment goes through ExtensionPay."
-  },
-  "withholdingsRfcNote": {
-    "message": "Rates assume you have an RFC registered. Without an RFC, withholding can be higher."
   }
 }

@@ -222,8 +222,7 @@ globalThis.MST_MESSAGES = Object.freeze({
     "telemetryNoticeLink": "Ver qué enviamos",
     "telemetryNoticeOff": "Desactivar",
     "telemetryOffDone": "Listo, ya no enviamos nada.",
-    "welcomeNoteTelemetry": "Tus costos y productos se guardan en tu navegador; no vemos tus precios ni las páginas que visitas. Solo enviamos contadores anónimos de uso (puedes desactivarlos) y el pago de PRO pasa por ExtensionPay.",
-    "withholdingsRfcNote": "Las tasas suponen que tienes RFC registrado. Sin RFC la retención puede ser mayor."
+    "welcomeNoteTelemetry": "Tus costos y productos se guardan en tu navegador; no vemos tus precios ni las páginas que visitas. Solo enviamos contadores anónimos de uso (puedes desactivarlos) y el pago de PRO pasa por ExtensionPay."
   },
   "en": {
     "cardTitle": "Profit calculator",
@@ -446,7 +445,6 @@ globalThis.MST_MESSAGES = Object.freeze({
     "telemetryNoticeLink": "See what we send",
     "telemetryNoticeOff": "Turn off",
     "telemetryOffDone": "Done, nothing is sent anymore.",
-    "welcomeNoteTelemetry": "Your costs and products are saved in your browser; we never see your prices or the pages you visit. We only send anonymous usage counters (you can turn them off) and the PRO payment goes through ExtensionPay.",
-    "withholdingsRfcNote": "Rates assume you have an RFC registered. Without an RFC, withholding can be higher."
+    "welcomeNoteTelemetry": "Your costs and products are saved in your browser; we never see your prices or the pages you visit. We only send anonymous usage counters (you can turn them off) and the PRO payment goes through ExtensionPay."
   }
 });

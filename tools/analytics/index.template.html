@@ -86,7 +86,7 @@ td.num, th.num { text-align: right; white-space: nowrap; }
     <div class="actions">
       <button id="load" type="button">Load</button>
       <label class="check"><input id="demo" type="checkbox" /> Demo (sample data)</label>
-      <label class="check"><input id="cohort" type="checkbox" /> New installs only</label>
+      <label class="check"><input id="cohort" type="checkbox" /> New installs only (funnel and diagnosis; other sections stay all-installs)</label>
       <button id="copy" type="button" class="ghost" hidden>Copy report</button>
       <span class="hint" id="status" role="status"></span>
     </div>
@@ -312,7 +312,7 @@ function render() {
   // 8. Diagnosis
   const box = $("diag");
   box.replaceChildren();
-  for (const f of diagnose({ ...R, funnel: F })) {
+  for (const f of diagnose({ ...R, funnel: F }, { cohort: $("cohort").checked ? "new" : "all" })) {
     const d = el("div", "finding " + f.level);
     d.append(el("div", "", f.text), el("div", "nums", f.numbers));
     box.append(d);
