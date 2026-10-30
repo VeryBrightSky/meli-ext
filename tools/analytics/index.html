@@ -1,0 +1,720 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src https: http://localhost:* http://127.0.0.1:*; img-src data:; base-uri 'none'; form-action 'none'" />
+<meta name="robots" content="noindex,nofollow" />
+<meta name="color-scheme" content="light dark" />
+<title>Netio analytics (private)</title>
+<style>
+:root {
+  --bg: #f6f7fb; --panel: #ffffff; --ink: #14172e; --muted: #5d6384; --line: #e2e5f1;
+  --accent: #2d3277; --good: #0a8f4a; --warn: #b26a00; --bad: #c62839; --bar: #4a56dc; --bar2: #cfd3f3;
+  --chip: #eef0fb;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #11132a; --panel: #1a1d3b; --ink: #eceefb; --muted: #9ba0c9; --line: #2b2f57;
+    --accent: #8f98ff; --good: #38d27f; --warn: #f0b04a; --bad: #ff6b7a; --bar: #7b86ff; --bar2: #2b2f57;
+    --chip: #23274d;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+main { max-width: 980px; margin: 0 auto; padding: 16px; }
+h1 { font-size: 22px; margin: 4px 0 2px; }
+h2 { font-size: 16px; margin: 0 0 10px; }
+.sub { color: var(--muted); font-size: 13px; margin: 0 0 14px; }
+section, .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px; margin: 0 0 14px; }
+label { display: block; font-size: 12px; color: var(--muted); margin: 8px 0 3px; }
+input, select { width: 100%; font: inherit; padding: 9px 10px; border-radius: 9px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
+.row { display: grid; gap: 10px; grid-template-columns: 1fr; }
+@media (min-width: 720px) { .row { grid-template-columns: 1.4fr 1.4fr 1fr 0.6fr; } }
+button { font: inherit; font-weight: 600; padding: 9px 14px; border-radius: 9px; border: 1px solid var(--accent); background: var(--accent); color: #fff; cursor: pointer; }
+@media (prefers-color-scheme: dark) { button { color: #0e1030; } }
+button.ghost { background: transparent; color: var(--accent); }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
+.check { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; color: var(--muted); margin: 0; }
+.check input { width: auto; }
+.cards { display: grid; gap: 10px; grid-template-columns: repeat(2, 1fr); }
+@media (min-width: 720px) { .cards { grid-template-columns: repeat(3, 1fr); } }
+.card { background: var(--chip); border-radius: 12px; padding: 10px 12px; }
+.card b { display: block; font-size: 24px; line-height: 1.15; }
+.card span { font-size: 12px; color: var(--muted); }
+.card small { display: block; font-size: 11px; color: var(--muted); margin-top: 2px; }
+.banner { border-radius: 12px; padding: 10px 12px; margin: 0 0 14px; font-size: 14px; border: 1px solid var(--warn); color: var(--warn); background: transparent; }
+.banner.err { border-color: var(--bad); color: var(--bad); }
+.bars { display: grid; gap: 8px; }
+.bar { display: grid; gap: 3px; }
+.bar .top { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; flex-wrap: wrap; }
+.bar .top span:last-child { color: var(--muted); text-align: right; }
+.track { background: var(--bar2); border-radius: 6px; height: 12px; overflow: hidden; }
+.fill { background: var(--bar); height: 100%; border-radius: 6px; min-width: 2px; }
+.hint { color: var(--muted); font-size: 12px; margin: 6px 0 0; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 6px 4px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--muted); font-weight: 600; font-size: 12px; }
+td.num, th.num { text-align: right; white-space: nowrap; }
+.two { display: grid; gap: 14px; grid-template-columns: 1fr; }
+@media (min-width: 720px) { .two { grid-template-columns: 1fr 1fr; } }
+.finding { border-left: 4px solid var(--muted); padding: 6px 10px; margin: 8px 0; background: var(--chip); border-radius: 0 10px 10px 0; }
+.finding.high { border-color: var(--bad); } .finding.medium { border-color: var(--warn); } .finding.info { border-color: var(--accent); }
+.finding .nums { color: var(--muted); font-size: 12px; margin-top: 2px; }
+.tag { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.watermark { position: fixed; inset: 0; pointer-events: none; z-index: 5; display: none; align-items: center; justify-content: center; }
+.watermark.on { display: flex; }
+.watermark span { transform: rotate(-24deg); font-size: clamp(28px, 8vw, 84px); font-weight: 900; color: var(--bad); opacity: .16; text-align: center; line-height: 1.1; }
+.sample-note { color: var(--bad); font-weight: 700; }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div class="watermark" id="watermark" aria-hidden="true"><span>SAMPLE DATA,<br />NOT REAL</span></div>
+<main>
+  <h1>Netio analytics</h1>
+  <p class="sub">Private dashboard. Talks only to the Supabase URL you type below. Nothing is stored except in this tab.</p>
+
+  <div class="panel" id="connect">
+    <div class="row">
+      <div><label for="url">Supabase URL</label><input id="url" type="url" placeholder="https://xxxx.supabase.co" autocomplete="off" /></div>
+      <div><label for="key">Anon key</label><input id="key" type="password" placeholder="eyJ..." autocomplete="off" /></div>
+      <div><label for="secret">Admin secret</label><input id="secret" type="password" autocomplete="off" /></div>
+      <div><label for="range">Range</label>
+        <select id="range"><option value="7">7 days</option><option value="30" selected>30 days</option><option value="90">90 days</option></select></div>
+    </div>
+    <div class="actions">
+      <button id="load" type="button">Load</button>
+      <label class="check"><input id="demo" type="checkbox" /> Demo (sample data)</label>
+      <label class="check"><input id="cohort" type="checkbox" /> New installs only</label>
+      <button id="copy" type="button" class="ghost" hidden>Copy report</button>
+      <span class="hint" id="status" role="status"></span>
+    </div>
+  </div>
+
+  <div class="banner err" id="error" hidden></div>
+  <div class="banner" id="small" hidden></div>
+
+  <div id="report" hidden>
+    <section id="s-summary"><h2>1. Summary</h2><div class="cards" id="cards"></div></section>
+    <section id="s-funnel"><h2>2. Funnel</h2><div class="bars" id="funnel"></div>
+      <p class="hint">Each bar is distinct installs that reached the step. Percentages show step conversion vs the previous step with a Wilson 95% interval in brackets.</p></section>
+    <section id="s-retention"><h2>3. Retention</h2><table id="retention"></table>
+      <p class="hint">Share of new installs, old enough to be measured, that were active on or after day N.</p></section>
+    <section id="s-paywall"><h2>4. Paywall and checkout</h2><div class="two">
+      <div><h2 class="tag">Paywall seen, by reason (installs)</h2><div class="bars" id="pw-reason"></div></div>
+      <div><h2 class="tag">Paywall seen, by upsell key (installs)</h2><div class="bars" id="pw-key"></div></div>
+      <div><h2 class="tag">Checkout clicks, by plan (installs)</h2><div class="bars" id="co-plan"></div></div>
+      <div><h2 class="tag">Checkout clicks, by source (installs)</h2><div class="bars" id="co-from"></div></div></div></section>
+    <section id="s-seg"><h2>5. Segments (latest value per install)</h2><div class="two" id="segments"></div></section>
+    <section id="s-health"><h2>6. Health</h2><div class="two">
+      <div><h2 class="tag">Errors</h2><table id="errors"></table></div>
+      <div><h2 class="tag">Other health numbers</h2><table id="health"></table></div></div></section>
+    <section id="s-unin"><h2>7. Uninstall reasons</h2><div class="bars" id="unin"></div><p class="hint" id="unin-meta"></p></section>
+    <section id="s-diag"><h2>8. Diagnosis</h2><div id="diag"></div></section>
+  </div>
+</main>
+
+<script>
+"use strict";
+// LIB:BEGIN
+// Pure logic for the private analytics dashboard (index.html inlines this
+// file verbatim, minus the `export ` keywords: run
+// `node tools/analytics/sync-lib.mjs` after editing; a unit test fails if the
+// page and this file ever drift apart). No DOM, no network, no secrets.
+//
+// The input is the single jsonb returned by public.netio_report(); see
+// supabase.sql for the exact shape.
+
+const FUNNEL_STEPS = [
+  { key: "installed", label: "Installed" },
+  { key: "active", label: "Opened the product (active day)" },
+  { key: "card_seen", label: "Saw the card on a listing" },
+  { key: "cost_entered", label: "Entered a product cost" },
+  { key: "target_price_used", label: "Used the target price" },
+  { key: "paywall_seen", label: "Saw a PRO paywall" },
+  { key: "checkout_click", label: "Clicked buy" },
+  { key: "paid_detected", label: "Paid" }
+];
+
+const SMALL_SAMPLE = 100;
+
+const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
+const arr = (v) => (Array.isArray(v) ? v : []);
+const obj = (v) => (v && typeof v === "object" && !Array.isArray(v) ? v : {});
+
+// Wilson score interval for k successes out of n (default 95%).
+function wilson(k, n, z = 1.96) {
+  k = num(k);
+  n = num(n);
+  if (!(n > 0) || k < 0 || k > n) return null;
+  const p = k / n;
+  const z2 = z * z;
+  const denom = 1 + z2 / n;
+  const centre = (p + z2 / (2 * n)) / denom;
+  const half = (z * Math.sqrt((p * (1 - p)) / n + z2 / (4 * n * n))) / denom;
+  return { p, lo: Math.max(0, centre - half), hi: Math.min(1, centre + half) };
+}
+
+const fmtPct = (x, digits = 0) => `${(x * 100).toFixed(digits)}%`;
+
+// "34% (95% CI 22% to 48%)" or "n/a" when there is no denominator.
+function rateText(k, n) {
+  const w = wilson(k, n);
+  if (!w) return "n/a";
+  return `${fmtPct(w.p)} (95% CI ${fmtPct(w.lo)} to ${fmtPct(w.hi)})`;
+}
+
+// Fill every field the page reads, so a missing key never throws.
+function normalizeReport(raw) {
+  const r = obj(raw);
+  const funnel = (f) => {
+    const o = obj(f);
+    return Object.fromEntries(FUNNEL_STEPS.map((s) => [s.key, num(o[s.key])]));
+  };
+  const list = (v) => arr(v).map((x) => ({ k: String(x?.k ?? "?"), n: num(x?.n), events: num(x?.events) }));
+  const diag = obj(r.diag);
+  const summary = obj(r.summary);
+  const unin = obj(r.uninstall);
+  const shares = obj(r.shares);
+  return {
+    sample: r.sample === true,
+    sinceDays: num(r.since_days) || 90,
+    generatedAt: typeof r.generated_at === "string" ? r.generated_at : null,
+    installsPerDay: arr(r.installs_per_day).map((x) => ({ d: String(x?.d ?? ""), n: num(x?.n) })),
+    funnel: funnel(r.funnel),
+    funnelNew: funnel(r.funnel_new),
+    paywallByReason: list(r.paywall_by_reason),
+    paywallByKey: list(r.paywall_by_key),
+    checkoutByPlan: list(r.checkout_by_plan),
+    checkoutByFrom: list(r.checkout_by_from),
+    retention: Object.fromEntries(
+      ["d0", "d1", "d3", "d7", "d14", "d30"].map((k) => [
+        k,
+        { eligible: num(obj(obj(r.retention)[k]).eligible), retained: num(obj(obj(r.retention)[k]).retained) }
+      ])
+    ),
+    trialState: list(r.trial_state),
+    platform: list(r.platform),
+    lang: list(r.lang),
+    extVersion: list(r.ext_version),
+    chromeMajor: list(r.chrome_major),
+    errors: arr(r.errors).map((x) => ({ k: String(x?.k ?? "?"), n: num(x?.n), installs: num(x?.installs) })),
+    diag: {
+      expired: num(diag.expired),
+      expiredNoCost: num(diag.expired_no_cost),
+      costNoPaywall: num(diag.cost_no_paywall),
+      paywallNoCheckout: num(diag.paywall_no_checkout),
+      checkoutNoPaid: num(diag.checkout_no_paid),
+      checkoutFailedInstalls: num(diag.checkout_failed_installs),
+      checkoutFailedEvents: num(diag.checkout_failed_events),
+      cardNoCost: num(diag.card_no_cost)
+    },
+    summary: {
+      cards: num(summary.cards),
+      products: num(summary.products),
+      searches: num(summary.searches),
+      costEntries: num(summary.cost_entries),
+      calcs: num(summary.calcs),
+      anchorsMissing: num(summary.anchors_missing),
+      days: num(summary.days)
+    },
+    uninstall: {
+      n: num(unin.n),
+      medianDays: unin.median_days == null ? null : num(unin.median_days),
+      reasons: list(unin.reasons)
+    },
+    shares: {
+      shareClicks: num(shares.share_click),
+      reviewShown: num(shares.review_shown),
+      reviewClicked: num(shares.review_clicked),
+      reviewDismissed: num(shares.review_dismissed)
+    }
+  };
+}
+
+// Step-by-step view of a funnel: reach, step conversion vs the previous
+// step, conversion vs installs, each with its Wilson interval. A step that
+// exceeds the previous one (events lost, or installs from before analytics
+// existed) is flagged instead of showing a negative drop.
+function funnelRows(funnel) {
+  const rows = [];
+  const top = num(funnel.installed);
+  FUNNEL_STEPS.forEach((s, i) => {
+    const n = num(funnel[s.key]);
+    const prev = i === 0 ? null : num(funnel[FUNNEL_STEPS[i - 1].key]);
+    const stepOk = prev !== null && prev > 0 && n <= prev;
+    const stepRate = stepOk ? wilson(n, prev) : null;
+    const overall = top > 0 && n <= top ? wilson(n, top) : null;
+    rows.push({
+      key: s.key,
+      label: s.label,
+      n,
+      prev,
+      stepRate,
+      drop: stepOk ? 1 - n / prev : null,
+      overall,
+      anomaly: prev !== null && n > prev
+    });
+  });
+  return rows;
+}
+
+const isSmallSample = (installs) => num(installs) < SMALL_SAMPLE;
+
+const share = (list, test) => {
+  const total = list.reduce((a, x) => a + x.n, 0);
+  const hit = list.filter(test).reduce((a, x) => a + x.n, 0);
+  return { hit, total };
+};
+
+// Rule-based findings, plain English, each with the numbers behind it.
+// Level: high (act now), medium (look into it), info (context).
+function diagnose(report) {
+  const R = report;
+  const F = R.funnel;
+  const out = [];
+  const add = (id, level, text, numbers) => out.push({ id, level, text, numbers });
+  const installs = F.installed;
+
+  if (installs === 0) {
+    add("no_data", "info", "No installs in this range yet. Nothing to diagnose.", "installs 0");
+    return out;
+  }
+  if (isSmallSample(installs)) {
+    add(
+      "low_sample", "info",
+      "Too few users to trust any percentage here. Read the numbers as stories about individual people, not rates.",
+      `${installs} installs, need about ${SMALL_SAMPLE}+ for stable rates`
+    );
+  }
+
+  const lang = share(R.lang, (x) => x.k !== "es");
+  if (lang.total > 0 && lang.hit / lang.total >= 0.25) {
+    add(
+      "non_es", "medium",
+      "A big share of installs use a browser language other than Spanish. They are probably not Mexican sellers.",
+      `${lang.hit} of ${lang.total} installs (${rateText(lang.hit, lang.total)})`
+    );
+  }
+  const cros = share(R.platform, (x) => x.k === "cros");
+  if (cros.total > 0 && cros.hit / cros.total >= 0.15) {
+    add(
+      "chromebooks", "medium",
+      "Many installs are on ChromeOS. That is often school Chromebooks, not people selling on Mercado Libre.",
+      `${cros.hit} of ${cros.total} installs (${rateText(cros.hit, cros.total)})`
+    );
+  }
+
+  const noCard = installs - F.card_seen;
+  if (installs >= 5 && noCard / installs >= 0.3) {
+    add(
+      "no_card", noCard / installs >= 0.5 ? "high" : "medium",
+      "Many installs never saw the card. Either they never opened a Mercado Libre Mexico product page, or the card did not show up.",
+      `${noCard} of ${installs} installs saw no card (${rateText(noCard, installs)})`
+    );
+  }
+
+  const am = R.summary.anchorsMissing;
+  const cardsAll = R.summary.cards + am;
+  if (cardsAll >= 10 && am / cardsAll >= 0.1) {
+    add(
+      "anchors", am / cardsAll >= 0.25 ? "high" : "medium",
+      "On a noticeable share of product pages the card could not find the price block. The page layout may have changed.",
+      `${am} of ${cardsAll} product pages (${rateText(am, cardsAll)})`
+    );
+  }
+
+  const cardNoCost = Math.max(0, F.card_seen - F.cost_entered);
+  if (F.card_seen >= 5 && cardNoCost / F.card_seen >= 0.5) {
+    add(
+      "card_no_cost", "high",
+      "People saw the card but did not type a product cost. The card may not make it obvious what to do next, or the net number alone was enough for them.",
+      `${cardNoCost} of ${F.card_seen} card viewers never entered a cost (${rateText(cardNoCost, F.card_seen)})`
+    );
+  }
+
+  const trialNow = R.trialState.find((x) => x.k === "trial")?.n ?? 0;
+  const cnp = R.diag.costNoPaywall;
+  if (F.cost_entered >= 5 && cnp / F.cost_entered >= 0.4) {
+    add(
+      "cost_no_paywall", "info",
+      "Many people who entered a cost never saw a paywall. That is expected while the 7-day trial is running, because PRO is unlocked then.",
+      `${cnp} of ${F.cost_entered} cost-entering installs (${rateText(cnp, F.cost_entered)}); ${trialNow} installs are still in trial`
+    );
+  }
+
+  const pnc = R.diag.paywallNoCheckout;
+  if (F.paywall_seen >= 5 && pnc / F.paywall_seen >= 0.8) {
+    add(
+      "paywall_no_checkout", "high",
+      "Almost everyone who saw a paywall did not click buy. The offer, the price, or the timing is not landing.",
+      `${pnc} of ${F.paywall_seen} installs that saw a paywall (${rateText(pnc, F.paywall_seen)})`
+    );
+  }
+
+  const cf = R.diag.checkoutFailedInstalls;
+  if (cf > 0) {
+    add(
+      "checkout_failed", F.checkout_click > 0 && cf / F.checkout_click >= 0.2 ? "high" : "medium",
+      "Some people clicked buy but the checkout page could not open (payment provider unreachable or blocked).",
+      `${cf} installs hit a checkout failure (${R.diag.checkoutFailedEvents} events) out of ${F.checkout_click} that clicked buy`
+    );
+  }
+
+  const cnpaid = R.diag.checkoutNoPaid;
+  if (F.checkout_click >= 3 && cnpaid / F.checkout_click >= 0.7) {
+    add(
+      "checkout_no_paid", "medium",
+      "Most people who clicked buy have not paid. They may have left on the payment page, or the payment was not detected.",
+      `${cnpaid} of ${F.checkout_click} installs that clicked buy (${rateText(cnpaid, F.checkout_click)})`
+    );
+  }
+
+  if (R.diag.expired >= 3 && R.diag.expiredNoCost / R.diag.expired >= 0.5) {
+    add(
+      "expired_no_engage", "high",
+      "Trials ended for people who never really used the product (no cost ever entered). They never got the value, so a paywall cannot convert them.",
+      `${R.diag.expiredNoCost} of ${R.diag.expired} expired trials never entered a cost (${rateText(R.diag.expiredNoCost, R.diag.expired)})`
+    );
+  }
+
+  for (const e of R.errors) {
+    if (e.installs >= 3) {
+      add(
+        `error_${e.k}`, "medium",
+        `Error "${e.k}" is hitting several installs.`,
+        `${e.installs} installs, ${e.n} events`
+      );
+    }
+  }
+
+  if (out.every((f) => f.level === "info") && installs >= SMALL_SAMPLE) {
+    add("clean", "info", "No rule fired. Nothing stands out as broken.", `${installs} installs`);
+  }
+  return out;
+}
+
+const line = (k, v) => `${k}: ${v}`;
+const listText = (l) => (l.length ? l.map((x) => `${x.k} ${x.n}`).join(", ") : "none");
+
+// Compact plain-text report: every number, no secrets, safe to paste anywhere.
+function reportText(report, { cohort = "all" } = {}) {
+  const R = report;
+  const F = cohort === "new" ? R.funnelNew : R.funnel;
+  const rows = funnelRows(F);
+  const L = [];
+  L.push(`NETIO ANALYTICS REPORT${R.sample ? " (SAMPLE DATA, NOT REAL)" : ""}`);
+  L.push(`range: last ${R.sinceDays} days${R.generatedAt ? `, generated ${R.generatedAt}` : ""}, cohort: ${cohort === "new" ? "new installs only" : "all installs"}`);
+  if (isSmallSample(F.installed)) L.push(`WARNING: only ${F.installed} installs, too few to trust percentages.`);
+  L.push("");
+  L.push("FUNNEL (distinct installs; step conversion vs previous step; Wilson 95% CI)");
+  for (const r of rows) {
+    const step = r.stepRate ? ` | step ${fmtPct(r.stepRate.p)} [${fmtPct(r.stepRate.lo)}-${fmtPct(r.stepRate.hi)}]` : r.anomaly ? " | step n/a (more than previous step)" : "";
+    const all = r.overall && r.key !== "installed" ? ` | of installs ${fmtPct(r.overall.p)} [${fmtPct(r.overall.lo)}-${fmtPct(r.overall.hi)}]` : "";
+    L.push(`${r.label}: ${r.n}${step}${all}`);
+  }
+  L.push("");
+  L.push("RETENTION (installs active on or after day N / eligible)");
+  L.push(
+    Object.entries(R.retention).map(([k, v]) => `${k.toUpperCase()} ${v.retained}/${v.eligible}`).join(", ")
+  );
+  L.push("");
+  L.push(line("paywall seen by reason (installs)", listText(R.paywallByReason)));
+  L.push(line("paywall seen by upsell key (installs)", listText(R.paywallByKey)));
+  L.push(line("checkout clicks by plan (installs)", listText(R.checkoutByPlan)));
+  L.push(line("checkout clicks by source (installs)", listText(R.checkoutByFrom)));
+  L.push(line("checkout failures", `${R.diag.checkoutFailedInstalls} installs, ${R.diag.checkoutFailedEvents} events`));
+  L.push("");
+  L.push(line("trial state now (installs)", listText(R.trialState)));
+  L.push(line("platform", listText(R.platform)));
+  L.push(line("language", listText(R.lang)));
+  L.push(line("extension version", listText(R.extVersion)));
+  L.push(line("chrome major", listText(R.chromeMajor)));
+  L.push("");
+  const s = R.summary;
+  L.push(
+    `DAILY COUNTERS (sums): cards ${s.cards}, distinct products/day ${s.products}, searches ${s.searches}, cost entries ${s.costEntries}, calcs ${s.calcs}, anchors missing ${s.anchorsMissing} (${s.cards + s.anchorsMissing > 0 ? fmtPct(s.anchorsMissing / (s.cards + s.anchorsMissing), 1) : "n/a"} of product pages)`
+  );
+  L.push(line("errors (installs/events)", R.errors.length ? R.errors.map((e) => `${e.k} ${e.installs}/${e.n}`).join(", ") : "none"));
+  L.push(
+    line(
+      "uninstall survey",
+      `${R.uninstall.n} answers; median days used ${R.uninstall.medianDays ?? "n/a"}; reasons ${listText(R.uninstall.reasons)}`
+    )
+  );
+  L.push(
+    line("shares and reviews", `share clicks ${R.shares.shareClicks}, review asks shown ${R.shares.reviewShown}, clicked ${R.shares.reviewClicked}, dismissed ${R.shares.reviewDismissed}`)
+  );
+  L.push("");
+  L.push("DIAGNOSIS");
+  const findings = diagnose({ ...R, funnel: F });
+  for (const f of findings) L.push(`- [${f.level}] ${f.text} (${f.numbers})`);
+  return L.join("\n");
+}
+
+// Clearly synthetic data so the layout can be reviewed before real data
+// exists. Deterministic. The page also shows a SAMPLE DATA watermark.
+function demoReport() {
+  const funnel = { installed: 142, active: 118, card_seen: 77, cost_entered: 31, target_price_used: 24, paywall_seen: 19, checkout_click: 5, paid_detected: 2 };
+  return {
+    sample: true,
+    since_days: 30,
+    generated_at: "SAMPLE",
+    installs_per_day: Array.from({ length: 14 }, (_, i) => ({ d: `2026-10-${String(17 + i).padStart(2, "0")}`, n: [3, 5, 4, 8, 6, 2, 3, 7, 9, 5, 4, 6, 8, 5][i] })),
+    funnel,
+    funnel_new: { ...funnel, installed: 120, active: 104, card_seen: 70, cost_entered: 28, target_price_used: 22, paywall_seen: 17, checkout_click: 5, paid_detected: 2 },
+    paywall_by_reason: [{ k: "teaser", n: 17, events: 22 }, { k: "alert", n: 6, events: 8 }, { k: "upsell", n: 9, events: 14 }, { k: "expired-banner", n: 4, events: 4 }, { k: "radar", n: 3, events: 3 }],
+    paywall_by_key: [{ k: "target", n: 17, events: 22 }, { k: "loss", n: 6, events: 8 }, { k: "msi", n: 4, events: 5 }, { k: "sweetspot", n: 3, events: 3 }],
+    checkout_by_plan: [{ k: "pro-monthly", n: 4, events: 5 }, { k: "pro-yearly", n: 1, events: 1 }],
+    checkout_by_from: [{ k: "upsell", n: 3, events: 4 }, { k: "expired-banner", n: 2, events: 2 }],
+    retention: { d0: { eligible: 120, retained: 104 }, d1: { eligible: 111, retained: 48 }, d3: { eligible: 98, retained: 33 }, d7: { eligible: 80, retained: 21 }, d14: { eligible: 52, retained: 11 }, d30: { eligible: 9, retained: 1 } },
+    trial_state: [{ k: "trial", n: 44 }, { k: "expired", n: 58 }, { k: "free", n: 3 }, { k: "paid", n: 2 }],
+    platform: [{ k: "win", n: 96 }, { k: "mac", n: 14 }, { k: "cros", n: 27 }, { k: "android", n: 0 }, { k: "other", n: 5 }],
+    lang: [{ k: "es", n: 101 }, { k: "en", n: 38 }, { k: "pt", n: 3 }],
+    ext_version: [{ k: "1.5.0", n: 120 }, { k: "1.4.3", n: 22 }],
+    chrome_major: [{ k: "141", n: 70 }, { k: "140", n: 41 }, { k: "139", n: 31 }],
+    errors: [{ k: "no_anchor", n: 31, installs: 9 }, { k: "no_price", n: 6, installs: 4 }, { k: "render_fail", n: 1, installs: 1 }],
+    diag: { expired: 58, expired_no_cost: 39, cost_no_paywall: 12, paywall_no_checkout: 14, checkout_no_paid: 3, checkout_failed_installs: 1, checkout_failed_events: 2, card_no_cost: 46 },
+    summary: { cards: 412, products: 196, searches: 88, cost_entries: 133, calcs: 301, anchors_missing: 57, days: 30 },
+    uninstall: { n: 11, median_days: 2, reasons: [{ k: "no_card", n: 4 }, { k: "numbers", n: 2 }, { k: "price", n: 2 }, { k: "not_mx", n: 1 }, { k: "confused", n: 1 }, { k: "other", n: 1 }] },
+    shares: { share_click: 6, review_shown: 9, review_clicked: 2, review_dismissed: 5 }
+  };
+}
+// LIB:END
+
+const $ = (id) => document.getElementById(id);
+const el = (tag, cls, text) => {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text !== undefined) n.textContent = text;
+  return n;
+};
+const UNINSTALL_LABELS = {
+  no_card: "Did not see the card",
+  numbers: "Numbers do not match Mercado Libre",
+  price: "Too expensive",
+  not_mx: "Not a Mexico seller",
+  confused: "Did not understand how to use it",
+  other: "Other"
+};
+let current = null; // normalized report on screen
+
+// --- connection fields (tab-scoped storage only) ---
+const FIELDS = ["url", "key", "secret", "range"];
+for (const f of FIELDS) {
+  try {
+    const v = sessionStorage.getItem("netio-analytics:" + f);
+    if (v) $(f).value = v;
+  } catch { /* storage blocked: fields just start empty */ }
+  $(f).addEventListener("change", () => {
+    try { sessionStorage.setItem("netio-analytics:" + f, $(f).value); } catch { /* ignore */ }
+  });
+}
+
+function showError(msg) {
+  $("error").textContent = msg;
+  $("error").hidden = !msg;
+}
+
+async function fetchReport() {
+  const base = $("url").value.trim().replace(/\/+$/, "");
+  const key = $("key").value.trim();
+  const secret = $("secret").value;
+  if (!/^https:\/\/[a-z0-9.-]+(:\d+)?$/i.test(base) && !/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(base)) {
+    throw new Error("Supabase URL must look like https://xxxx.supabase.co");
+  }
+  if (!key || !secret) throw new Error("Anon key and admin secret are required.");
+  const res = await fetch(base + "/rest/v1/rpc/netio_report", {
+    method: "POST",
+    headers: { apikey: key, Authorization: "Bearer " + key, "Content-Type": "application/json" },
+    body: JSON.stringify({ secret, since: $("range").value + " days" })
+  });
+  const text = await res.text();
+  if (!res.ok) {
+    let detail = text.slice(0, 200);
+    try { detail = JSON.parse(text).message || detail; } catch { /* keep raw */ }
+    throw new Error("HTTP " + res.status + ": " + detail);
+  }
+  return JSON.parse(text);
+}
+
+// --- rendering ---
+function bars(container, items, { total, labelOf = (x) => x.k } = {}) {
+  container.replaceChildren();
+  if (!items.length) { container.append(el("p", "hint", "No data yet.")); return; }
+  const max = Math.max(1, ...items.map((x) => x.n));
+  for (const it of items) {
+    const row = el("div", "bar");
+    const top = el("div", "top");
+    top.append(el("span", "", labelOf(it)));
+    const share = total ? " (" + fmtPct(it.n / total) + ")" : "";
+    top.append(el("span", "", it.n + share));
+    const track = el("div", "track");
+    const fill = el("div", "fill");
+    fill.style.width = Math.max(1, (it.n / max) * 100) + "%";
+    track.append(fill);
+    row.append(top, track);
+    container.append(row);
+  }
+}
+
+function simpleTable(table, head, rows) {
+  table.replaceChildren();
+  const thead = el("tr");
+  head.forEach((h, i) => thead.append(el("th", i ? "num" : "", h)));
+  table.append(thead);
+  if (!rows.length) {
+    const tr = el("tr"); tr.append(el("td", "", "No data yet.")); table.append(tr); return;
+  }
+  for (const r of rows) {
+    const tr = el("tr");
+    r.forEach((c, i) => tr.append(el("td", i ? "num" : "", String(c))));
+    table.append(tr);
+  }
+}
+
+function render() {
+  const R = current;
+  const F = $("cohort").checked ? R.funnelNew : R.funnel;
+  $("report").hidden = false;
+  $("copy").hidden = false;
+  $("watermark").classList.toggle("on", R.sample);
+  const small = isSmallSample(F.installed);
+  $("small").hidden = !small;
+  $("small").textContent = small
+    ? "Too few users to trust: only " + F.installed + " installs in range (about " + SMALL_SAMPLE + "+ needed for stable rates). Read these as individual stories, not percentages."
+    : "";
+
+  // 1. Summary
+  const rows = funnelRows(F);
+  const by = Object.fromEntries(rows.map((r) => [r.key, r]));
+  const cards = $("cards");
+  cards.replaceChildren();
+  const card = (label, value, sub) => {
+    const c = el("div", "card");
+    c.append(el("b", "", value), el("span", "", label));
+    if (sub) c.append(el("small", "", sub));
+    cards.append(c);
+  };
+  const ci = (k, n) => { const w = wilson(k, n); return w ? "95% CI " + fmtPct(w.lo) + " to " + fmtPct(w.hi) : ""; };
+  card("Installs", String(F.installed), R.sample ? "SAMPLE DATA" : "last " + R.sinceDays + " days");
+  card("Active (opened the product)", String(F.active));
+  card("Activation rate (entered a product cost)", F.installed ? fmtPct(Math.min(F.cost_entered, F.installed) / F.installed) : "n/a", ci(F.cost_entered, F.installed));
+  card("Paywall reach (of installs)", F.installed ? fmtPct(Math.min(F.paywall_seen, F.installed) / F.installed) : "n/a", ci(F.paywall_seen, F.installed));
+  card("Checkout clicks", String(F.checkout_click), F.paywall_seen ? ci(F.checkout_click, F.paywall_seen) + " of paywall viewers" : "");
+  card("Paid", String(F.paid_detected), F.installed ? ci(F.paid_detected, F.installed) + " of installs" : "");
+
+  // 2. Funnel
+  const fb = $("funnel");
+  fb.replaceChildren();
+  const top = Math.max(1, F.installed);
+  for (const r of rows) {
+    const row = el("div", "bar");
+    const head = el("div", "top");
+    head.append(el("span", "", r.label));
+    let right = String(r.n);
+    if (r.stepRate) {
+      right += "  |  " + fmtPct(r.stepRate.p) + " of previous [" + fmtPct(r.stepRate.lo) + " to " + fmtPct(r.stepRate.hi) + "], drop " + fmtPct(r.drop);
+    } else if (r.anomaly) {
+      right += "  |  more than previous step (n/a)";
+    }
+    head.append(el("span", "", right));
+    const track = el("div", "track");
+    const fill = el("div", "fill");
+    fill.style.width = Math.max(1, (r.n / top) * 100) + "%";
+    track.append(fill);
+    row.append(head, track);
+    fb.append(row);
+  }
+
+  // 3. Retention
+  const labels = { d0: "Day 0", d1: "Day 1+", d3: "Day 3+", d7: "Day 7+", d14: "Day 14+", d30: "Day 30+" };
+  simpleTable($("retention"), ["Active on or after", "Retained / eligible", "Rate (95% CI)"],
+    Object.entries(R.retention).map(([k, v]) => [labels[k], v.retained + " / " + v.eligible, rateText(v.retained, v.eligible)]));
+
+  // 4. Paywall and checkout
+  bars($("pw-reason"), R.paywallByReason);
+  bars($("pw-key"), R.paywallByKey);
+  bars($("co-plan"), R.checkoutByPlan);
+  bars($("co-from"), R.checkoutByFrom);
+
+  // 5. Segments
+  const seg = $("segments");
+  seg.replaceChildren();
+  for (const [title, list] of [["Platform", R.platform], ["Language", R.lang], ["Extension version", R.extVersion], ["Chrome major", R.chromeMajor]]) {
+    const box = el("div");
+    box.append(el("h2", "tag", title));
+    const b = el("div", "bars");
+    box.append(b);
+    bars(b, list, { total: list.reduce((a, x) => a + x.n, 0) });
+    seg.append(box);
+  }
+
+  // 6. Health
+  simpleTable($("errors"), ["Code", "Installs", "Events"], R.errors.map((e) => [e.k, e.installs, e.n]));
+  const s = R.summary;
+  const pages = s.cards + s.anchorsMissing;
+  simpleTable($("health"), ["Metric", "Value"], [
+    ["Product pages with no price block", pages ? s.anchorsMissing + " of " + pages + " (" + rateText(s.anchorsMissing, pages) + ")" : "n/a"],
+    ["Checkout failures", R.diag.checkoutFailedInstalls + " installs, " + R.diag.checkoutFailedEvents + " events"],
+    ["Cards rendered (sum of daily counters)", s.cards],
+    ["Distinct products per day (sum)", s.products],
+    ["Search pages", s.searches],
+    ["Cost entries", s.costEntries],
+    ["Calculations", s.calcs],
+    ["Trial state now", R.trialState.map((x) => x.k + " " + x.n).join(", ") || "none"],
+    ["Share clicks", R.shares.shareClicks],
+    ["Review ask shown / clicked / dismissed", R.shares.reviewShown + " / " + R.shares.reviewClicked + " / " + R.shares.reviewDismissed]
+  ]);
+
+  // 7. Uninstall
+  bars($("unin"), R.uninstall.reasons, { total: R.uninstall.n, labelOf: (x) => UNINSTALL_LABELS[x.k] || x.k });
+  $("unin-meta").textContent = R.uninstall.n + " answers. Median days used before uninstall: " + (R.uninstall.medianDays ?? "n/a") + ".";
+
+  // 8. Diagnosis
+  const box = $("diag");
+  box.replaceChildren();
+  for (const f of diagnose({ ...R, funnel: F })) {
+    const d = el("div", "finding " + f.level);
+    d.append(el("div", "", f.text), el("div", "nums", f.numbers));
+    box.append(d);
+  }
+}
+
+async function load() {
+  showError("");
+  $("status").textContent = "";
+  try {
+    if ($("demo").checked) {
+      current = normalizeReport(demoReport());
+    } else {
+      $("status").textContent = "Loading...";
+      current = normalizeReport(await fetchReport());
+    }
+    $("status").textContent = current.sample ? "Showing sample data" : "Loaded";
+    render();
+  } catch (err) {
+    $("status").textContent = "";
+    showError(String(err && err.message ? err.message : err));
+  }
+}
+
+$("load").addEventListener("click", load);
+$("demo").addEventListener("change", load);
+$("cohort").addEventListener("change", () => { if (current) render(); });
+$("copy").addEventListener("click", async () => {
+  if (!current) return;
+  const text = reportText(current, { cohort: $("cohort").checked ? "new" : "all" });
+  try {
+    await navigator.clipboard.writeText(text);
+    $("status").textContent = "Report copied. No secrets included.";
+  } catch {
+    const ta = el("textarea"); ta.value = text; document.body.append(ta); ta.select();
+    try { document.execCommand("copy"); $("status").textContent = "Report copied."; } catch { $("status").textContent = "Copy failed; select the text manually."; }
+    ta.remove();
+  }
+});
+</script>
+</body>
+</html>

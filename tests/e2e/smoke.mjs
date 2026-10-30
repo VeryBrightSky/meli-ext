@@ -14,6 +14,7 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { createServer } from "node:https";
+import { createServer as createHttpServer } from "node:http";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -1128,6 +1129,166 @@ try {
   pass("openDashboard opens once, then focuses the existing tab (no tabs permission)");
   for (const pg of await browser.pages()) if (pg.url().startsWith(dashUrl)) await pg.close();
 
+  // ================= PHASE 10: v1.5.0 anonymous funnel analytics ================
+  console.log("\nPHASE 10 — ANALYTICS (dormant by default, mock backend, allowlist, opt-out)");
+  // Mock Supabase REST endpoint with CORS (what the service worker will meet).
+  const received = [];
+  const mock = createHttpServer((req, res) => {
+    const cors = {
+      "access-control-allow-origin": "*",
+      "access-control-allow-headers": "apikey, authorization, content-type, prefer",
+      "access-control-allow-methods": "POST, OPTIONS"
+    };
+    if (req.method === "OPTIONS") {
+      res.writeHead(204, cors);
+      res.end();
+      return;
+    }
+    let body = "";
+    req.on("data", (c) => (body += c));
+    req.on("end", () => {
+      received.push({ url: req.url, headers: req.headers, body });
+      res.writeHead(201, cors);
+      res.end();
+    });
+  });
+  await new Promise((r) => mock.listen(0, "127.0.0.1", r));
+  const mockUrl = `http://127.0.0.1:${mock.address().port}`;
+  const fixtureTitle = "Celular Test Pro 128 GB";
+  const rows = () => received.flatMap((r) => JSON.parse(r.body));
+  const ext = await browser.newPage();
+  await ext.goto(`chrome-extension://${extId}/src/options/options.html`, { waitUntil: "load" });
+  const sendMsg = (msg) => ext.evaluate((m) => chrome.runtime.sendMessage(m), msg);
+  // Known state: never-paid, trial long over, no analytics leftovers.
+  await ext.evaluate(async () => {
+    await chrome.storage.local.remove(["mst:proOverride", "mst:proStatus", "mst:telemetryOverride", "mst:telemetry", "mst:tq", "mst:tlast", "mst:tflags", "mst:tday", "mst:tcounts", "mst:iid", "mst:telemetryNoticeSeen", "mst:metrics"]);
+    await chrome.storage.local.set({ "mst:installedAt": Date.now() - 9 * 24 * 3600 * 1000 });
+  });
+
+  // -- dormant: no override, no build config -> not one request, no analytics UI
+  const dormantPage = tap(await browser.newPage(), "dormant");
+  await dormantPage.goto(PRODUCT_URL, { waitUntil: "load" });
+  await dormantPage.waitForSelector("#mst-card-root", { visible: true, timeout: 20000 });
+  await typeInto(dormantPage, 2, "400");
+  await sendMsg({ type: "telemetryFlush" });
+  await sleep(500);
+  assert.equal(received.length, 0, "dormant build must not contact any analytics endpoint");
+  const dormantState = await sendMsg({ type: "telemetryState", payload: { debug: true } });
+  assert.equal(dormantState.data.configured, false);
+  assert.equal(dormantState.data.queue, 0);
+  assert.ok(dormantState.data.counts.card_seen >= 1, "events still counted locally while dormant");
+  await ext.reload({ waitUntil: "load" });
+  await sleep(500);
+  assert.equal(await ext.$eval("#telemetry-box", (e) => e.hidden), true, "no analytics toggle when dormant");
+  const wel = await browser.newPage();
+  await wel.goto(`chrome-extension://${extId}/src/onboarding/welcome.html`, { waitUntil: "load" });
+  await wel.waitForFunction(() => (document.getElementById("note")?.textContent ?? "").length > 0);
+  assert.equal(await wel.$eval("#tnotice", (e) => e.hidden), true);
+  assert.ok((await wel.$eval("#note", (e) => e.textContent)).includes("no tenemos servidores"), "original no-servers note kept");
+  await wel.close();
+  await dormantPage.close();
+  pass("dormant by default: 0 requests, no toggle, no notice, original privacy note, local counters still count");
+
+  // -- enable via the QA override (stripped from release builds)
+  await ext.evaluate(async (url) => {
+    await chrome.storage.local.set({ "mst:telemetryOverride": { url, key: "anon-test-key" } });
+  }, mockUrl);
+  await ext.reload({ waitUntil: "load" });
+  await ext.waitForFunction(() => !document.getElementById("telemetry-box").hidden, { timeout: 5000 });
+  assert.equal(await ext.$eval("#telemetry-enabled", (c) => c.checked), true, "default on when configured");
+  assert.equal(await ext.$eval("#telemetry-notice", (e) => e.hidden), false, "first-run notice shown once in options");
+  assert.ok((await ext.$eval("#telemetry-notice", (e) => e.textContent)).includes("Ver qué enviamos"));
+  await ext.reload({ waitUntil: "load" });
+  await ext.waitForFunction(() => !document.getElementById("telemetry-box").hidden, { timeout: 5000 });
+  assert.equal(await ext.$eval("#telemetry-notice", (e) => e.hidden), true, "notice is not shown a second time");
+  const wel2 = await browser.newPage();
+  await wel2.goto(`chrome-extension://${extId}/src/onboarding/welcome.html`, { waitUntil: "load" });
+  await wel2.waitForFunction(() => !document.getElementById("tnotice").hidden, { timeout: 5000 });
+  assert.ok((await wel2.$eval("#tnotice", (e) => e.textContent)).includes("Ver qué enviamos"));
+  assert.ok((await wel2.$eval("#tnotice-link", (a) => a.href)).endsWith("/privacidad.html"));
+  await wel2.close();
+  pass("configured: toggle on by default, notice once in options, notice with 'Ver qué enviamos' on welcome");
+
+  // -- drive the funnel
+  const fp = tap(await browser.newPage(), "funnel");
+  await fp.goto(PRODUCT_URL, { waitUntil: "load" });
+  await fp.waitForSelector("#mst-card-root", { visible: true, timeout: 20000 });
+  await typeInto(fp, 2, "400");
+  await fp.waitForSelector(".mst-row--teaser", { visible: true });
+  await fp.click(".mst-row--teaser");
+  await sleep(300);
+  await fp.click(".mst-upsell__cta"); // monthly
+  await sleep(1500);
+  await sendMsg({ type: "telemetryFlush" });
+  await sleep(500);
+  const all = rows();
+  const seen = (event, pred = () => true) => all.some((r) => r.event === event && pred(r.props));
+  assert.ok(seen("install") === false, "no install event: extension was installed before analytics were enabled");
+  assert.ok(seen("active_day", (p) => p.trial_state === "expired" && p.pro === false && p.days_since_install >= 9), "active_day with expired trial");
+  assert.ok(seen("card_seen", (p) => p.page === "catalog"), "card_seen (catalog URL shape)");
+  assert.ok(seen("first_cost_entered"), "first_cost_entered");
+  assert.ok(seen("paywall_seen", (p) => p.reason === "teaser" && p.key === "target"), "paywall_seen teaser/target");
+  assert.ok(seen("paywall_seen", (p) => p.reason === "upsell" && p.key === "target"), "paywall_seen upsell/target");
+  assert.ok(seen("checkout_click", (p) => p.plan === "pro-monthly" && p.from === "upsell"), "checkout_click monthly");
+  assert.ok(seen("trial_expired_seen"), "trial_expired_seen");
+  // Wire format: only allowlisted columns, enum-like props, CORS request from the extension.
+  const COLS = ["chrome_major", "event", "ext_version", "install_id", "lang", "platform", "props"];
+  for (const r of all) {
+    assert.deepEqual(Object.keys(r).sort(), COLS);
+    assert.match(r.install_id, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    assert.equal(r.ext_version, "1.5.0");
+    for (const v of Object.values(r.props)) assert.match(String(v), /^[a-z0-9._:+-]{1,24}$/);
+  }
+  assert.equal(new Set(all.map((r) => r.install_id)).size, 1, "one random install id");
+  const blob = received.map((r) => r.body).join("\n");
+  for (const bad of ["mercadolibre", "mercadopago", "827", "744", "750", "400", fixtureTitle, "Celular", "MLM", "http", "$"]) {
+    assert.ok(!blob.toLowerCase().includes(bad.toLowerCase()), `payload must not contain "${bad}"`);
+  }
+  const h = received[0].headers;
+  assert.equal(h.apikey, "anon-test-key");
+  assert.equal(h.authorization, "Bearer anon-test-key");
+  assert.equal(h.prefer, "return=minimal");
+  assert.ok((h.origin ?? "").startsWith("chrome-extension://"), `origin ${h.origin}`);
+  assert.equal(received[0].url, "/rest/v1/events");
+  pass(`funnel rows reach the mock with CORS (${all.length} rows): only allowlisted keys, no URL/price/title/listing id`);
+
+  // -- debug diagnostic is visible
+  await ext.goto(`chrome-extension://${extId}/src/options/options.html?debug`, { waitUntil: "load" });
+  await ext.waitForFunction(() => /last send 20\d ok/.test(document.getElementById("telemetry-debug")?.textContent ?? ""), { timeout: 5000 });
+  pass("options ?debug shows host, queue and last send status (201 ok)");
+
+  // -- opt out via the UI: queue cleared, nothing more is sent
+  await fp.bringToFront();
+  await typeInto(fp, 2, "401");
+  await ext.bringToFront();
+  const sentBefore = received.length;
+  await ext.click("#telemetry-enabled");
+  await sleep(500);
+  let st = await sendMsg({ type: "telemetryState", payload: { debug: true } });
+  assert.equal(st.data.enabled, false);
+  assert.equal(st.data.queue, 0, "opt-out clears the queue");
+  await fp.bringToFront();
+  await typeInto(fp, 2, "402");
+  await fp.reload({ waitUntil: "load" });
+  await fp.waitForSelector("#mst-card-root", { visible: true, timeout: 20000 });
+  await sendMsg({ type: "telemetryFlush" });
+  await sleep(500);
+  assert.equal(received.length, sentBefore, "no request after opt-out");
+  st = await sendMsg({ type: "telemetryState", payload: { debug: true } });
+  assert.equal(st.data.queue, 0);
+  pass("opt-out: queue cleared, zero further requests");
+
+  // -- release-style dormancy again: override removed -> still nothing
+  await ext.evaluate(() => chrome.storage.local.remove("mst:telemetryOverride"));
+  await sendMsg({ type: "telemetryFlush" });
+  await sleep(300);
+  assert.equal(received.length, sentBefore);
+  pass("override removed: telemetry dormant again");
+  await fp.close();
+  await ext.close();
+  mock.close();
+
+  // (runs before the reload test: headless Chrome cannot re-register the extension after runtime.reload)
   // Extension reloaded under an open tab: the orphaned card says so and the
   // button brings the page back with the new version.
   const sw = await browser.waitForTarget((t) => t.type() === "service_worker" && t.url().startsWith("chrome-extension://"));
@@ -1151,6 +1312,7 @@ try {
   pass("Recargar reloads the page (stale notice gone)");
   await upPage.close();
   await opener.close().catch(() => {});
+
 
   console.log(`\nE2E: ${passed.length}/${passed.length} checks passed`);
 } finally {

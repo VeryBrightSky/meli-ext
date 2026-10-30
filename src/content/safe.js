@@ -16,7 +16,24 @@ globalThis.MST_SAFE = (() => {
   const LOG_THROTTLE_MS = 60 * 1000;
   const lastLog = new Map();
 
+  // Anonymous error code for the funnel analytics (enum only, never the
+  // message or stack). An orphaned context cannot message the worker, so
+  // "context invalidated" is not reportable from here by design.
+  function codeFor(label) {
+    const l = String(label);
+    if (l.startsWith("uncaught@") || l === "unhandledrejection") return "uncaught";
+    if (l.startsWith("page-data")) return "parse_fail";
+    if (l.startsWith("card")) return l === "card-recover" ? "route_fail" : "render_fail";
+    if (/quick|strip|export-bar/.test(l)) return "quickview_fail";
+    return "route_fail";
+  }
+
   function report(label, err) {
+    try {
+      globalThis.MST_TRACK?.error(codeFor(label));
+    } catch {
+      // analytics must never break error reporting
+    }
     const now = Date.now();
     const prev = lastLog.get(label) ?? 0;
     if (now - prev < LOG_THROTTLE_MS) return;

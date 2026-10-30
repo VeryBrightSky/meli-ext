@@ -13,6 +13,8 @@ globalThis.MST_CARD = (() => {
   const UI = globalThis.MST_UI;
   const T = globalThis.MST_I18N.t;
   const SAFE = globalThis.MST_SAFE;
+  // Anonymous funnel events (typed, allowlisted in the service worker).
+  const TRACK = globalThis.MST_TRACK;
   // Hard ceiling for any typed money/percent value (mirrors CALC's clamp).
   const MAX_INPUT = 1e9;
 
@@ -176,7 +178,10 @@ globalThis.MST_CARD = (() => {
     input.placeholder = "0.00";
     input.className = `${PREFIX}-input`;
 
-    const apply = () => onValue(Math.min(CALC.parseMoney(input.value), MAX_INPUT));
+    const apply = () => {
+      TRACK.count("calcs"); // a committed (debounced) edit, never a keystroke
+      onValue(Math.min(CALC.parseMoney(input.value), MAX_INPUT));
+    };
     const debouncedApply = debounced(apply);
 
     input.addEventListener("input", debouncedApply);
@@ -385,6 +390,7 @@ globalThis.MST_CARD = (() => {
       // A render failure must never leave inputs dead mid-typing; log once
       // and keep the last consistent view.
       console.warn(`[${BRAND.name}] card update failed (keeping last view):`, err);
+      TRACK.error("render_fail");
     }
   }
 
@@ -429,6 +435,7 @@ globalThis.MST_CARD = (() => {
     // Full mode and no service-cost row for this weight/price: say so instead
     // of showing a net that silently counts the missing fee as $0.
     if (quote.fixedCostUnavailable) {
+      TRACK.error("fee_unavailable");
       renderUnavailable(quote, b);
       return;
     }
@@ -468,6 +475,8 @@ globalThis.MST_CARD = (() => {
     });
     refs.sweetspot.style.display = spot ? "" : "none";
     if (spot) {
+      TRACK.once("first_sweetspot_seen");
+      if (!pro) TRACK.once("paywall_seen", { reason: "teaser", key: "sweetspot" });
       refs.sweetspot.textContent = pro
         ? T("sweetSpot", [fmtMoney(spot.targetPriceMXN), fmtMoney(spot.netGainMXN)])
         : T("sweetSpotTeaser", [fmtMoney(spot.netGainMXN)]);
@@ -581,6 +590,7 @@ globalThis.MST_CARD = (() => {
       const show = state.listingTypeId === "premium" && b.profitMinMXN !== undefined;
       refs.msiTeaser.root.style.display = show ? "" : "none";
       if (show) {
+        TRACK.once("paywall_seen", { reason: "teaser", key: "msi" });
         const cost = CALC.msiCost(state.priceMXN, msiReferencePct(teaserTerm));
         const after = CALC.round2(b.profitMinMXN - cost);
         refs.msiTeaser.set(T("msiTeaser", [String(teaserTerm), fmtMoney(after)]));
@@ -612,6 +622,7 @@ globalThis.MST_CARD = (() => {
     refs.isr.root.style.display = showW ? "" : "none";
     refs.netAfter.root.style.display = showW ? "" : "none";
     refs.withholdingsHint.style.display = showW ? "" : "none";
+    refs.withholdingsRfc.style.display = showW ? "" : "none";
     if (showW) {
       const w = CALC.computeWithholdings(state.priceMXN, SOURCE.withholdings);
       patchRow(refs.iva, null, fmtCharge(w.ivaMXN), flash);
@@ -715,6 +726,7 @@ globalThis.MST_CARD = (() => {
       const teaserPct = Math.max(state.targetMarginPct || 0, DEFAULT_TEASER_MARGIN_PCT);
       refs.targetTeaser.root.style.display = hasCost ? "" : "none";
       if (hasCost) {
+        TRACK.once("paywall_seen", { reason: "teaser", key: "target" });
         const hi = solve(quote.pctMax, teaserPct);
         const text = hi !== null ? fmtMoney(hi) : T("targetUnreachable");
         refs.targetTeaser.label.textContent = T("rowTargetTeaser", [String(teaserPct)]);
@@ -727,9 +739,11 @@ globalThis.MST_CARD = (() => {
         const losing = b.profitMaxMXN < 0;
         const thin = !losing && b.marginMinPct < THIN_MARGIN_PCT;
         if (losing) {
+          TRACK.once("paywall_seen", { reason: "alert", key: "loss" });
           refs.alert.show(T("alertLoss", [fmtMoney(-b.profitMaxMXN), String(teaserPct)]), "loss");
           refs.alert.reason = ["loss", [fmtMoney(-b.profitMaxMXN), String(teaserPct)]];
         } else if (thin) {
+          TRACK.once("paywall_seen", { reason: "alert", key: "target" });
           refs.alert.show(T("alertThin", [String(b.marginMinPct), String(teaserPct)]), "thin");
           refs.alert.reason = ["target", refs.targetTeaser.vars];
         } else {
@@ -872,11 +886,13 @@ globalThis.MST_CARD = (() => {
         ask.remove();
         save("local", { [REVIEW_KEY]: how });
         globalThis.MST_GATE.track(`review:${how}`);
+        TRACK.event("review_ask", { state: how });
       };
       link.addEventListener("click", () => done("clicked"));
       close.addEventListener("click", () => done("dismissed"));
       ask.append(link, close);
       refs.summary.after(ask);
+      TRACK.once("review_ask", { state: "shown" });
     }).catch(() => {});
 
     // What-if price: editable, pre-filled from the page; reset link restores.
@@ -1238,6 +1254,9 @@ globalThis.MST_CARD = (() => {
     body.appendChild(refs.netAfter.root);
     refs.withholdingsHint = el("div", `${PREFIX}-hint`, T("withholdingsHint"));
     body.appendChild(refs.withholdingsHint);
+    // The rates above assume an RFC registered with Mercado Libre.
+    refs.withholdingsRfc = el("div", `${PREFIX}-hint`, T("withholdingsRfcNote"));
+    body.appendChild(refs.withholdingsRfc);
 
     // Sweet-spot nudge: clicking applies the suggested what-if price.
     refs.sweetspot = el("button", `${PREFIX}-sweetspot`, "");
@@ -1265,6 +1284,10 @@ globalThis.MST_CARD = (() => {
         state.productCostMXN = v;
         update();
         persistInputs();
+        if (v > 0) {
+          TRACK.once("first_cost_entered");
+          TRACK.count("cost_entries");
+        }
       }
     );
     refs.costInput.setAttribute("aria-label", T("inputProductCostAria"));
@@ -1307,6 +1330,7 @@ globalThis.MST_CARD = (() => {
           state.targetMarginPct = Math.min(v, 99);
           update();
           persistInputs();
+          if (v > 0) TRACK.once("first_target_price_used");
         }
       );
       refs.marginInput.setAttribute("aria-label", T("inputMarginAria"));
@@ -1394,6 +1418,7 @@ globalThis.MST_CARD = (() => {
     refs.shareBtn.addEventListener("click", () => {
       refs.shareBtn.href = buildShareUrl();
       globalThis.MST_GATE.track("click:share");
+      TRACK.event("share_click", { where: "card" });
     });
     refs.summary.appendChild(refs.shareBtn);
 
@@ -1416,7 +1441,8 @@ globalThis.MST_CARD = (() => {
       refs.iva?.root,
       refs.isr?.root,
       refs.netAfter?.root,
-      refs.withholdingsHint
+      refs.withholdingsHint,
+      refs.withholdingsRfc
     ].filter(Boolean);
     const shipRowEl = refs.shippingInput.closest(`.${PREFIX}-row`);
     shipRowEl.before(details);
@@ -1620,6 +1646,7 @@ globalThis.MST_CARD = (() => {
     }).catch((err) => {
       // storage unavailable (extension reloaded): keep the page-price view
       console.warn(`[${BRAND.name}] could not restore saved inputs:`, err);
+      if (SAFE.alive()) TRACK.error("storage_fail");
     });
     return card;
   }

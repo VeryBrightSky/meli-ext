@@ -214,7 +214,16 @@ globalThis.MST_MESSAGES = Object.freeze({
     "optResetConfirm": "¿Borrar todos tus costos, ventas e historial de precios? No se puede deshacer.",
     "staleNotice": "Netio se actualizó. Recarga la página para seguir.",
     "staleReload": "Recargar",
-    "feeUnavailable": "No disponible para este peso"
+    "feeUnavailable": "No disponible para este peso",
+    "optTelemetry": "Compartir estadísticas anónimas de uso",
+    "optTelemetryHint": "Enviamos solo contadores anónimos: qué funciones se usan, errores y la versión. Nunca enviamos URLs, precios, costos, títulos de publicaciones ni tu correo. Puedes desactivarlo cuando quieras.",
+    "optTelemetryDebug": "Diagnóstico de estadísticas",
+    "telemetryNotice": "Netio envía estadísticas anónimas de uso para mejorar. No incluyen precios, costos ni las páginas que visitas.",
+    "telemetryNoticeLink": "Ver qué enviamos",
+    "telemetryNoticeOff": "Desactivar",
+    "telemetryOffDone": "Listo, ya no enviamos nada.",
+    "welcomeNoteTelemetry": "Tus costos y productos se guardan en tu navegador; no vemos tus precios ni las páginas que visitas. Solo enviamos contadores anónimos de uso (puedes desactivarlos) y el pago de PRO pasa por ExtensionPay.",
+    "withholdingsRfcNote": "Las tasas suponen que tienes RFC registrado. Sin RFC la retención puede ser mayor."
   },
   "en": {
     "cardTitle": "Profit calculator",
@@ -429,6 +438,15 @@ globalThis.MST_MESSAGES = Object.freeze({
     "optResetConfirm": "Delete all saved costs, sales and price history? This can't be undone.",
     "staleNotice": "Netio was updated. Reload the page to continue.",
     "staleReload": "Reload",
-    "feeUnavailable": "Not available for this weight"
+    "feeUnavailable": "Not available for this weight",
+    "optTelemetry": "Share anonymous usage statistics",
+    "optTelemetryHint": "We only send anonymous counters: which features are used, errors and the version. We never send URLs, prices, costs, listing titles or your email. You can turn it off any time.",
+    "optTelemetryDebug": "Statistics diagnostics",
+    "telemetryNotice": "Netio sends anonymous usage statistics to improve. They never include prices, costs or the pages you visit.",
+    "telemetryNoticeLink": "See what we send",
+    "telemetryNoticeOff": "Turn off",
+    "telemetryOffDone": "Done, nothing is sent anymore.",
+    "welcomeNoteTelemetry": "Your costs and products are saved in your browser; we never see your prices or the pages you visit. We only send anonymous usage counters (you can turn them off) and the PRO payment goes through ExtensionPay.",
+    "withholdingsRfcNote": "Rates assume you have an RFC registered. Without an RFC, withholding can be higher."
   }
 });

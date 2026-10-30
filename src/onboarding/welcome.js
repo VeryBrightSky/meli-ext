@@ -26,7 +26,34 @@
   const share = document.getElementById("share");
   share.textContent = T("btnShareApp");
   share.href = `https://wa.me/?text=${encodeURIComponent(T("shareText", [BRAND.shareUrl("welcome")]))}`;
-  share.addEventListener("click", () => globalThis.MST_GATE.track("click:share"));
+  share.addEventListener("click", () => {
+    globalThis.MST_GATE.track("click:share");
+    globalThis.MST_TRACK.event("share_click", { where: "welcome" });
+  });
   document.getElementById("note").textContent = T("welcomeNote");
   globalThis.MST_GATE.track("seen:welcome");
+
+  // Anonymous analytics notice: only when a backend is configured in this
+  // build (the default build is dormant and keeps the original note).
+  const tstate = await globalThis.MST_TRACK.state();
+  if (tstate?.configured) {
+    document.getElementById("note").textContent = T("welcomeNoteTelemetry");
+    const box = document.getElementById("tnotice");
+    document.getElementById("tnotice-text").textContent = T("telemetryNotice");
+    const link = document.getElementById("tnotice-link");
+    link.textContent = T("telemetryNoticeLink");
+    link.href = `${BRAND.landingUrl}/privacidad.html`;
+    const off = document.getElementById("tnotice-off");
+    off.textContent = tstate.enabled ? T("telemetryNoticeOff") : T("telemetryOffDone");
+    off.disabled = !tstate.enabled;
+    off.addEventListener("click", async () => {
+      const res = await globalThis.MST_TRACK.setEnabled(false);
+      if (res) {
+        off.textContent = T("telemetryOffDone");
+        off.disabled = true;
+      }
+    });
+    box.hidden = false;
+  }
+  globalThis.MST_TRACK.event("welcome_seen");
 })();

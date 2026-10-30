@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src https: http://localhost:* http://127.0.0.1:*; img-src data:; base-uri 'none'; form-action 'none'" />
+<meta name="robots" content="noindex,nofollow" />
+<meta name="color-scheme" content="light dark" />
+<title>Netio analytics (private)</title>
+<style>
+:root {
+  --bg: #f6f7fb; --panel: #ffffff; --ink: #14172e; --muted: #5d6384; --line: #e2e5f1;
+  --accent: #2d3277; --good: #0a8f4a; --warn: #b26a00; --bad: #c62839; --bar: #4a56dc; --bar2: #cfd3f3;
+  --chip: #eef0fb;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #11132a; --panel: #1a1d3b; --ink: #eceefb; --muted: #9ba0c9; --line: #2b2f57;
+    --accent: #8f98ff; --good: #38d27f; --warn: #f0b04a; --bad: #ff6b7a; --bar: #7b86ff; --bar2: #2b2f57;
+    --chip: #23274d;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+main { max-width: 980px; margin: 0 auto; padding: 16px; }
+h1 { font-size: 22px; margin: 4px 0 2px; }
+h2 { font-size: 16px; margin: 0 0 10px; }
+.sub { color: var(--muted); font-size: 13px; margin: 0 0 14px; }
+section, .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px; margin: 0 0 14px; }
+label { display: block; font-size: 12px; color: var(--muted); margin: 8px 0 3px; }
+input, select { width: 100%; font: inherit; padding: 9px 10px; border-radius: 9px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
+.row { display: grid; gap: 10px; grid-template-columns: 1fr; }
+@media (min-width: 720px) { .row { grid-template-columns: 1.4fr 1.4fr 1fr 0.6fr; } }
+button { font: inherit; font-weight: 600; padding: 9px 14px; border-radius: 9px; border: 1px solid var(--accent); background: var(--accent); color: #fff; cursor: pointer; }
+@media (prefers-color-scheme: dark) { button { color: #0e1030; } }
+button.ghost { background: transparent; color: var(--accent); }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
+.check { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; color: var(--muted); margin: 0; }
+.check input { width: auto; }
+.cards { display: grid; gap: 10px; grid-template-columns: repeat(2, 1fr); }
+@media (min-width: 720px) { .cards { grid-template-columns: repeat(3, 1fr); } }
+.card { background: var(--chip); border-radius: 12px; padding: 10px 12px; }
+.card b { display: block; font-size: 24px; line-height: 1.15; }
+.card span { font-size: 12px; color: var(--muted); }
+.card small { display: block; font-size: 11px; color: var(--muted); margin-top: 2px; }
+.banner { border-radius: 12px; padding: 10px 12px; margin: 0 0 14px; font-size: 14px; border: 1px solid var(--warn); color: var(--warn); background: transparent; }
+.banner.err { border-color: var(--bad); color: var(--bad); }
+.bars { display: grid; gap: 8px; }
+.bar { display: grid; gap: 3px; }
+.bar .top { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; flex-wrap: wrap; }
+.bar .top span:last-child { color: var(--muted); text-align: right; }
+.track { background: var(--bar2); border-radius: 6px; height: 12px; overflow: hidden; }
+.fill { background: var(--bar); height: 100%; border-radius: 6px; min-width: 2px; }
+.hint { color: var(--muted); font-size: 12px; margin: 6px 0 0; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 6px 4px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--muted); font-weight: 600; font-size: 12px; }
+td.num, th.num { text-align: right; white-space: nowrap; }
+.two { display: grid; gap: 14px; grid-template-columns: 1fr; }
+@media (min-width: 720px) { .two { grid-template-columns: 1fr 1fr; } }
+.finding { border-left: 4px solid var(--muted); padding: 6px 10px; margin: 8px 0; background: var(--chip); border-radius: 0 10px 10px 0; }
+.finding.high { border-color: var(--bad); } .finding.medium { border-color: var(--warn); } .finding.info { border-color: var(--accent); }
+.finding .nums { color: var(--muted); font-size: 12px; margin-top: 2px; }
+.tag { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.watermark { position: fixed; inset: 0; pointer-events: none; z-index: 5; display: none; align-items: center; justify-content: center; }
+.watermark.on { display: flex; }
+.watermark span { transform: rotate(-24deg); font-size: clamp(28px, 8vw, 84px); font-weight: 900; color: var(--bad); opacity: .16; text-align: center; line-height: 1.1; }
+.sample-note { color: var(--bad); font-weight: 700; }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div class="watermark" id="watermark" aria-hidden="true"><span>SAMPLE DATA,<br />NOT REAL</span></div>
+<main>
+  <h1>Netio analytics</h1>
+  <p class="sub">Private dashboard. Talks only to the Supabase URL you type below. Nothing is stored except in this tab.</p>
+
+  <div class="panel" id="connect">
+    <div class="row">
+      <div><label for="url">Supabase URL</label><input id="url" type="url" placeholder="https://xxxx.supabase.co" autocomplete="off" /></div>
+      <div><label for="key">Anon key</label><input id="key" type="password" placeholder="eyJ..." autocomplete="off" /></div>
+      <div><label for="secret">Admin secret</label><input id="secret" type="password" autocomplete="off" /></div>
+      <div><label for="range">Range</label>
+        <select id="range"><option value="7">7 days</option><option value="30" selected>30 days</option><option value="90">90 days</option></select></div>
+    </div>
+    <div class="actions">
+      <button id="load" type="button">Load</button>
+      <label class="check"><input id="demo" type="checkbox" /> Demo (sample data)</label>
+      <label class="check"><input id="cohort" type="checkbox" /> New installs only</label>
+      <button id="copy" type="button" class="ghost" hidden>Copy report</button>
+      <span class="hint" id="status" role="status"></span>
+    </div>
+  </div>
+
+  <div class="banner err" id="error" hidden></div>
+  <div class="banner" id="small" hidden></div>
+
+  <div id="report" hidden>
+    <section id="s-summary"><h2>1. Summary</h2><div class="cards" id="cards"></div></section>
+    <section id="s-funnel"><h2>2. Funnel</h2><div class="bars" id="funnel"></div>
+      <p class="hint">Each bar is distinct installs that reached the step. Percentages show step conversion vs the previous step with a Wilson 95% interval in brackets.</p></section>
+    <section id="s-retention"><h2>3. Retention</h2><table id="retention"></table>
+      <p class="hint">Share of new installs, old enough to be measured, that were active on or after day N.</p></section>
+    <section id="s-paywall"><h2>4. Paywall and checkout</h2><div class="two">
+      <div><h2 class="tag">Paywall seen, by reason (installs)</h2><div class="bars" id="pw-reason"></div></div>
+      <div><h2 class="tag">Paywall seen, by upsell key (installs)</h2><div class="bars" id="pw-key"></div></div>
+      <div><h2 class="tag">Checkout clicks, by plan (installs)</h2><div class="bars" id="co-plan"></div></div>
+      <div><h2 class="tag">Checkout clicks, by source (installs)</h2><div class="bars" id="co-from"></div></div></div></section>
+    <section id="s-seg"><h2>5. Segments (latest value per install)</h2><div class="two" id="segments"></div></section>
+    <section id="s-health"><h2>6. Health</h2><div class="two">
+      <div><h2 class="tag">Errors</h2><table id="errors"></table></div>
+      <div><h2 class="tag">Other health numbers</h2><table id="health"></table></div></div></section>
+    <section id="s-unin"><h2>7. Uninstall reasons</h2><div class="bars" id="unin"></div><p class="hint" id="unin-meta"></p></section>
+    <section id="s-diag"><h2>8. Diagnosis</h2><div id="diag"></div></section>
+  </div>
+</main>
+
+<script>
+"use strict";
+// LIB:BEGIN
+// LIB:END
+
+const $ = (id) => document.getElementById(id);
+const el = (tag, cls, text) => {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text !== undefined) n.textContent = text;
+  return n;
+};
+const UNINSTALL_LABELS = {
+  no_card: "Did not see the card",
+  numbers: "Numbers do not match Mercado Libre",
+  price: "Too expensive",
+  not_mx: "Not a Mexico seller",
+  confused: "Did not understand how to use it",
+  other: "Other"
+};
+let current = null; // normalized report on screen
+
+// --- connection fields (tab-scoped storage only) ---
+const FIELDS = ["url", "key", "secret", "range"];
+for (const f of FIELDS) {
+  try {
+    const v = sessionStorage.getItem("netio-analytics:" + f);
+    if (v) $(f).value = v;
+  } catch { /* storage blocked: fields just start empty */ }
+  $(f).addEventListener("change", () => {
+    try { sessionStorage.setItem("netio-analytics:" + f, $(f).value); } catch { /* ignore */ }
+  });
+}
+
+function showError(msg) {
+  $("error").textContent = msg;
+  $("error").hidden = !msg;
+}
+
+async function fetchReport() {
+  const base = $("url").value.trim().replace(/\/+$/, "");
+  const key = $("key").value.trim();
+  const secret = $("secret").value;
+  if (!/^https:\/\/[a-z0-9.-]+(:\d+)?$/i.test(base) && !/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(base)) {
+    throw new Error("Supabase URL must look like https://xxxx.supabase.co");
+  }
+  if (!key || !secret) throw new Error("Anon key and admin secret are required.");
+  const res = await fetch(base + "/rest/v1/rpc/netio_report", {
+    method: "POST",
+    headers: { apikey: key, Authorization: "Bearer " + key, "Content-Type": "application/json" },
+    body: JSON.stringify({ secret, since: $("range").value + " days" })
+  });
+  const text = await res.text();
+  if (!res.ok) {
+    let detail = text.slice(0, 200);
+    try { detail = JSON.parse(text).message || detail; } catch { /* keep raw */ }
+    throw new Error("HTTP " + res.status + ": " + detail);
+  }
+  return JSON.parse(text);
+}
+
+// --- rendering ---
+function bars(container, items, { total, labelOf = (x) => x.k } = {}) {
+  container.replaceChildren();
+  if (!items.length) { container.append(el("p", "hint", "No data yet.")); return; }
+  const max = Math.max(1, ...items.map((x) => x.n));
+  for (const it of items) {
+    const row = el("div", "bar");
+    const top = el("div", "top");
+    top.append(el("span", "", labelOf(it)));
+    const share = total ? " (" + fmtPct(it.n / total) + ")" : "";
+    top.append(el("span", "", it.n + share));
+    const track = el("div", "track");
+    const fill = el("div", "fill");
+    fill.style.width = Math.max(1, (it.n / max) * 100) + "%";
+    track.append(fill);
+    row.append(top, track);
+    container.append(row);
+  }
+}
+
+function simpleTable(table, head, rows) {
+  table.replaceChildren();
+  const thead = el("tr");
+  head.forEach((h, i) => thead.append(el("th", i ? "num" : "", h)));
+  table.append(thead);
+  if (!rows.length) {
+    const tr = el("tr"); tr.append(el("td", "", "No data yet.")); table.append(tr); return;
+  }
+  for (const r of rows) {
+    const tr = el("tr");
+    r.forEach((c, i) => tr.append(el("td", i ? "num" : "", String(c))));
+    table.append(tr);
+  }
+}
+
+function render() {
+  const R = current;
+  const F = $("cohort").checked ? R.funnelNew : R.funnel;
+  $("report").hidden = false;
+  $("copy").hidden = false;
+  $("watermark").classList.toggle("on", R.sample);
+  const small = isSmallSample(F.installed);
+  $("small").hidden = !small;
+  $("small").textContent = small
+    ? "Too few users to trust: only " + F.installed + " installs in range (about " + SMALL_SAMPLE + "+ needed for stable rates). Read these as individual stories, not percentages."
+    : "";
+
+  // 1. Summary
+  const rows = funnelRows(F);
+  const by = Object.fromEntries(rows.map((r) => [r.key, r]));
+  const cards = $("cards");
+  cards.replaceChildren();
+  const card = (label, value, sub) => {
+    const c = el("div", "card");
+    c.append(el("b", "", value), el("span", "", label));
+    if (sub) c.append(el("small", "", sub));
+    cards.append(c);
+  };
+  const ci = (k, n) => { const w = wilson(k, n); return w ? "95% CI " + fmtPct(w.lo) + " to " + fmtPct(w.hi) : ""; };
+  card("Installs", String(F.installed), R.sample ? "SAMPLE DATA" : "last " + R.sinceDays + " days");
+  card("Active (opened the product)", String(F.active));
+  card("Activation rate (entered a product cost)", F.installed ? fmtPct(Math.min(F.cost_entered, F.installed) / F.installed) : "n/a", ci(F.cost_entered, F.installed));
+  card("Paywall reach (of installs)", F.installed ? fmtPct(Math.min(F.paywall_seen, F.installed) / F.installed) : "n/a", ci(F.paywall_seen, F.installed));
+  card("Checkout clicks", String(F.checkout_click), F.paywall_seen ? ci(F.checkout_click, F.paywall_seen) + " of paywall viewers" : "");
+  card("Paid", String(F.paid_detected), F.installed ? ci(F.paid_detected, F.installed) + " of installs" : "");
+
+  // 2. Funnel
+  const fb = $("funnel");
+  fb.replaceChildren();
+  const top = Math.max(1, F.installed);
+  for (const r of rows) {
+    const row = el("div", "bar");
+    const head = el("div", "top");
+    head.append(el("span", "", r.label));
+    let right = String(r.n);
+    if (r.stepRate) {
+      right += "  |  " + fmtPct(r.stepRate.p) + " of previous [" + fmtPct(r.stepRate.lo) + " to " + fmtPct(r.stepRate.hi) + "], drop " + fmtPct(r.drop);
+    } else if (r.anomaly) {
+      right += "  |  more than previous step (n/a)";
+    }
+    head.append(el("span", "", right));
+    const track = el("div", "track");
+    const fill = el("div", "fill");
+    fill.style.width = Math.max(1, (r.n / top) * 100) + "%";
+    track.append(fill);
+    row.append(head, track);
+    fb.append(row);
+  }
+
+  // 3. Retention
+  const labels = { d0: "Day 0", d1: "Day 1+", d3: "Day 3+", d7: "Day 7+", d14: "Day 14+", d30: "Day 30+" };
+  simpleTable($("retention"), ["Active on or after", "Retained / eligible", "Rate (95% CI)"],
+    Object.entries(R.retention).map(([k, v]) => [labels[k], v.retained + " / " + v.eligible, rateText(v.retained, v.eligible)]));
+
+  // 4. Paywall and checkout
+  bars($("pw-reason"), R.paywallByReason);
+  bars($("pw-key"), R.paywallByKey);
+  bars($("co-plan"), R.checkoutByPlan);
+  bars($("co-from"), R.checkoutByFrom);
+
+  // 5. Segments
+  const seg = $("segments");
+  seg.replaceChildren();
+  for (const [title, list] of [["Platform", R.platform], ["Language", R.lang], ["Extension version", R.extVersion], ["Chrome major", R.chromeMajor]]) {
+    const box = el("div");
+    box.append(el("h2", "tag", title));
+    const b = el("div", "bars");
+    box.append(b);
+    bars(b, list, { total: list.reduce((a, x) => a + x.n, 0) });
+    seg.append(box);
+  }
+
+  // 6. Health
+  simpleTable($("errors"), ["Code", "Installs", "Events"], R.errors.map((e) => [e.k, e.installs, e.n]));
+  const s = R.summary;
+  const pages = s.cards + s.anchorsMissing;
+  simpleTable($("health"), ["Metric", "Value"], [
+    ["Product pages with no price block", pages ? s.anchorsMissing + " of " + pages + " (" + rateText(s.anchorsMissing, pages) + ")" : "n/a"],
+    ["Checkout failures", R.diag.checkoutFailedInstalls + " installs, " + R.diag.checkoutFailedEvents + " events"],
+    ["Cards rendered (sum of daily counters)", s.cards],
+    ["Distinct products per day (sum)", s.products],
+    ["Search pages", s.searches],
+    ["Cost entries", s.costEntries],
+    ["Calculations", s.calcs],
+    ["Trial state now", R.trialState.map((x) => x.k + " " + x.n).join(", ") || "none"],
+    ["Share clicks", R.shares.shareClicks],
+    ["Review ask shown / clicked / dismissed", R.shares.reviewShown + " / " + R.shares.reviewClicked + " / " + R.shares.reviewDismissed]
+  ]);
+
+  // 7. Uninstall
+  bars($("unin"), R.uninstall.reasons, { total: R.uninstall.n, labelOf: (x) => UNINSTALL_LABELS[x.k] || x.k });
+  $("unin-meta").textContent = R.uninstall.n + " answers. Median days used before uninstall: " + (R.uninstall.medianDays ?? "n/a") + ".";
+
+  // 8. Diagnosis
+  const box = $("diag");
+  box.replaceChildren();
+  for (const f of diagnose({ ...R, funnel: F })) {
+    const d = el("div", "finding " + f.level);
+    d.append(el("div", "", f.text), el("div", "nums", f.numbers));
+    box.append(d);
+  }
+}
+
+async function load() {
+  showError("");
+  $("status").textContent = "";
+  try {
+    if ($("demo").checked) {
+      current = normalizeReport(demoReport());
+    } else {
+      $("status").textContent = "Loading...";
+      current = normalizeReport(await fetchReport());
+    }
+    $("status").textContent = current.sample ? "Showing sample data" : "Loaded";
+    render();
+  } catch (err) {
+    $("status").textContent = "";
+    showError(String(err && err.message ? err.message : err));
+  }
+}
+
+$("load").addEventListener("click", load);
+$("demo").addEventListener("change", load);
+$("cohort").addEventListener("change", () => { if (current) render(); });
+$("copy").addEventListener("click", async () => {
+  if (!current) return;
+  const text = reportText(current, { cohort: $("cohort").checked ? "new" : "all" });
+  try {
+    await navigator.clipboard.writeText(text);
+    $("status").textContent = "Report copied. No secrets included.";
+  } catch {
+    const ta = el("textarea"); ta.value = text; document.body.append(ta); ta.select();
+    try { document.execCommand("copy"); $("status").textContent = "Report copied."; } catch { $("status").textContent = "Copy failed; select the text manually."; }
+    ta.remove();
+  }
+});
+</script>
+</body>
+</html>

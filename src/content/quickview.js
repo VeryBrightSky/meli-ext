@@ -370,6 +370,7 @@ globalThis.MST_QUICKVIEW = (() => {
   }
 
   function downloadCsv() {
+    globalThis.MST_TRACK.event("csv_export");
     const blob = new Blob([buildCsv()], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -454,6 +455,11 @@ globalThis.MST_QUICKVIEW = (() => {
     const summaryEl = document.querySelector(`.${PREFIX}-radar--preview .${PREFIX}-radar__summary`);
     if (!summaryEl) return;
     const c = previewCounts();
+    if (c.total > 0) {
+      // Anonymous funnel: the free seller was shown the locked Radar preview.
+      globalThis.MST_TRACK.once("radar_preview_seen", { n_items: globalThis.MST_TRACK.bucket(c.total) });
+      globalThis.MST_TRACK.once("paywall_seen", { reason: "radar", key: "radar" });
+    }
     summaryEl.textContent = T("radarFreeSummary", [
       String(c.total),
       String(c.profit),
@@ -663,6 +669,7 @@ globalThis.MST_QUICKVIEW = (() => {
         injected++;
       } catch (err) {
         failed++;
+        globalThis.MST_TRACK.error("quickview_fail");
         processed.add(item); // don't retry a poisoned item every pass
         warn("strip failed for one result (skipped):", err);
       }

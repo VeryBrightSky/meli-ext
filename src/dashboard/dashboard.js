@@ -17,7 +17,11 @@
   const shareBtn = document.getElementById("share-btn");
   shareBtn.textContent = T("btnShareApp");
   shareBtn.href = `https://wa.me/?text=${encodeURIComponent(T("shareText", [BRAND.shareUrl("dashboard")]))}`;
-  shareBtn.addEventListener("click", () => globalThis.MST_GATE.track("click:share"));
+  shareBtn.addEventListener("click", () => {
+    globalThis.MST_GATE.track("click:share");
+    globalThis.MST_TRACK.event("share_click", { where: "dashboard" });
+  });
+  globalThis.MST_TRACK.event("dashboard_open");
 
   const send = (type, payload) =>
     chrome.runtime.sendMessage({ type, payload }).catch(() => null);
@@ -37,7 +41,7 @@
       `${T("upsellLead_dashboard")}. ${T("upsellBody_dashboard")}`;
     document.getElementById("upsell-pricing").textContent = T("upsellPricing");
     const upgrade = async (plan) => {
-      const res = await globalThis.MST_GATE.openUpgrade(plan);
+      const res = await globalThis.MST_GATE.openUpgrade(plan, "dashboard");
       const note = document.getElementById("upsell-pricing");
       note.textContent = res?.ok ? T("upsellOpened") : T("upsellOpenFailed");
     };
@@ -54,10 +58,11 @@
     loginLink.textContent = T("optLogin");
     loginLink.addEventListener("click", async (e) => {
       e.preventDefault();
-      const res = await globalThis.MST_GATE.openLogin();
+      const res = await globalThis.MST_GATE.openLogin("dashboard");
       if (!res?.ok) document.getElementById("upsell-pricing").textContent = T("upsellOpenFailed");
     });
     globalThis.MST_GATE.track("open:dashboard-page");
+    globalThis.MST_TRACK.event("paywall_seen", { reason: "dashboard", key: "dashboard" });
   }
   // A PRO answer that arrives after the 1.5s status timeout: reload once so
   // a paying user sees the full table instead of the free preview.
@@ -313,8 +318,10 @@
     if (!pro) {
       document.getElementById("upsell").scrollIntoView({ behavior: "smooth" });
       globalThis.MST_GATE.track("open:dashboard-csv");
+      globalThis.MST_TRACK.event("paywall_seen", { reason: "dashboard", key: "dashboard" });
       return;
     }
+    globalThis.MST_TRACK.event("csv_export");
     // Text cells: a seller-controlled title starting with = + - @ would run as
     // a formula in Excel, so it gets a leading apostrophe. Money/percent
     // columns are exported as raw numbers (worst case), which spreadsheets

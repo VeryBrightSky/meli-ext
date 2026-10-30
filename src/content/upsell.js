@@ -37,7 +37,7 @@ globalThis.MST_UPSELL = (() => {
     // After a plan click the checkout opens in a new tab; say so here and
     // promise the live update (content.js rebuilds on the SW's proChanged).
     const opened = async (plan) => {
-      const res = await GATE.openUpgrade(plan);
+      const res = await GATE.openUpgrade(plan, "upsell");
       // Only claim the checkout opened when it did (offline → key creation fails).
       if (res?.ok) {
         note.textContent = T("upsellOpened");
@@ -59,7 +59,7 @@ globalThis.MST_UPSELL = (() => {
     const login = el("button", `${PREFIX}-upsell__close ${PREFIX}-upsell__login`, T("optLogin"));
     login.type = "button";
     login.addEventListener("click", async () => {
-      const res = await GATE.openLogin();
+      const res = await GATE.openLogin("upsell");
       if (!res?.ok) {
         note.textContent = T("upsellOpenFailed");
         note.classList.remove(`${PREFIX}-upsell__note--active`);
@@ -114,6 +114,7 @@ globalThis.MST_UPSELL = (() => {
       const key = setText(reason, vars);
       panel.hidden = false;
       GATE.track(`open:${key}`);
+      globalThis.MST_TRACK.event("paywall_seen", { reason: "upsell", key });
       try {
         panel.scrollIntoView({ block: "nearest", behavior: "smooth" });
       } catch {
@@ -236,14 +237,14 @@ globalThis.MST_UPSELL = (() => {
         }).catch(() => {});
       }
       btn.textContent = T("trialKeep");
-      btn.addEventListener("click", () => GATE.openUpgrade(BRAND.plans.monthly).then(failNote));
+      btn.addEventListener("click", () => GATE.openUpgrade(BRAND.plans.monthly, "trial-banner").then(failNote));
     } else if (status.trialExpired && (status.trialDaysSinceEnd ?? 0) <= 14) {
       stateKey = "expired";
       root.dataset.tone = "expired";
       text.textContent = T("trialExpiredBanner");
       btn.textContent = T("trialReactivate");
       // Straight to the plan picker; no detour through a panel at the bottom.
-      btn.addEventListener("click", () => GATE.openUpgrade().then(failNote));
+      btn.addEventListener("click", () => GATE.openUpgrade(undefined, "expired-banner").then(failNote));
     }
     if (!stateKey) return root;
 
@@ -252,7 +253,10 @@ globalThis.MST_UPSELL = (() => {
       const until = d[stateKey] ?? 0;
       if (Date.now() < until) return;
       root.hidden = false;
-      if (stateKey === "expired") GATE.track("seen:expired");
+      if (stateKey === "expired") {
+        GATE.track("seen:expired");
+        globalThis.MST_TRACK.once("paywall_seen", { reason: "expired-banner", key: "expired" });
+      }
     }).catch(() => {});
     close.addEventListener("click", () => {
       root.hidden = true;

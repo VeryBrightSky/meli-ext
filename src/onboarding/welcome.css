@@ -42,3 +42,11 @@ h1 { font-size: 34px; line-height: 1.12; letter-spacing: -0.6px; margin: 0 0 12p
 .btn-ghost { background: rgba(255, 255, 255, 0.08); color: #fff; border-color: rgba(255, 255, 255, 0.2); }
 .btn-ghost:hover { background: rgba(255, 255, 255, 0.14); }
 .note { margin-top: 22px; font-size: 13px; color: #9a9ec9; line-height: 1.5; }
+.tnotice {
+  margin-top: 14px; padding: 12px 14px; font-size: 13px; line-height: 1.5; color: #c7caf0;
+  background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 12px;
+  display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center;
+}
+.tnotice[hidden] { display: none; }
+.tnotice a { color: #9affc9; font-weight: 700; }
+.btn-sm { font-size: 13px; padding: 7px 12px; }

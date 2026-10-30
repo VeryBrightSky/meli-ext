@@ -17,6 +17,7 @@
 (() => {
   const BRAND = globalThis.EXT_BRAND;
   const SAFE = globalThis.MST_SAFE;
+  const TRACK = globalThis.MST_TRACK;
   const PREFIX = BRAND.cssPrefix;
   const CARD_ID = `${PREFIX}-card-root`;
   const TAG = `[${BRAND.name}]`;
@@ -480,7 +481,11 @@
     if (isStale(gen)) return;
     const found = await waitForAnchor();
     if (isStale(gen) || !found) {
-      if (!found && !isStale(gen)) logAnchorDiagnostics();
+      if (!found && !isStale(gen)) {
+        logAnchorDiagnostics();
+        TRACK.count("anchors_missing");
+        TRACK.error("no_anchor");
+      }
       return;
     }
     if (document.getElementById(CARD_ID)) return;
@@ -489,6 +494,7 @@
     pageData = SAFE.run("page-data", () => globalThis.MST_PAGE.collect(found.el), null);
     if (!pageData?.price) {
       warn("price not found on page (itemprop meta + andes-money-amount both missed) — not injecting");
+      TRACK.error("no_price");
       pageData = null;
       return;
     }
@@ -503,6 +509,11 @@
     if (isStale(gen) || document.getElementById(CARD_ID)) return;
     found.el.insertAdjacentElement("afterend", card);
     log("card injected ✔");
+    // Anonymous funnel: coarse page kind only (never the URL or the item id;
+    // the id is hashed locally just to count DISTINCT listings per day).
+    TRACK.once("card_seen", { page: /\/p\/MLM\d+/.test(location.pathname) ? "catalog" : "product" });
+    TRACK.count("cards");
+    TRACK.count("product", TRACK.hash(pageData.itemId ?? location.pathname));
     logCardVisibilityReport(document.getElementById(CARD_ID));
     watchCardPersistence();
   }
@@ -554,7 +565,13 @@
         }
         if (initial) await waitForPageSettled();
         if (isStale(gen)) return;
-        globalThis.MST_QUICKVIEW.init().catch((err) => warn("quick view init failed:", err));
+        globalThis.MST_QUICKVIEW.init().then(
+          () => TRACK.count("searches"),
+          (err) => {
+            warn("quick view init failed:", err);
+            TRACK.error("quickview_fail");
+          }
+        );
         onCleanup(() => globalThis.MST_QUICKVIEW.destroy());
         break;
       default:
@@ -597,7 +614,10 @@
         SAFE.wrap("spa-reroute", () => {
           waitForDomQuiet(400, 4000).then(() => {
             if (isStale(gen)) return; // navigated again already
-            route({ initial: false }).catch((err) => warn("route failed:", err));
+            route({ initial: false }).catch((err) => {
+              warn("route failed:", err);
+              TRACK.error("route_fail");
+            });
           });
         }),
         250
@@ -643,8 +663,14 @@
     );
     startUrlWatcher();
     startProWatcher();
-    await route({ initial: true }).catch((err) => warn("initial route failed:", err));
+    await route({ initial: true }).catch((err) => {
+      warn("initial route failed:", err);
+      TRACK.error("route_fail");
+    });
   }
 
-  main().catch((err) => console.error(TAG, "fatal:", err));
+  main().catch((err) => {
+    console.error(TAG, "fatal:", err);
+    TRACK.error("route_fail");
+  });
 })();

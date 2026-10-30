@@ -125,11 +125,73 @@ async function loadSubscriptionStatus() {
 }
 loadSubscriptionStatus();
 
+// Anonymous analytics: the toggle and notice exist only in builds that have a
+// backend configured; ?debug also shows the local diagnostic line (queue, last
+// send status, HTTP code or error) so a broken backend is visible at once.
+async function loadTelemetry() {
+  const TRACK = globalThis.MST_TRACK;
+  TRACK.event("options_open");
+  const debug = new URLSearchParams(location.search).has("debug");
+  const st = await TRACK.state(debug);
+  if (!st || (!st.configured && !debug)) return;
+  const box = document.getElementById("telemetry-box");
+  box.hidden = false;
+  const row = document.getElementById("telemetry-row");
+  const hint = document.getElementById("telemetry-hint");
+  const toggle = document.getElementById("telemetry-enabled");
+  if (st.configured) {
+    document.getElementById("lbl-telemetry").textContent = T("optTelemetry");
+    hint.textContent = T("optTelemetryHint");
+    toggle.checked = st.enabled;
+    toggle.addEventListener("change", async () => {
+      await TRACK.setEnabled(toggle.checked);
+      renderDebug();
+    });
+    if (!st.noticeSeen) {
+      document.getElementById("telemetry-notice-text").textContent = T("telemetryNotice");
+      const link = document.getElementById("telemetry-notice-link");
+      link.textContent = T("telemetryNoticeLink");
+      link.href = `${BRAND.landingUrl}/privacidad.html`;
+      document.getElementById("telemetry-notice").hidden = false;
+      TRACK.noticeSeen();
+    }
+  } else {
+    row.hidden = true;
+    hint.hidden = true;
+  }
+  async function renderDebug() {
+    if (!debug) return;
+    const d = await TRACK.state(true);
+    if (!d) return;
+    const last = d.last
+      ? `${d.last.status || "0"} ${d.last.error ?? "ok"} @ ${new Date(d.last.at).toLocaleTimeString("en-US")}`
+      : "none";
+    const mode = !d.configured ? "dormant" : d.enabled ? "on" : "off";
+    const counts = Object.entries(d.counts ?? {})
+      .filter(([k]) => !k.includes(":"))
+      .map(([k, v]) => `${k} ${v}`)
+      .join(" · ");
+    document.getElementById("telemetry-debug").textContent =
+      `${T("optTelemetryDebug")}: ${mode} · host ${d.host ?? "-"}${d.qa ? " (QA override)" : ""}` +
+      ` · queue ${d.queue} · last send ${last} · id ${d.iid ? d.iid.slice(0, 8) : "-"}` +
+      (counts ? ` · ${counts}` : "");
+  }
+  renderDebug();
+}
+loadTelemetry().catch(() => {});
+
 // Reset removes ONLY Netio's own data. Never storage.clear(): ExtPay keeps
 // the seller's payment key in storage.sync (clearing it drops a paying user
 // to free until they log in again), and mst:installedAt must survive so a
 // reset is not a free trial restart.
-const KEEP_LOCAL = new Set([`${BRAND.cssPrefix}:installedAt`, `${BRAND.cssPrefix}:metrics`]);
+// Analytics keys (install id, opt-out choice, queue, once-ever flags) survive
+// a reset too: wiping them would mint a new install id and replay every
+// "first time" event.
+const KEEP_LOCAL = new Set([
+  `${BRAND.cssPrefix}:installedAt`,
+  `${BRAND.cssPrefix}:metrics`,
+  ...Object.values(globalThis.MST_TELEMETRY_CORE.KEYS)
+]);
 async function removeOwnKeys(area, extraKeys = []) {
   const all = await area.get(null);
   const mine = Object.keys(all).filter(
@@ -140,6 +202,7 @@ async function removeOwnKeys(area, extraKeys = []) {
 resetBtn.addEventListener("click", async () => {
   // Irreversible: costs, sales and price history live only in this browser.
   if (!window.confirm(T("optResetConfirm"))) return;
+  globalThis.MST_TRACK.event("reset_clicked");
   await removeOwnKeys(chrome.storage.local);
   await removeOwnKeys(chrome.storage.sync, [
     ...Object.keys(DEFAULT_SETTINGS),

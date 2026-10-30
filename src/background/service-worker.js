@@ -1,8 +1,17 @@
 // MV3 service worker. Network activity is limited to ExtensionPay payment
-// verification (extensionpay.com) — fee/shipping data stays bundled.
+// verification (extensionpay.com) and, ONLY when a backend is configured at
+// build time and the seller has not opted out, batched anonymous usage events
+// (src/telemetry). Fee/shipping data stays bundled.
 "use strict";
 
-importScripts("../config/branding.js", "../pro/gate.js", "../vendor/extpay.js");
+importScripts(
+  "../config/branding.js",
+  "../pro/gate.js",
+  "../vendor/extpay.js",
+  "../config/telemetry-config.js",
+  "../telemetry/telemetry-core.js",
+  "../telemetry/telemetry-sw.js"
+);
 
 const extpay = ExtPay(globalThis.EXT_BRAND.extpayId);
 try {
@@ -27,6 +36,37 @@ async function getUserCached() {
 }
 const PREFIX = globalThis.EXT_BRAND.cssPrefix;
 const INSTALLED_KEY = `${PREFIX}:installedAt`;
+
+// --- Anonymous analytics (dormant unless configured; see src/telemetry) -------
+// Trial state for the daily active_day row, from LOCAL data only (cached
+// ExtPay answer + the local reverse trial): never an extra network call.
+async function currentTrialState() {
+  const G = globalThis.MST_GATE;
+  const now = Date.now();
+  const stored = await chrome.storage.local.get([INSTALLED_KEY, `${PREFIX}:proStatus`]);
+  const cached = G.isCacheUsable(stored[`${PREFIX}:proStatus`], now) ? stored[`${PREFIX}:proStatus`] : null;
+  const s = G.mergeStatus(G.resolveStatus(null, cached), G.computeLocalTrial(stored[INSTALLED_KEY], now));
+  return { state: globalThis.MST_TELEMETRY_CORE.trialStateOf(s), pro: Boolean(s.pro) };
+}
+const telemetry = globalThis.MST_TELEMETRY_SW.create({
+  storage: chrome.storage.local,
+  config: globalThis.MST_TELEMETRY_CONFIG,
+  fetch: (...args) => globalThis.fetch(...args),
+  version: chrome.runtime.getManifest().version,
+  uiLang: () => chrome.i18n.getUILanguage(),
+  ua: () => globalThis.navigator?.userAgent ?? "",
+  uaPlatform: () => globalThis.navigator?.userAgentData?.platform ?? "",
+  randomUUID: () => crypto.randomUUID(),
+  randomId: () => crypto.randomUUID().slice(0, 12),
+  installedKey: INSTALLED_KEY,
+  landingUrl: globalThis.EXT_BRAND.landingUrl,
+  setUninstallURL: (url) => chrome.runtime.setUninstallURL(url),
+  getTrialState: currentTrialState
+});
+const quietly = (p) => p?.catch?.((err) => console.warn("[Netio] analytics step failed:", err));
+// Every worker start: refresh the survey URL and flush anything left over.
+quietly(telemetry.init().then(() => telemetry.flush()));
+chrome.runtime.onInstalled.addListener((details) => quietly(telemetry.onInstalled(details)));
 
 // Reverse trial: stamp first-run time on install, and on update for users
 // who predate it (they get the same 7 PRO days — a reason to look again).
@@ -131,6 +171,7 @@ const handlers = {
     const user = await getUserCached(); // throws offline → caller uses cache
     const s = globalThis.MST_GATE.computeProStatus(user, Date.now());
     refreshBadge(user);
+    if (s.paid) quietly(telemetry.markPaid());
     // trialStartedAt rides along so an offline cache can re-evaluate the
     // ExtPay trial window instead of freezing "pro: true" for 30 days.
     return { ...s, trialStartedAt: user?.trialStartedAt ?? null };
@@ -140,7 +181,15 @@ const handlers = {
   openPaymentPage: async (payload) => extpay.openPaymentPage(payload?.plan),
   openLoginPage: async () => extpay.openLoginPage(),
 
-  openDashboard: async () => openOrFocusDashboard()
+  openDashboard: async () => openOrFocusDashboard(),
+
+  // Analytics (validated and gated inside telemetry; see src/telemetry).
+  track: async (_payload, message) => telemetry.track(message.event, message.props),
+  tcount: async (_payload, message) => telemetry.count(message.key, message.arg),
+  telemetryState: async (payload) => telemetry.getState({ debug: payload?.debug === true }),
+  telemetrySet: async (payload) => telemetry.setEnabled(payload?.enabled !== false),
+  telemetryNoticeSeen: async () => telemetry.markNoticeSeen(),
+  telemetryFlush: async () => telemetry.flush()
 };
 
 // Open the dashboard, or bring an already-open one to the front instead of
@@ -175,7 +224,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     sendResponse({ ok: false, error: `Unknown message type: ${String(message.type)}` });
     return false;
   }
-  handler(message.payload ?? {})
+  handler(message.payload ?? {}, message)
     .then((data) => sendResponse({ ok: true, data }))
     .catch((err) => sendResponse({ ok: false, error: String(err?.message ?? err) }));
   return true; // keep the channel open for the async response
@@ -199,6 +248,7 @@ async function broadcastProChanged() {
 try {
   extpay.onPaid.addListener(() => {
     userCache = null;
+    quietly(telemetry.markPaid());
     refreshBadge();
     broadcastProChanged();
   });

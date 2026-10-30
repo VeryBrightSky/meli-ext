@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lamento verte ir | Netio</title>
+  <meta name="robots" content="noindex" />
+  <meta name="theme-color" content="#1e2255" />
+  <link rel="icon" href="netio-logo.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    .bye { max-width: 560px; margin: 0 auto; padding: 48px 20px 80px; }
+    .bye h1 { font-size: clamp(28px, 6vw, 40px); margin: 8px 0 8px; }
+    .bye .lead { color: var(--muted); margin: 0 0 22px; }
+    .reasons { display: grid; gap: 10px; margin: 0 0 18px; padding: 0; list-style: none; }
+    .reasons button { width: 100%; text-align: left; font: inherit; font-weight: 600; color: var(--text); background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; cursor: pointer; }
+    .reasons button[aria-pressed="true"] { border-color: var(--green); background: rgba(0, 166, 80, 0.14); }
+    .bye label { display: block; font-size: 14px; color: var(--muted); margin: 0 0 6px; }
+    .bye textarea { width: 100%; font: inherit; color: var(--text); background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; resize: vertical; }
+    .bye .count { font-size: 12px; color: var(--muted-dim); text-align: right; }
+    .bye .row { display: flex; gap: 10px; align-items: center; margin-top: 14px; flex-wrap: wrap; }
+    .bye button.send { font: inherit; font-weight: 700; color: #fff; background: var(--green); border: 0; border-radius: 12px; padding: 12px 20px; cursor: pointer; }
+    .bye button.send:disabled { opacity: 0.45; cursor: not-allowed; }
+    .bye .lang { margin-left: auto; font: inherit; font-size: 13px; color: var(--muted); background: transparent; border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; cursor: pointer; }
+    .bye .fine { font-size: 12px; color: var(--muted-dim); margin-top: 18px; }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+  <div class="bg" aria-hidden="true"></div>
+  <header class="nav">
+    <div class="wrap">
+      <a class="lockup" href="index.html" aria-label="Netio">
+        <img class="mark" src="netio-logo.svg" alt="" width="32" height="32" />
+        <span class="word">netio</span>
+      </a>
+    </div>
+  </header>
+
+  <main class="bye">
+    <section id="ask">
+      <h1 data-t="title">Lamento verte ir</h1>
+      <p class="lead" data-t="lead">¿Qué pasó? Un toque nos ayuda a mejorar Netio. Es anónimo.</p>
+      <ul class="reasons" id="reasons"></ul>
+      <label for="note" data-t="noteLabel">¿Algo más? (opcional, máximo 140 caracteres)</label>
+      <textarea id="note" rows="3" maxlength="140"></textarea>
+      <div class="count"><span id="left">140</span></div>
+      <div class="row">
+        <button type="button" class="send" id="send" disabled data-t="send">Enviar</button>
+        <button type="button" class="lang" id="lang">English</button>
+      </div>
+      <p class="fine" data-t="fine">No pedimos tu correo ni guardamos cookies. Quitamos enlaces y correos del texto antes de enviarlo.</p>
+    </section>
+    <section id="thanks" hidden>
+      <h1 data-t="thanksTitle">Gracias</h1>
+      <p class="lead" data-t="thanksBody">Tu respuesta nos ayuda a mejorar. Si cambias de opinión, Netio sigue en la Chrome Web Store.</p>
+    </section>
+  </main>
+
+  <script>
+    // Set by scripts/enable-telemetry.mjs. Empty = the page still works, shows
+    // the thank-you and sends nothing.
+    window.NETIO_TELEMETRY = { url: "", key: "" }; // NETIO_TELEMETRY_CONFIG
+  </script>
+  <script>
+    "use strict";
+    // <cleanNote>
+    function cleanNote(raw) {
+      let s = String(raw == null ? "" : raw);
+      s = s.replace(/https?:\/\/\S*/gi, " ")
+        .replace(/\bwww\.\S*/gi, " ")
+        .replace(/\S+@\S+/g, " ")
+        .replace(/\S*[a-z0-9-]+\.(com|mx|net|org|io|app|co)\b\S*/gi, " ")
+        .replace(/@/g, " ")
+        .replace(/[\u0000-\u001f\u007f]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+      return s.slice(0, 140).trim();
+    }
+    // </cleanNote>
+
+    const TEXT = {
+      es: {
+        title: "Lamento verte ir",
+        lead: "¿Qué pasó? Un toque nos ayuda a mejorar Netio. Es anónimo.",
+        noteLabel: "¿Algo más? (opcional, máximo 140 caracteres)",
+        send: "Enviar",
+        fine: "No pedimos tu correo ni guardamos cookies. Quitamos enlaces y correos del texto antes de enviarlo.",
+        thanksTitle: "Gracias",
+        thanksBody: "Tu respuesta nos ayuda a mejorar. Si cambias de opinión, Netio sigue en la Chrome Web Store.",
+        other: "English",
+        reasons: {
+          no_card: "No vi la tarjeta",
+          numbers: "Los números no coinciden con Mercado Libre",
+          price: "Era muy caro",
+          not_mx: "No soy vendedor de México",
+          confused: "No entendí cómo usarla",
+          other: "Otro"
+        }
+      },
+      en: {
+        title: "Sorry to see you go",
+        lead: "What happened? One tap helps us improve Netio. It is anonymous.",
+        noteLabel: "Anything else? (optional, 140 characters max)",
+        send: "Send",
+        fine: "We do not ask for your email or store cookies. Links and emails are removed from the text before sending.",
+        thanksTitle: "Thank you",
+        thanksBody: "Your answer helps us improve. If you change your mind, Netio is still on the Chrome Web Store.",
+        other: "Español",
+        reasons: {
+          no_card: "I never saw the card",
+          numbers: "The numbers do not match Mercado Libre",
+          price: "It was too expensive",
+          not_mx: "I do not sell in Mexico",
+          confused: "I did not understand how to use it",
+          other: "Other"
+        }
+      }
+    };
+    const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+    const params = new URLSearchParams(location.search);
+    const iid = UUID.test(params.get("i") || "") ? params.get("i") : null;
+    const ver = /^\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(params.get("v") || "") ? params.get("v") : "0.0.0";
+    const int = (k, max) => { const n = Number(params.get(k)); return Number.isInteger(n) && n >= 0 && n <= max ? n : null; };
+    let lang = "es";
+    let chosen = null;
+    const $ = (id) => document.getElementById(id);
+
+    function paint() {
+      const t = TEXT[lang];
+      document.documentElement.lang = lang === "es" ? "es-MX" : "en";
+      document.title = t.title + " | Netio";
+      for (const n of document.querySelectorAll("[data-t]")) n.textContent = t[n.dataset.t];
+      $("lang").textContent = t.other;
+      const list = $("reasons");
+      list.replaceChildren();
+      for (const [key, label] of Object.entries(t.reasons)) {
+        const li = document.createElement("li");
+        const b = document.createElement("button");
+        b.type = "button";
+        b.textContent = label;
+        b.setAttribute("aria-pressed", String(chosen === key));
+        b.addEventListener("click", () => { chosen = key; $("send").disabled = false; paint(); });
+        li.append(b);
+        list.append(li);
+      }
+    }
+    $("lang").addEventListener("click", () => { lang = lang === "es" ? "en" : "es"; paint(); });
+    $("note").addEventListener("input", () => { $("left").textContent = String(140 - $("note").value.length); });
+
+    function platform() {
+      const u = navigator.userAgent;
+      if (/CrOS/.test(u)) return "cros";
+      if (/Windows/.test(u)) return "win";
+      if (/Android/.test(u)) return "android";
+      if (/Macintosh|Mac OS X/.test(u)) return "mac";
+      if (/Linux|X11/.test(u)) return "linux";
+      return "other";
+    }
+
+    async function send() {
+      if (!chosen) return;
+      $("send").disabled = true;
+      const cfg = window.NETIO_TELEMETRY || {};
+      const props = { reason: chosen };
+      const note = cleanNote($("note").value);
+      if (note) props.note = note;
+      const d = int("d", 3650), c = int("c", 1), p = int("p", 1);
+      if (d !== null) props.days_used = d;
+      if (c !== null) props.cost_entered = c;
+      if (p !== null) props.saw_paywall = p;
+      const m = /Chrom(?:e|ium)\/(\d{1,3})\./.exec(navigator.userAgent);
+      const row = {
+        install_id: iid,
+        event: "uninstall_reason",
+        props,
+        ext_version: ver,
+        lang,
+        chrome_major: m ? Number(m[1]) : null,
+        platform: platform()
+      };
+      if (cfg.url && cfg.key) {
+        try {
+          await fetch(cfg.url.replace(/\/+$/, "") + "/rest/v1/events", {
+            method: "POST",
+            headers: { apikey: cfg.key, Authorization: "Bearer " + cfg.key, "Content-Type": "application/json", Prefer: "return=minimal" },
+            body: JSON.stringify([row]),
+            keepalive: true
+          });
+        } catch (e) { /* the thank-you shows either way */ }
+      }
+      $("ask").hidden = true;
+      $("thanks").hidden = false;
+    }
+    $("send").addEventListener("click", send);
+    paint();
+  </script>
+</body>
+</html>

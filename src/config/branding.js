@@ -13,7 +13,7 @@ globalThis.EXT_BRAND = Object.freeze({
   storeName: "Netio: Calculadora de Comisiones y Ganancias Mercado Libre México",
   // Name used in manifest.json dev builds.
   manifestName: "Netio (dev)",
-  version: "1.4.3",
+  version: "1.5.0",
   description:
     "Calculadora de comisiones, ganancias y precios para vendedores de Mercado Libre México.",
   // ExtensionPay id (registered at extensionpay.com). Plans configured there:
@@ -26,6 +26,9 @@ globalThis.EXT_BRAND = Object.freeze({
   shareUrl(where) {
     return `${this.storeUrl}?utm_source=whatsapp&utm_medium=share&utm_campaign=${where}`;
   },
+  // Where the public landing pages live (privacy policy, uninstall survey).
+  // Must serve privacidad.html and adios.html from this base; no trailing slash.
+  landingUrl: "https://netio.app",
   storeReviewsUrl: "https://chromewebstore.google.com/detail/netio/bjhikillfgbpblogloljjhejogfeajac/reviews",
   plans: Object.freeze({ monthly: "pro-monthly", yearly: "pro-yearly" }),
   // Path relative to the extension root; resolve with chrome.runtime.getURL().

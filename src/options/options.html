@@ -42,6 +42,19 @@
         <input type="text" inputmode="decimal" id="acquisition-pct" placeholder="0" />
       </label>
 
+      <div class="telemetry" id="telemetry-box" hidden>
+        <label class="setting" id="telemetry-row">
+          <input type="checkbox" id="telemetry-enabled" />
+          <span id="lbl-telemetry"></span>
+        </label>
+        <p class="hint" id="telemetry-hint"></p>
+        <p class="hint hint--ok" id="telemetry-notice" hidden>
+          <span id="telemetry-notice-text"></span>
+          <a id="telemetry-notice-link" href="#" target="_blank" rel="noopener"></a>
+        </p>
+        <p class="status status--metrics" id="telemetry-debug"></p>
+      </div>
+
       <div class="subscription">
         <h2 id="lbl-subscription"></h2>
         <p class="status" id="sub-status">…</p>
@@ -64,6 +77,8 @@
     <script src="../config/locale-data.js"></script>
     <script src="../config/i18n.js"></script>
     <script src="../fees/calculator.js"></script>
+    <script src="../telemetry/telemetry-client.js"></script>
+    <script src="../telemetry/telemetry-core.js"></script>
     <script src="../pro/gate.js"></script>
     <script src="../pro/live-reload.js"></script>
     <script src="options.js"></script>

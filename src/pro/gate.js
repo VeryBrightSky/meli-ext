@@ -249,15 +249,31 @@ globalThis.MST_GATE = (() => {
 
   const isPro = () => current.pro;
   const status = () => current;
-  const send = (type, payload) =>
-    chrome.runtime.sendMessage({ type, payload }).catch(() => ({ ok: false }));
+  // Never throws or rejects: an orphaned context ("Extension context
+  // invalidated") answers {ok:false} like any other failure.
+  const send = (type, payload) => {
+    try {
+      return Promise.resolve(chrome.runtime.sendMessage({ type, payload })).catch(() => ({ ok: false }));
+    } catch {
+      return Promise.resolve({ ok: false });
+    }
+  };
   // plan: ExtPay plan nickname ("pro-monthly" / "pro-yearly"); omit for the
   // generic choose-plan page.
-  const openUpgrade = (plan) => {
+  // `from` names the surface that asked (a paywall reason or "trial-banner"):
+  // it feeds the anonymous funnel only, never the checkout request.
+  const openUpgrade = async (plan, from = "upsell") => {
     track(plan ? `click:${plan}` : "click:plans");
-    return send("openPaymentPage", plan ? { plan } : undefined);
+    const T = globalThis.MST_TRACK;
+    T?.event("checkout_click", { plan: plan || "plans", from });
+    const res = await send("openPaymentPage", plan ? { plan } : undefined);
+    if (!res?.ok) T?.event("checkout_failed", { from });
+    return res;
   };
-  const openLogin = () => send("openLoginPage");
+  const openLogin = (from = "upsell") => {
+    globalThis.MST_TRACK?.event("login_click", { from });
+    return send("openLoginPage");
+  };
   const openDashboard = () => send("openDashboard");
 
   return Object.freeze({

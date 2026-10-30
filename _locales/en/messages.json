@@ -637,5 +637,32 @@
   },
   "feeUnavailable": {
     "message": "Not available for this weight"
+  },
+  "optTelemetry": {
+    "message": "Share anonymous usage statistics"
+  },
+  "optTelemetryHint": {
+    "message": "We only send anonymous counters: which features are used, errors and the version. We never send URLs, prices, costs, listing titles or your email. You can turn it off any time."
+  },
+  "optTelemetryDebug": {
+    "message": "Statistics diagnostics"
+  },
+  "telemetryNotice": {
+    "message": "Netio sends anonymous usage statistics to improve. They never include prices, costs or the pages you visit."
+  },
+  "telemetryNoticeLink": {
+    "message": "See what we send"
+  },
+  "telemetryNoticeOff": {
+    "message": "Turn off"
+  },
+  "telemetryOffDone": {
+    "message": "Done, nothing is sent anymore."
+  },
+  "welcomeNoteTelemetry": {
+    "message": "Your costs and products are saved in your browser; we never see your prices or the pages you visit. We only send anonymous usage counters (you can turn them off) and the PRO payment goes through ExtensionPay."
+  },
+  "withholdingsRfcNote": {
+    "message": "Rates assume you have an RFC registered. Without an RFC, withholding can be higher."
   }
 }
