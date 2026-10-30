@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="es-MX">
+<head>
+  <meta charset="utf-8" />
+  <title>Laptops | MercadoLibre</title>
+  <style>
+    /* Grid layout as served by MELI (2026-10): the card content box has a
+       fixed height with overflow hidden, so anything appended inside it is
+       clipped. The list layout (search.html) has no such box. */
+    .ui-search-layout--grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; list-style: none; padding: 0; }
+    .poly-card--grid-card { display: flex; flex-direction: column; background: #fff; }
+    .poly-card--grid-card .poly-card__content { height: 120px; overflow: hidden; }
+  </style>
+</head>
+<body>
+  <nav class="andes-breadcrumb">
+    <a class="andes-breadcrumb__link" href="#">Computación</a>
+  </nav>
+  <ol class="ui-search-layout ui-search-layout--grid">
+    <li class="ui-search-layout__item">
+      <div class="poly-card poly-card--grid-card">
+        <div class="poly-card__content">
+          <h2 class="poly-component__title">Laptop MSI Katana 15 B13VFK</h2>
+          <span class="poly-component__seller">Por MSI</span>
+          <div class="poly-component__price">
+            <span class="andes-money-amount">
+              <span class="andes-money-amount__fraction">18,999</span>
+            </span>
+          </div>
+          <div class="poly-component__shipping">Envío gratis</div>
+        </div>
+      </div>
+    </li>
+    <li class="ui-search-layout__item">
+      <div class="poly-card poly-card--grid-card">
+        <div class="poly-card__content">
+          <h2 class="poly-component__title">Laptop Gamer 16 GB RAM</h2>
+          <div class="poly-component__price">
+            <span class="andes-money-amount">
+              <span class="andes-money-amount__fraction">12,499</span>
+            </span>
+            <span class="poly-price__installments">en 12x $1,041 sin interés</span>
+          </div>
+        </div>
+      </div>
+    </li>
+    <li class="ui-search-layout__item">
+      <div class="poly-card poly-card--grid-card">
+        <div class="poly-card__content">
+          <h2 class="poly-component__title">Mouse inalámbrico ENVÍO GRATIS incluido</h2>
+          <div class="poly-component__price">
+            <span class="andes-money-amount">
+              <span class="andes-money-amount__fraction">249</span>
+            </span>
+          </div>
+        </div>
+      </div>
+    </li>
+    <li class="ui-search-layout__item">
+      <div class="poly-card poly-card--grid-card">
+        <div class="poly-card__content">
+          <h2 class="poly-component__title">Teclado mecánico</h2>
+          <div class="poly-component__price">
+            <span class="andes-money-amount">
+              <span class="andes-money-amount__fraction">899</span>
+            </span>
+            <span class="poly-price__installments">en 6 meses sin intereses</span>
+          </div>
+          <div class="poly-component__shipping">Llega gratis mañana</div>
+        </div>
+      </div>
+    </li>
+  </ol>
+</body>
+</html>

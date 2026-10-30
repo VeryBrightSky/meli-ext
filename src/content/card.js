@@ -315,10 +315,11 @@ globalThis.MST_CARD = (() => {
     // falls back to the card's last-used local value. Keeps the card and the
     // dashboard from ever showing different profit for the same listing.
     const optShip = settings.defaultShippingMXN;
-    state.shippingCostMXN =
-      optShip === null || optShip === undefined
-        ? CALC.parseMoney(defaults?.shippingCostMXN ?? 0)
-        : CALC.parseMoney(optShip);
+    const optShipSet = !(optShip === null || optShip === undefined);
+    state.shippingCostMXN = optShipSet
+      ? CALC.parseMoney(optShip)
+      : CALC.parseMoney(defaults?.shippingCostMXN ?? 0);
+    state.shippingAutofilled = false;
     state.targetMarginPct = CALC.parseMoney(defaults?.targetMarginPct ?? 0);
     state.productCostMXN = CALC.parseMoney(stored[`${PREFIX}:cost:${state.itemId}`] ?? 0);
     state.salesPerMonth = CALC.parseMoney(stored[`${PREFIX}:sales:${state.itemId}`] ?? 0);
@@ -335,6 +336,29 @@ globalThis.MST_CARD = (() => {
       state.categoryGroupId = savedPick;
       state.categoryAutoDetected = false;
     }
+    // Shipping unset everywhere (no options value, nothing typed before) on a
+    // listing at/above $299, where free shipping is mandatory and the seller
+    // pays it: the headline used to count shipping as $0 while the sweet spot
+    // already assumed the smallest bracket (0.3 kg). Both now assume the same
+    // estimate, shown in the shipping row as an autofilled value (the same
+    // mechanics as the weight select) so it never becomes the saved default
+    // and anything the seller types replaces it. An explicit options $0 is a
+    // deliberate "my shipping is free" and is left alone.
+    if (!optShipSet && !(state.shippingCostMXN > 0)) applyShippingEstimate();
+  }
+
+  // Fill the shipping row with the Mercado Envíos estimate for the chosen
+  // weight (or 0.3 kg) when the seller has not typed a cost. Returns true
+  // when a value was filled.
+  function applyShippingEstimate() {
+    if (!(state.priceMXN >= SOURCE.freeShippingThresholdMXN)) return false;
+    if (state.shippingCostMXN > 0 && !state.shippingAutofilled) return false;
+    const kg = state.weightKg > 0 ? state.weightKg : 0.3;
+    const cost = globalThis.MST_SHIPPING.costForWeight(kg);
+    if (cost === null || !(cost > 0)) return false;
+    state.shippingCostMXN = cost;
+    state.shippingAutofilled = true;
+    return true;
   }
 
   // --- Update (no DOM rebuilding) ---------------------------------------------
@@ -1135,17 +1159,8 @@ globalThis.MST_CARD = (() => {
       // Autofill the estimated shipping only when the seller hasn't typed
       // one (empty, or a value this select filled earlier): a manual value
       // or a saved default always wins.
-      if (
-        state.weightKg > 0 &&
-        state.priceMXN >= SOURCE.freeShippingThresholdMXN &&
-        (!(state.shippingCostMXN > 0) || state.shippingAutofilled)
-      ) {
-        const cost = globalThis.MST_SHIPPING.costForWeight(state.weightKg);
-        if (cost !== null) {
-          state.shippingCostMXN = cost;
-          state.shippingAutofilled = true;
-          refs.shippingInput.syncFromState();
-        }
+      if (state.weightKg > 0 && applyShippingEstimate()) {
+        refs.shippingInput.syncFromState();
       }
       update();
       persistInputs();
@@ -1211,16 +1226,31 @@ globalThis.MST_CARD = (() => {
     const shipRow = el("div", `${PREFIX}-row`);
     refs.shipLabel = el("span", `${PREFIX}-row__label`, T("rowShipping"));
     shipRow.appendChild(refs.shipLabel);
+    // An autofilled estimate is marked so the seller can tell it from a cost
+    // they typed (title + class; the value itself stays editable).
+    const markShippingEstimate = () => {
+      const est = state.shippingAutofilled && state.shippingCostMXN > 0;
+      refs.shippingInput.classList.toggle(`${PREFIX}-input--estimate`, est);
+      refs.shippingInput.dataset.estimate = est ? "1" : "";
+      if (est) refs.shippingInput.title = T("badgeEstimate");
+      else refs.shippingInput.removeAttribute("title");
+    };
     refs.shippingInput = moneyInput(
       () => state.shippingCostMXN,
       (v) => {
         state.shippingCostMXN = v;
         state.shippingAutofilled = false; // typed by the seller: never overwritten
+        markShippingEstimate();
         update();
         persistInputs();
       }
     );
     refs.shippingInput.setAttribute("aria-label", T("inputShippingAria"));
+    const syncShipping = refs.shippingInput.syncFromState;
+    refs.shippingInput.syncFromState = () => {
+      syncShipping();
+      markShippingEstimate();
+    };
     shipRow.appendChild(refs.shippingInput);
     body.appendChild(shipRow);
 

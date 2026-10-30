@@ -144,10 +144,8 @@ globalThis.MST_PAGE = (() => {
   // Premium listings can offer meses sin intereses; Clásica cannot (official
   // help page). MSI on the page is therefore a strong Premium signal — its
   // absence is weaker, so callers treat this as a default, not a fact.
-  // MSI wording seen on MX listings: "12 meses sin intereses",
-  // "Mismo precio en 12 meses de $X", "Mismo precio 6 cuotas de…", "MSI".
-  const MSI_RE = /meses sin intereses|mismo precio(?: en)? \d+ (?:meses|cuotas)|\bmsi\b/i;
-
+  // The wording itself (and why the bare token "MSI" is not a signal) lives
+  // in MST_UI.isMsiText, shared with the search Quick View.
   function guessListingType(anchorEl) {
     // Scope the signal to the price/payment area of the VISIBLE price (the
     // anchor): MELI prints "meses sin intereses" in site-wide banners and a
@@ -158,10 +156,14 @@ globalThis.MST_PAGE = (() => {
       anchorEl ??
       document.querySelector(".ui-pdp-price, .ui-pdp-payment, #payment_methods");
     let text = (scope ?? document.body).innerText || "";
-    // The installment line often sits in the next sibling block.
+    // The installment line often sits in the next sibling block, or in the
+    // price subtitles / payment-methods block outside the anchor's row.
     const next = scope?.nextElementSibling;
     if (next) text += " " + (next.innerText || "");
-    if (MSI_RE.test(text)) return "premium";
+    for (const line of document.querySelectorAll(".ui-pdp-price__subtitles, #payment_methods")) {
+      text += " " + (line.innerText || "");
+    }
+    if (globalThis.MST_UI.isMsiText(text)) return "premium";
     return "classic";
   }
 

@@ -676,5 +676,20 @@
   },
   "ownerWrongKey": {
     "message": "Wrong key"
+  },
+  "welcomeTitleExpired": {
+    "message": "Your PRO trial has ended"
+  },
+  "welcomeLeadExpired": {
+    "message": "Keep using the free calculator or activate PRO. Here's how to get value from it:"
+  },
+  "welcomeTitleFree": {
+    "message": "Netio is ready"
+  },
+  "welcomeLeadFree": {
+    "message": "Use the free calculator or activate PRO whenever you want. Here's how to get value from it:"
+  },
+  "optOwnerPaste": {
+    "message": "Paste and activate"
   }
 }

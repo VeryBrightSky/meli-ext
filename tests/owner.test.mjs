@@ -148,7 +148,7 @@ function fakeTel(owner) {
     config: { url: "https://t.supabase.co", key: "anon" },
     fetch: async (u, init) => { calls.push({ u, body: init.body }); return { status: 204, text: async () => "" }; },
     now: () => Date.parse("2026-10-30T15:00:00"),
-    version: "1.5.1",
+    version: "1.5.2",
     uiLang: () => "es-419",
     ua: () => "Mozilla/5.0 Chrome/141.0.0.0",
     uaPlatform: () => "Windows",
@@ -235,4 +235,50 @@ test("build strips the QA hash override line from owner.js in release", () => {
   const line = "hash = stored?.[HASH_OVERRIDE_KEY] || hash;";
   assert.equal(src.split(line).length - 1, 1);
   assert.ok(build.includes(line));
+});
+
+// v1.5.2 audit (F/K): keys pasted with surrounding whitespace are accepted
+// (stored trimmed); the stored key is hashed once per key/hash pair, not twice
+// per status refresh; and the options page has no ?owner= URL path.
+test("v1.5.2 owner key: whitespace trimmed, hashed once per key, no URL activation path", async () => {
+  reset();
+  useThrowaway();
+  assert.equal(await O.activate(`  ${KEY}\n`), true);
+  assert.equal(store.local[O.STORAGE_KEY], KEY, "stored trimmed");
+  assert.equal(await O.isActive(), true);
+
+  // Count digests across two status refreshes with an unchanged key.
+  const subtle = globalThis.crypto.subtle;
+  const realDigest = subtle.digest;
+  let digests = 0;
+  Object.defineProperty(subtle, "digest", { configurable: true, writable: true, value: function (...a) { digests++; return realDigest.apply(this, a); } });
+  try {
+    // A fresh key (the memo already holds KEY from the activation above).
+    const KEY2 = randomBytes(32).toString("hex");
+    reset();
+    store.local[O.HASH_OVERRIDE_KEY] = createHash("sha256").update(KEY2, "utf8").digest("hex");
+    store.local[O.STORAGE_KEY] = KEY2;
+    assert.equal((await G.refresh()).owner, true);
+    assert.equal((await G.refresh()).owner, true);
+    assert.equal(digests, 1, "one SHA-256 for two refreshes of the same key");
+    // A changed key or hash is re-verified.
+    store.local[O.STORAGE_KEY] = KEY2 + "x";
+    assert.equal(await O.isActive(), false);
+    assert.equal(digests, 2);
+    store.local[O.STORAGE_KEY] = KEY2;
+    store.local[O.HASH_OVERRIDE_KEY] = "0".repeat(64);
+    assert.equal(await O.isActive(), false);
+    assert.equal(digests, 3);
+    // Removal locks without hashing anything.
+    delete store.local[O.STORAGE_KEY];
+    assert.equal(await O.isActive(), false);
+    assert.equal(digests, 3);
+  } finally {
+    Object.defineProperty(subtle, "digest", { configurable: true, writable: true, value: realDigest });
+  }
+
+  const options = readFileSync(join(root, "src/options/options.js"), "utf8");
+  assert.ok(!/params\.(has|get)\("owner"\)|\?owner=/.test(options), "no ?owner= URL activation");
+  assert.ok(!options.includes("history.replaceState"), "nothing rewrites the URL");
+  assert.ok(options.includes("navigator.clipboard.readText"), "paste helper reads the clipboard on click");
 });

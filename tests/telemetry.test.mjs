@@ -396,15 +396,32 @@ test("enable-telemetry: key validation and landing page config injection", async
   assert.throws(() => applyAdiosConfig("<html></html>", "u", "k"));
 });
 
-test("version 1.5.1 is consistent across branding, package and manifest", () => {
+test("version 1.5.2 is consistent across branding, package and manifest", () => {
   new Function(readFileSync(join(root, "src/config/branding.js"), "utf8"))();
   const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
   const man = JSON.parse(readFileSync(join(root, "manifest.json"), "utf8"));
-  assert.equal(globalThis.EXT_BRAND.version, "1.5.1");
-  assert.equal(pkg.version, "1.5.1");
-  assert.equal(man.version, "1.5.1");
+  assert.equal(globalThis.EXT_BRAND.version, "1.5.2");
+  assert.equal(pkg.version, "1.5.2");
+  assert.equal(man.version, "1.5.2");
   assert.deepEqual(man.permissions, ["storage"]);
   assert.deepEqual(man.host_permissions, ["https://extensionpay.com/*"]);
+});
+
+// v1.5.2 audit (G): the store name describes the tool for sellers and fits
+// the 75-character Chrome Web Store limit; "Mercado Libre" appears once, as
+// the platform the tool is for, and the listing keeps the no-affiliation line.
+test("v1.5.2 store name is the seller-facing one, within 75 chars, with the disclaimer kept", () => {
+  new Function(readFileSync(join(root, "src/config/branding.js"), "utf8"))();
+  const name = globalThis.EXT_BRAND.storeName;
+  assert.equal(name, "Netio: Calculadora de comisiones para vendedores de Mercado Libre");
+  assert.ok(name.length <= 75, `${name.length} chars`);
+  assert.equal(name.length, 65);
+  const listing = readFileSync(join(root, "docs/store-listing-1.4.md"), "utf8");
+  assert.ok(listing.includes(name));
+  assert.ok(!listing.includes("Comisiones y Ganancias Mercado Libre México"));
+  assert.ok(listing.includes("no está afiliada a Mercado Libre"));
+  const build = readFileSync(join(root, "scripts/build.mjs"), "utf8");
+  assert.ok(build.includes("release ? BRAND.storeName : BRAND.manifestName"));
 });
 
 test("landing base is the real site and the options debug line shows the full install id", () => {
@@ -413,4 +430,48 @@ test("landing base is the real site and the options debug line shows the full in
   assert.ok(readFileSync(join(root, "src/options/options.js"), "utf8").includes("install id ${d.iid ?? \"-\"}"));
   const b = readFileSync(join(root, "scripts/build.mjs"), "utf8");
   assert.ok(b.includes("-telemetry.zip") && b.includes('join(root, "release"'), "keyed zip goes to release/ only");
+});
+
+// v1.5.2 audit (J): a flush() that arrives while another flush is in flight
+// (debounce timer vs. an explicit flush) used to return {skipped:true}; it
+// now waits for the in-flight flush and reports its result.
+test("v1.5.2 flush while in flight awaits the running flush instead of skipping", async () => {
+  let release;
+  const gate = new Promise((r) => { release = r; });
+  const calls = [];
+  const storage = fakeStorage();
+  let n = 0;
+  const sw = SW.create({
+    storage,
+    config: { url: "https://t.supabase.co", key: "anon" },
+    fetch: async (url, init) => { calls.push(init.body); await gate; return { status: 201, text: async () => "" }; },
+    now: () => Date.parse("2026-10-30T15:00:00"),
+    version: "1.5.2",
+    uiLang: () => "es-419",
+    ua: () => "Mozilla/5.0 Chrome/141.0.0.0",
+    uaPlatform: () => "Windows",
+    randomUUID: () => UUID,
+    randomId: () => `id${++n}`,
+    timers: { set: () => 1, clear: () => {} },
+    landingUrl: "https://netiox.netlify.app",
+    setUninstallURL: async () => {},
+    getTrialState: async () => ({ state: "trial", pro: true })
+  });
+  await sw.onInstalled({ reason: "install" });
+  await sw.track("options_open", {});
+  const first = sw.flush();
+  const second = sw.flush(); // in flight: must not be skipped
+  await new Promise((r) => setImmediate(r));
+  assert.equal(calls.length, 1, "one POST in flight");
+  release();
+  const [a, b] = await Promise.all([first, second]);
+  assert.equal(a.skipped, undefined);
+  assert.equal(b.skipped, undefined);
+  assert.ok(a.sent >= 1, `first sent ${a.sent}`);
+  assert.deepEqual(b, a, "the waiting caller gets the in-flight result");
+  assert.equal(calls.length, 1, "no duplicate POST");
+  // A later flush runs again (nothing left: sent 0, no POST).
+  const c = await sw.flush();
+  assert.deepEqual(c, { sent: 0 });
+  assert.equal(calls.length, 1);
 });

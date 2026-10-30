@@ -83,7 +83,36 @@ globalThis.MST_UI = (() => {
 
   const csvLine = (cells) => cells.map(csvCell).join(",");
 
+  // --- Listing signals read from page text -----------------------------------
+  // Premium listings can offer meses sin intereses; Clásica cannot (official
+  // help page). MSI wording seen on MX listings: "12 meses sin intereses",
+  // "Mismo precio en 12 meses de $X", "Mismo precio 6 cuotas de…", and the
+  // newer short form "12x $69 sin interés". The bare token "MSI" is NOT a
+  // signal: it is also a laptop brand ("Laptop MSI Katana", seller "Por MSI")
+  // and flagged Clásica listings as Premium (v1.5.1 audit).
+  const MSI_RE =
+    /meses sin inter[eé]s(?:es)?|mismo precio(?: en)? \d+ (?:meses|cuotas)|\b\d+\s*(?:x|cuotas(?: de)?)\s*\$?\s*[\d.,]+(?:\s+\d{2})?\s*sin inter[eé]s(?:es)?/i;
+  const isMsiText = (text) => MSI_RE.test(String(text ?? ""));
+  // "Envío gratis" and the newer "Llega gratis hoy/mañana".
+  const FREE_SHIPPING_RE = /(?:env[ií]o|llega) gratis/i;
+  const isFreeShippingText = (text) => FREE_SHIPPING_RE.test(String(text ?? ""));
+
+  // Quick View flags for one result. `scoped` is the text of the card's
+  // price/installment/shipping elements when the page has them (null when it
+  // does not); `body` is the rest of the card with the title, the seller line
+  // and our own strip removed. Only one of them is read, never the title.
+  function resultFlags({ scoped = null, body = "" } = {}) {
+    const text = typeof scoped === "string" ? scoped : String(body ?? "");
+    return {
+      freeShipping: isFreeShippingText(text),
+      listingTypeGuess: isMsiText(text) ? "premium" : "classic"
+    };
+  }
+
   return Object.freeze({
+    isMsiText,
+    isFreeShippingText,
+    resultFlags,
     csvText,
     csvFixed,
     csvCell,

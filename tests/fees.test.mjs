@@ -1027,3 +1027,97 @@ test("v1.4.3 gate.refresh: an answer after the timeout is applied, cached and an
     globalThis.chrome = prevChrome;
   }
 });
+
+// v1.5.2 audit (C): a band solution of 198.99999999999997 passed the float
+// feasibility test, but the displayed 199.00 sits in the next Full service
+// cost band (35 instead of 32) where it does not cover; the solver then gave
+// up after five cents and returned an infeasible 199.05. The real answer is
+// 204.00, the band solution of the $199 band.
+test("v1.5.2 solveTargetPrice: candidate rounded onto a higher band is not returned infeasible (199.05 → 204.00)", () => {
+  const fixedFn = SOURCE.fixedCostFnFor({ listingTypeId: "classic", fullWeightKg: 0.3 });
+  const ship = (p) => CALC.subsidizedShipping({ fullShippingMXN: 52.4, priceMXN: p, freeShipping: p >= 299, subsidyPct: 50, thresholdMXN: 299 });
+  const fn = (p) => fixedFn(p) + ship(p);
+  const got = CALC.solveTargetPrice({ costMXN: 35, shippingMXN: 0, marginPct: 30, ratePct: 10, fixedCostFn: fn, thresholds: [99, 199, 299], minPriceMXN: 35 });
+  assert.equal(got, 204);
+  assert.ok(got * 0.6 + 1e-9 >= 35 + fn(got), "returned price must cover");
+  assert.ok(!(199.05 * 0.6 + 1e-9 >= 35 + fn(199.05)), "the old answer really was infeasible");
+});
+
+// Brute force over a grid of inputs (Full weights, plain classic/premium,
+// reputation shipping, margins, rates): the answer must be feasible and no
+// cheaper cent price from $35 up may be feasible.
+test("v1.5.2 solveTargetPrice: brute force grid, every answer feasible and minimal", () => {
+  const combos = [];
+  const fullWeights = [null, 0.3, 0.5, 1, 2];
+  for (const listingTypeId of ["classic", "premium"]) {
+    for (const fullWeightKg of fullWeights) {
+      for (const shippingFull of [0, 52.4, 120]) {
+        for (const subsidyPct of [0, 50]) {
+          for (const cost of [20, 35, 60, 119, 150, 199, 250]) {
+            for (const margin of [0, 30]) {
+              combos.push({ listingTypeId, fullWeightKg, shippingFull, subsidyPct, cost, margin });
+            }
+          }
+        }
+      }
+    }
+  }
+  // 2 × 5 × 3 × 2 × 7 × 2 = 840 raw combos; sample every 4th plus the Full
+  // ones with the audit's shipping so the run stays under a second.
+  const picked = combos.filter((c, i) => i % 4 === 0 || (c.fullWeightKg === 0.3 && c.shippingFull === 52.4));
+  assert.ok(picked.length >= 200, `grid too small: ${picked.length}`);
+  let checked = 0;
+  for (const c of picked) {
+    const rate = c.listingTypeId === "premium" ? 16.5 : 10;
+    const fixedFn = SOURCE.fixedCostFnFor({ listingTypeId: c.listingTypeId, fullWeightKg: c.fullWeightKg });
+    const ship = (p) =>
+      CALC.subsidizedShipping({ fullShippingMXN: c.shippingFull, priceMXN: p, freeShipping: p >= 299, subsidyPct: c.subsidyPct, thresholdMXN: 299 });
+    const fn = (p) => fixedFn(p) + ship(p);
+    const thresholds = [...new Set([...SOURCE.getFixedCostThresholds(c.fullWeightKg), 299])].sort((a, b) => a - b);
+    const got = CALC.solveTargetPrice({ costMXN: c.cost, shippingMXN: 0, marginPct: c.margin, ratePct: rate, fixedCostFn: fn, thresholds, minPriceMXN: 35 });
+    const denom = 1 - rate / 100 - c.margin / 100;
+    const covers = (p) => p * denom + 1e-9 >= c.cost + fn(p);
+    const label = JSON.stringify(c);
+    assert.ok(got !== null && Number.isFinite(got), `${label}: null`);
+    assert.equal(got, CALC.round2(got), `${label}: ${got} not a cent price`);
+    assert.ok(covers(got), `${label}: ${got} does not cover`);
+    const top = Math.min(Math.round(got * 100), 150000);
+    for (let cents = 3500; cents < top; cents++) {
+      if (covers(cents / 100)) assert.fail(`${label}: ${cents / 100} covers but solver said ${got}`);
+    }
+    checked++;
+  }
+  assert.ok(checked >= 200);
+});
+
+// v1.5.2 audit (A): the bare token "MSI" is a laptop brand, not an
+// installments signal. The Quick View reads the price/installment/shipping
+// elements when present and otherwise the card text minus title and seller.
+test("v1.5.2 listing signals: MSI brand is not Premium, installment wording is, titles never decide shipping", () => {
+  // "Laptop MSI Katana 15" (title) + "Por MSI" (seller) on a Clásica card:
+  // the scoped price text has no installment line.
+  const katana = UI.resultFlags({ scoped: "$ 18,999" });
+  assert.equal(katana.listingTypeGuess, "classic");
+  // Fallback (no price elements): title and seller are removed by the caller,
+  // the body may still carry the brand word.
+  assert.equal(UI.resultFlags({ body: "MSI Katana 15 B13VFK 16 GB RAM $ 18,999" }).listingTypeGuess, "classic");
+  assert.equal(UI.isMsiText("Laptop MSI Katana 15 B13VFK Por MSI"), false);
+  assert.equal(UI.isMsiText("msi"), false);
+  // Installment wording, long and short forms.
+  assert.equal(UI.resultFlags({ scoped: "$ 120 en 12 meses sin intereses" }).listingTypeGuess, "premium");
+  assert.equal(UI.resultFlags({ scoped: "$ 827 en 12x $69 sin interés" }).listingTypeGuess, "premium");
+  assert.equal(UI.isMsiText("12x $ 69 sin interés"), true);
+  assert.equal(UI.isMsiText("12 cuotas de $69 sin interés"), true);
+  assert.equal(UI.isMsiText("Mismo precio en 12 meses de $69"), true);
+  assert.equal(UI.isMsiText("Mismo precio 6 cuotas de $138"), true);
+  // "sin interés" outside an installment context is not a signal.
+  assert.equal(UI.isMsiText("Préstamo sin interés para tu negocio"), false);
+  // A title "ENVÍO GRATIS incluido" with no shipping element: the caller
+  // strips the title, so the body has no shipping text.
+  assert.equal(UI.resultFlags({ body: "$ 249 Por Tienda X" }).freeShipping, false);
+  // Scoped text wins even when the body would have matched.
+  assert.equal(UI.resultFlags({ scoped: "$ 249", body: "Envío gratis" }).freeShipping, false);
+  assert.equal(UI.resultFlags({ scoped: "$ 899 Llega gratis mañana" }).freeShipping, true);
+  assert.equal(UI.resultFlags({ body: "$ 827 Envío gratis" }).freeShipping, true);
+  assert.equal(UI.isFreeShippingText("ENVÍO GRATIS incluido"), true); // text-level only; callers exclude titles
+});

@@ -528,6 +528,17 @@
   async function route({ initial }) {
     const gen = generation;
 
+    // Page type first: on a page that is neither a listing nor a search
+    // (home, cart, help…) there is nothing to do, so no storage read and no
+    // message to the service worker (which would wake it on every MELI tab).
+    let pageType = detectPageType();
+    if (!pageType && sniffProductDom()) {
+      log("URL not recognized but product DOM detected, treating as product");
+      pageType = PageType.PRODUCT;
+    }
+    log("page type:", pageType ?? "(not a product/search page)");
+    if (!pageType) return;
+
     const settings = await chrome.storage.sync
       .get({ enabled: true, cardEnabled: true, stripsEnabled: true })
       .catch(() => ({ enabled: true, cardEnabled: true, stripsEnabled: true }));
@@ -542,13 +553,6 @@
     const proStatus = await globalThis.MST_GATE.refresh().catch(() => ({ pro: false }));
     if (isStale(gen)) return;
     log("pro status:", proStatus);
-
-    let pageType = detectPageType();
-    if (!pageType && sniffProductDom()) {
-      log("URL not recognized but product DOM detected, treating as product");
-      pageType = PageType.PRODUCT;
-    }
-    log("page type:", pageType ?? "(not a product/search page)");
 
     switch (pageType) {
       case PageType.PRODUCT:

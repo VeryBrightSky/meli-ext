@@ -1,6 +1,30 @@
 // Welcome page opened once by the service worker (install, and the first
-// update that brings the reverse trial). Says PRO is on and what to do first.
+// update that brings the reverse trial). Says what the seller actually has
+// (trial days, PRO, or the free plan after an expired trial) and what to do
+// first.
 "use strict";
+
+// Pure: entitlement status → the three header strings. A reinstall after an
+// expired trial lands here with trialExpired and 0 days left; it must not be
+// told PRO is on for 7 days (v1.5.1 audit).
+globalThis.MST_WELCOME_COPY = function welcomeCopy(s, T) {
+  if (s.owner || s.paid) {
+    return { pill: T("statusPro"), title: T("welcomeTitlePaid"), lead: T("welcomeLeadPaid"), state: "paid" };
+  }
+  if (s.trialActive && s.trialDaysLeft > 0) {
+    const days = s.trialDaysLeft;
+    return {
+      pill: days === 1 ? T("badgeTrialOne") : T("badgeTrial", [String(days)]),
+      title: T("welcomeTitle"),
+      lead: days === 1 ? T("welcomeLeadOne") : T("welcomeLead", [String(days)]),
+      state: "trial"
+    };
+  }
+  if (s.trialExpired) {
+    return { pill: T("statusFree"), title: T("welcomeTitleExpired"), lead: T("welcomeLeadExpired"), state: "expired" };
+  }
+  return { pill: T("statusFree"), title: T("welcomeTitleFree"), lead: T("welcomeLeadFree"), state: "free" };
+};
 
 (async () => {
   const BRAND = globalThis.EXT_BRAND;
@@ -9,10 +33,12 @@
   document.getElementById("brand-logo").src = chrome.runtime.getURL("src/assets/icons/icon48.png");
 
   const s = await globalThis.MST_GATE.refresh();
-  const days = s.trialDaysLeft || 7;
-  document.getElementById("pill").textContent = s.paid ? T("statusPro") : days === 1 ? T("badgeTrialOne") : T("badgeTrial", [String(days)]);
-  document.getElementById("title").textContent = s.paid ? T("welcomeTitlePaid") : T("welcomeTitle");
-  document.getElementById("lead").textContent = s.paid ? T("welcomeLeadPaid") : days === 1 ? T("welcomeLeadOne") : T("welcomeLead", [String(days)]);
+  const copy = globalThis.MST_WELCOME_COPY(s, T);
+  document.title = `${BRAND.name} · ${copy.title}`;
+  document.getElementById("pill").textContent = copy.pill;
+  document.getElementById("pill").dataset.state = copy.state;
+  document.getElementById("title").textContent = copy.title;
+  document.getElementById("lead").textContent = copy.lead;
   document.getElementById("s1t").textContent = T("welcomeStep1");
   document.getElementById("s1b").textContent = T("welcomeStep1Body");
   document.getElementById("s2t").textContent = T("welcomeStep2");

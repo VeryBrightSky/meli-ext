@@ -1,6 +1,6 @@
 # Chrome Web Store listing — v1.4 (paste into the dashboard)
 
-Title (manifest name, set by the build): `Netio: Calculadora de Comisiones y Ganancias Mercado Libre México`
+Title (manifest name, set by the build): `Netio: Calculadora de comisiones para vendedores de Mercado Libre`
 
 ## Descripción corta (≤132)
 

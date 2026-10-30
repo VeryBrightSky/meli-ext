@@ -49,7 +49,11 @@ execFileSync("openssl", [
 
 const fixtures = {
   product: readFileSync(join(root, "tests/fixtures/product.html"), "utf8"),
-  search: readFileSync(join(root, "tests/fixtures/search.html"), "utf8")
+  search: readFileSync(join(root, "tests/fixtures/search.html"), "utf8"),
+  // Grid layout (fixed-height, overflow-hidden card content) with the v1.5.2
+  // listing-signal edge cases (MSI brand, short installment form, shipping
+  // words in a title).
+  searchGrid: readFileSync(join(root, "tests/fixtures/search-grid.html"), "utf8")
 };
 // A product page whose price is unreadable (itemprop meta + andes money nodes
 // neutralized). The extension must render NOTHING rather than a wrong number.
@@ -81,7 +85,7 @@ const server = createServer(
     const host = req.headers.host ?? "";
     const url = req.url ?? "";
     const body = host.startsWith("listado.")
-      ? fixtures.search
+      ? (url.includes("grid") ? fixtures.searchGrid : fixtures.search)
       : url.includes("noprice")
         ? fixtures.productNoPrice
         : url.includes("nometa")
@@ -215,6 +219,15 @@ try {
     { timeout: 10000 }
   );
   pass("install stamped 9 days back → status 'tu prueba PRO terminó'");
+  // v1.5.2 (E): the welcome page after an expired trial (reinstall case) must
+  // not claim 7 days of PRO.
+  await seed.goto(`chrome-extension://${extId}/src/onboarding/welcome.html`, { waitUntil: "load" });
+  await seed.waitForFunction(() => (document.getElementById("title")?.textContent ?? "").length > 0, { timeout: 10000 });
+  assert.equal(await seed.$eval("#title", (e) => e.textContent), "Tu prueba PRO ya terminó");
+  assert.equal(await seed.$eval("#lead", (e) => e.textContent), "Puedes seguir usando la calculadora gratis o activar PRO. Así le sacas provecho:");
+  assert.equal(await seed.$eval("#pill", (e) => e.textContent), "Plan gratuito");
+  assert.ok(!(await seed.$eval("main", (e) => e.textContent)).includes("7 días"), "welcome must not promise 7 días after the trial");
+  pass("welcome after an expired trial: 'Tu prueba PRO ya terminó', free pill, no '7 días'");
   await seed.close();
 
   // ====================== PHASE 1: never-paid (locked) ======================
@@ -228,14 +241,27 @@ try {
   await page.waitForSelector("#mst-card-root", { visible: true, timeout: 20000 });
   pass("card injects and is visible");
 
-  // Answer-first summary + collapsed breakdown.
-  assert.equal(await page.$eval(".mst-summary__net", (e) => e.textContent), "Mercado Libre te deposita $744.30 por venta");
+  // Answer-first summary + collapsed breakdown. v1.5.2 (I): with no shipping
+  // set anywhere, an $827 listing (free shipping mandatory, seller pays) is
+  // headlined with the 0.3 kg Mercado Envíos estimate ($52.40) the sweet spot
+  // already assumed, instead of $0: 827 − 82.70 − 52.40 = 691.90.
+  await page.waitForFunction(() => (document.querySelector(".mst-summary__net")?.textContent ?? "").includes("$691.90"), { timeout: 5000 });
+  assert.equal(await page.$eval(".mst-summary__net", (e) => e.textContent), "Mercado Libre te deposita $691.90 por venta");
   assert.equal(await page.$eval("details.mst-breakdown", (d) => d.open), false, "breakdown collapsed by default");
   assert.ok(
     await page.$eval("details.mst-breakdown", (d) => d.textContent.includes("Comisión por venta")),
     "commission row lives inside the breakdown"
   );
-  pass("summary leads with 'Mercado Libre te deposita $744.30 por venta'; fee breakdown collapsed by default");
+  pass("summary leads with 'Mercado Libre te deposita $691.90 por venta' (0.3 kg shipping estimate); fee breakdown collapsed by default");
+  // The estimate sits in the shipping row, marked as an estimate, editable.
+  const shipEst = await page.$$eval(".mst-card input.mst-input", (inputs) => ({
+    value: inputs[1].value,
+    estimate: inputs[1].dataset.estimate,
+    title: inputs[1].title,
+    disabled: inputs[1].disabled
+  }));
+  assert.deepEqual(shipEst, { value: "52.40", estimate: "1", title: "Estimado", disabled: false });
+  pass("shipping row shows the autofilled 52.40 estimate (marked 'Estimado', editable)");
 
   // Spanish UI must render Spanish (regression: chrome.i18n served English).
   assert.equal(await page.$eval(".mst-title", (e) => e.textContent), "Calculadora de ganancias");
@@ -247,8 +273,8 @@ try {
 
   assert.equal(await page.evaluate(rowValue("Comisión")), "−$82.70");
   assert.equal(await page.evaluate(rowValue("Costo total")), "10%");
-  assert.equal(await page.evaluate(rowValue("Recibes aprox.")), "$744.30");
-  pass("free fee card intact: 10% category via structured data, net $744.30");
+  assert.equal(await page.evaluate(rowValue("Recibes aprox.")), "$691.90");
+  pass("free fee card intact: 10% category via structured data, net $691.90 (827 − 82.70 − 52.40 est. shipping)");
 
   // Retenciones is FREE (accuracy feature), default off (row hidden/empty).
   assert.equal(await page.evaluate(rowValue("IVA retenido")), "");
@@ -257,13 +283,15 @@ try {
   await sleep(300);
   assert.equal(await page.evaluate(rowValue("IVA retenido")), "−$57.03");
   assert.equal(await page.evaluate(rowValue("ISR retenido")), "−$17.82");
-  assert.equal(await page.evaluate(rowValue("Neto después")), "$669.45"); // 744.30 − 74.85
-  pass("retenciones (free): IVA −$57.03, ISR −$17.82, neto después $669.45");
+  assert.equal(await page.evaluate(rowValue("Neto después")), "$617.05"); // 691.90 − 74.85
+  pass("retenciones (free): IVA −$57.03, ISR −$17.82, neto después $617.05");
 
-  await typeInto(page, 1, "50"); // shipping
+  await typeInto(page, 1, "50"); // shipping: typed, replaces the estimate
+  assert.equal(await page.$$eval(".mst-card input.mst-input", (i) => i[1].dataset.estimate), "", "typed shipping is no longer marked as an estimate");
+  assert.equal(await page.evaluate(rowValue("Recibes aprox.")), "$694.30");
   await typeInto(page, 2, "400"); // product cost
   assert.equal(await page.evaluate(rowValue("Precio mínimo")), "$500.00");
-  pass("breakeven stays FREE: cost 400 + ship 50 → $500.00");
+  pass("typed shipping 50 replaces the estimate (net $694.30); breakeven stays FREE: cost 400 + ship 50 → $500.00");
 
   // Post-trial win-back banner is visible (trial ended 2 days ago).
   await page.waitForFunction(() => {
@@ -498,6 +526,29 @@ try {
     assert.equal(fit.cols, 8);
   }
   pass("dashboard table fits at 1280px and 1920px (8 columns, nothing cut off)");
+
+  // v1.5.2 (D): on a 360px phone the page itself never scrolls sideways; only
+  // the table does, inside its own box, and the export button stays reachable.
+  await dash.setViewport({ width: 360, height: 740 });
+  await sleep(150);
+  const mobile = await dash.evaluate(() => {
+    const exp = document.getElementById("export-btn");
+    const r = exp.getBoundingClientRect();
+    const scroller = document.querySelector(".table-scroll");
+    return {
+      scrollWidth: document.documentElement.scrollWidth,
+      bodyScrollWidth: document.body.scrollWidth,
+      exportVisible: !exp.hidden && r.width > 0 && r.right <= 360 && r.left >= 0,
+      exportText: exp.textContent,
+      tableScrolls: scroller.scrollWidth > scroller.clientWidth
+    };
+  });
+  assert.ok(mobile.scrollWidth <= 360, `dashboard overflows at 360px: ${JSON.stringify(mobile)}`);
+  assert.ok(mobile.bodyScrollWidth <= 360, `dashboard body overflows at 360px: ${JSON.stringify(mobile)}`);
+  assert.ok(mobile.exportVisible, `export button off-screen at 360px: ${JSON.stringify(mobile)}`);
+  assert.ok(mobile.tableScrolls, "the table scrolls inside its own box at 360px");
+  pass("dashboard at 360px: no page-wide horizontal scroll, table scrolls in its box, 'Exportar a CSV' reachable");
+  await dash.setViewport({ width: 1280, height: 900 });
 
   // Empty state when nothing is saved (snapshot + restore so later phases keep
   // the seeded product).
@@ -1028,6 +1079,63 @@ try {
   );
   pass("lazy-loaded 4th result gets a strip; export count follows (4)");
 
+  // ================= PHASE 6b: grid layout + listing signals (v1.5.2 A, B) ====
+  console.log("\nPHASE 6b — GRID LAYOUT (strip not clipped) + MSI brand / shipping-in-title signals");
+  const grid = tap(await browser.newPage(), "grid");
+  await grid.goto(`https://listado.mercadolibre.com.mx:${PORT}/laptops-grid`, { waitUntil: "load" });
+  await grid.waitForFunction(() => document.querySelectorAll(".mst-strip").length === 4, { timeout: 10000, polling: 200 });
+  const gridGeom = await grid.evaluate(() => {
+    const out = [];
+    for (const li of document.querySelectorAll("li.ui-search-layout__item")) {
+      const strip = li.querySelector(".mst-strip");
+      const r = strip.getBoundingClientRect();
+      const lr = li.getBoundingClientRect();
+      // Any overflow-clipping ancestor between the strip and the <li> must
+      // contain the strip entirely, or it is cut off.
+      let clipped = false;
+      for (let a = strip.parentElement; a && a !== li; a = a.parentElement) {
+        const ov = getComputedStyle(a).overflow;
+        if (/hidden|clip|auto|scroll/.test(ov)) {
+          const ar = a.getBoundingClientRect();
+          if (r.bottom > ar.bottom + 0.5 || r.top < ar.top - 0.5) clipped = true;
+        }
+      }
+      out.push({
+        hasOffsetParent: strip.offsetParent !== null,
+        height: Math.round(r.height),
+        withinLi: r.bottom <= lr.bottom + 0.5 && r.top >= lr.top - 0.5,
+        clipped,
+        inContentBox: Boolean(strip.closest(".poly-card__content"))
+      });
+    }
+    return out;
+  });
+  for (const [i, g] of gridGeom.entries()) {
+    assert.ok(g.hasOffsetParent && g.height > 0, `grid strip ${i} not rendered: ${JSON.stringify(g)}`);
+    assert.ok(g.withinLi, `grid strip ${i} outside its <li>: ${JSON.stringify(g)}`);
+    assert.ok(!g.clipped, `grid strip ${i} clipped by a fixed-height box: ${JSON.stringify(g)}`);
+    assert.ok(!g.inContentBox, `grid strip ${i} still inside the fixed-height content box`);
+  }
+  pass("grid layout: all 4 strips rendered on the <li>, fully visible, none clipped by the fixed-height card box");
+
+  const gridRows = await grid.$$eval("li.ui-search-layout__item", (lis) =>
+    lis.map((li) => {
+      const rows = [...li.querySelectorAll(".mst-strip__row")];
+      const val = (label) => rows.find((r) => r.querySelector(".mst-strip__label").textContent === label)?.querySelector(".mst-strip__value").textContent;
+      return { type: val("Tipo (estimado)"), free: val("Envío gratis"), seller: val("Vendedor") ?? null };
+    })
+  );
+  assert.deepEqual(gridRows.map((r) => r.type), ["Clásica", "Premium", "Clásica", "Premium"], JSON.stringify(gridRows));
+  assert.deepEqual(gridRows.map((r) => r.free), ["Sí", "No", "No", "Sí"], JSON.stringify(gridRows));
+  assert.equal(gridRows[0].seller, "Por MSI");
+  pass("signals: 'Laptop MSI Katana' / 'Por MSI' stays Clásica; '12x $1,041 sin interés' and '6 meses sin intereses' are Premium; 'ENVÍO GRATIS' in a title is not free shipping");
+  // The strip on the <li> still expands in place.
+  await grid.click("li.ui-search-layout__item:nth-child(3) .mst-strip__bar");
+  await sleep(200);
+  const panels = await grid.$$eval("li.ui-search-layout__item", (lis) => lis.map((li) => li.querySelector(".mst-strip__panel").hidden));
+  assert.deepEqual(panels, [true, true, false, true]);
+  await grid.close();
+
   // ================= PHASE 7: extraction edge cases ===========================
   console.log("\nPHASE 7 — EXTRACTION EDGE CASES (promo price without meta, no anchor)");
   // Discounted listing with NO itemprop meta: the DOM-only path must skip the
@@ -1236,7 +1344,7 @@ try {
   for (const r of all) {
     assert.deepEqual(Object.keys(r).sort(), COLS);
     assert.match(r.install_id, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
-    assert.equal(r.ext_version, "1.5.1");
+    assert.equal(r.ext_version, "1.5.2");
     for (const v of Object.values(r.props)) assert.match(String(v), /^[a-z0-9._:+-]{1,24}$/);
   }
   assert.equal(new Set(all.map((r) => r.install_id)).size, 1, "one random install id");
@@ -1254,7 +1362,21 @@ try {
 
   // -- debug diagnostic is visible
   await ext.goto(`chrome-extension://${extId}/src/options/options.html?debug`, { waitUntil: "load" });
-  await ext.waitForFunction(() => /last send 20\d ok/.test(document.getElementById("telemetry-debug")?.textContent ?? ""), { timeout: 5000 });
+  // The debug line is rendered once on load; a flush still in flight at that
+  // moment lands a moment later, so poll (reload) for up to 10 s.
+  {
+    const deadline = Date.now() + 10000;
+    let seen = false;
+    while (!seen && Date.now() < deadline) {
+      seen = await ext.evaluate(() => /last send 20\d ok/.test(document.getElementById("telemetry-debug")?.textContent ?? ""));
+      if (!seen) {
+        await sleep(500);
+        await ext.reload({ waitUntil: "load" });
+        await sleep(300);
+      }
+    }
+    assert.ok(seen, `debug line never showed a 2xx send: ${await ext.$eval("#telemetry-debug", (e) => e.textContent)}`);
+  }
   pass("options ?debug shows host, queue and last send status (201 ok)");
 
   // -- opt out via the UI: queue cleared, nothing more is sent
@@ -1289,7 +1411,7 @@ try {
   mock.close();
 
   // ================= PHASE 11: v1.5.1 owner key =================================
-  console.log("\nPHASE 11 - OWNER KEY (throwaway key via ?owner=, PRO everywhere, silent analytics)");
+  console.log("\nPHASE 11 - OWNER KEY (throwaway key typed in the box, PRO everywhere, silent analytics)");
   {
     const { createHash, randomBytes } = await import("node:crypto");
     const ownerKey = randomBytes(32).toString("hex"); // throwaway; never the real key
@@ -1307,22 +1429,50 @@ try {
     assert.equal(await o.$eval("#owner-box", (e) => e.hidden), true, "owner box hidden by default");
     pass("owner box hidden for normal users");
 
-    // Wrong key via URL param: "Clave incorrecta", param stripped, no unlock.
-    await o.goto(`chrome-extension://${extId}/src/options/options.html?owner=${"z".repeat(40)}`, { waitUntil: "load" });
+    // v1.5.2 (F): no URL activation path (the key would stay in Chrome's
+    // history). A ?owner= parameter is ignored and the box stays hidden.
+    await o.goto(`chrome-extension://${extId}/src/options/options.html?owner=${ownerKey}`, { waitUntil: "load" });
+    await o.waitForFunction(() => document.getElementById("sub-status").textContent !== "…");
+    await sleep(500);
+    assert.equal(await o.$eval("#owner-box", (e) => e.hidden), true, "URL param does not open the box");
+    assert.notEqual(await o.$eval("#sub-status", (e) => e.textContent), "Modo propietario activo");
+    assert.equal((await o.evaluate(() => chrome.storage.local.get("mst:ownerKey")))["mst:ownerKey"], undefined, "URL param stores nothing");
+    pass("?owner= in the URL activates nothing (no key in browser history)");
+
+    // Five clicks on the version label open the box (password input).
+    await o.goto(`chrome-extension://${extId}/src/options/options.html?debug=1`, { waitUntil: "load" });
+    await o.waitForFunction(() => document.getElementById("sub-status").textContent !== "…");
+    for (let i = 0; i < 5; i++) await o.click("#version-label");
+    assert.equal(await o.$eval("#owner-box", (e) => e.hidden), false, "box opens after 5 clicks");
+    assert.equal(await o.$eval("#owner-input", (e) => e.type), "password");
+    assert.equal(await o.$eval("#owner-paste", (e) => e.textContent), "Pegar y activar");
+    // "Pegar y activar" with nothing usable on the clipboard (headless: the
+    // read is denied or empty) just focuses the input; it never throws.
+    await o.click("#owner-paste");
+    await sleep(300);
+    assert.equal(await o.evaluate(() => document.activeElement?.id), "owner-input", "paste helper focuses the input when the clipboard gives nothing");
+    assert.equal(await o.$eval("#owner-box", (e) => e.hidden), false);
+    // Wrong key typed: "Clave incorrecta", nothing stored.
+    await o.type("#owner-input", "z".repeat(40));
+    await o.click("#owner-activate");
     await o.waitForFunction(() => !document.getElementById("owner-msg").hidden, { timeout: 5000 });
     assert.equal(await o.$eval("#owner-msg", (e) => e.textContent), "Clave incorrecta");
-    assert.ok(!o.url().includes("owner="), "owner param stripped from the URL");
     assert.equal((await o.evaluate(() => chrome.storage.local.get("mst:ownerKey")))["mst:ownerKey"], undefined);
-    pass("wrong key: 'Clave incorrecta', param stripped, nothing stored");
+    assert.equal(await o.$eval("#owner-input", (e) => e.value), "", "input cleared after a wrong key");
+    pass("5 clicks open the box; wrong key typed: 'Clave incorrecta', nothing stored");
 
-    // Right key: auto-activates, status line says owner mode, key not in DOM.
-    await o.goto(`chrome-extension://${extId}/src/options/options.html?owner=${ownerKey}&debug=1`, { waitUntil: "load" });
+    // Right key typed with surrounding whitespace (as pasted from a note):
+    // status line says owner mode, key not in DOM or URL.
+    await sleep(1100); // one try per second
+    await o.type("#owner-input", `  ${ownerKey}  `);
+    await o.keyboard.press("Enter");
     await o.waitForFunction(() => document.getElementById("sub-status").textContent === "Modo propietario activo", { timeout: 8000 });
-    assert.ok(!o.url().includes(ownerKey) && !o.url().includes("owner="), "key stripped from the URL");
-    assert.ok(o.url().includes("debug=1"), "other params kept");
+    assert.ok(!o.url().includes(ownerKey) && !o.url().includes("owner="), "key never in the URL");
+    assert.ok(o.url().includes("debug=1"), "URL untouched");
     assert.equal(await o.$eval("#owner-input", (e) => e.value), "", "input cleared");
     assert.ok(!(await o.content()).includes(ownerKey), "key never echoed in the DOM");
-    pass("right key: 'Modo propietario activo', key stripped from URL and DOM");
+    assert.equal((await o.evaluate(() => chrome.storage.local.get("mst:ownerKey")))["mst:ownerKey"], ownerKey, "stored trimmed");
+    pass("right key typed (with spaces): 'Modo propietario activo', stored trimmed, never in URL or DOM");
 
     // Toolbar badge reads PRO.
     const swT = await browser.waitForTarget((t) => t.type() === "service_worker" && t.url().startsWith("chrome-extension://"));
@@ -1359,9 +1509,11 @@ try {
     await od.close();
     const ow = await browser.newPage();
     await ow.goto(`chrome-extension://${extId}/src/onboarding/welcome.html`, { waitUntil: "load" });
-    await sleep(800);
+    await ow.waitForFunction(() => (document.getElementById("title")?.textContent ?? "").length > 0, { timeout: 10000 });
+    assert.equal(await ow.$eval("#pill", (e) => e.textContent), "PRO activo");
+    assert.equal(await ow.$eval("#title", (e) => e.textContent), "Netio PRO está activo");
     await ow.close();
-    pass("dashboard shows no paywall for the owner; welcome loads");
+    pass("dashboard shows no paywall for the owner; welcome says 'PRO activo'");
 
     // Analytics: nothing collected for the owner.
     const sendO = (m) => o.evaluate((x) => chrome.runtime.sendMessage(x), m);
@@ -1382,8 +1534,12 @@ try {
     await o.evaluate(() => chrome.storage.local.remove(["mst:owner", "mst:ownerKey"]));
     pass("tampered flag does not unlock; removed key locks");
 
-    // Reset keeps the key.
-    await o.goto(`chrome-extension://${extId}/src/options/options.html?owner=${ownerKey}`, { waitUntil: "load" });
+    // Reset keeps the key (re-activate through the box first).
+    await o.goto(`chrome-extension://${extId}/src/options/options.html`, { waitUntil: "load" });
+    await o.waitForFunction(() => document.getElementById("sub-status").textContent !== "…");
+    for (let i = 0; i < 5; i++) await o.click("#version-label");
+    await o.type("#owner-input", ownerKey);
+    await o.click("#owner-activate");
     await o.waitForFunction(() => document.getElementById("sub-status").textContent === "Modo propietario activo", { timeout: 8000 });
     o.once("dialog", (d) => d.accept());
     await o.click("#reset-btn");

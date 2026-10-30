@@ -47,18 +47,29 @@ globalThis.MST_OWNER = (() => {
   }
 
   // True only when the stored key hashes to the expected value right now.
+  // Storage is read every time (a removed or replaced key locks at once), but
+  // the SHA-256 of one key string against one expected hash is computed once
+  // per context: the gate asks twice per status refresh (v1.5.1 audit nit).
+  let memo = null; // { key, hash, ok } for the last verified pair
   async function isActive() {
     try {
       const stored = await chrome.storage.local.get([STORAGE_KEY, HASH_OVERRIDE_KEY]);
-      return await matches(stored[STORAGE_KEY], expectedHash(stored));
+      const key = stored[STORAGE_KEY];
+      const hash = expectedHash(stored);
+      if (memo && memo.key === key && memo.hash === hash) return memo.ok;
+      const ok = await matches(key, hash);
+      memo = typeof key === "string" ? { key, hash, ok } : null;
+      return ok;
     } catch {
       return false;
     }
   }
 
-  // Verify a typed key; on success store it (local only).
-  async function activate(key) {
+  // Verify a typed or pasted key (surrounding whitespace ignored); on success
+  // store it (local only).
+  async function activate(rawKey) {
     try {
+      const key = typeof rawKey === "string" ? rawKey.trim() : rawKey;
       const stored = await chrome.storage.local.get(HASH_OVERRIDE_KEY);
       if (!(await matches(key, expectedHash(stored)))) return false;
       await chrome.storage.local.set({ [STORAGE_KEY]: key });

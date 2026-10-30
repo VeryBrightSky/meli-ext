@@ -227,7 +227,12 @@ globalThis.MST_MESSAGES = Object.freeze({
     "optOwnerLabel": "Clave de propietario",
     "optOwnerActivate": "Activar",
     "optOwnerRemove": "Quitar",
-    "ownerWrongKey": "Clave incorrecta"
+    "ownerWrongKey": "Clave incorrecta",
+    "welcomeTitleExpired": "Tu prueba PRO ya terminó",
+    "welcomeLeadExpired": "Puedes seguir usando la calculadora gratis o activar PRO. Así le sacas provecho:",
+    "welcomeTitleFree": "Netio está listo",
+    "welcomeLeadFree": "Puedes usar la calculadora gratis o activar PRO cuando quieras. Así le sacas provecho:",
+    "optOwnerPaste": "Pegar y activar"
   },
   "en": {
     "cardTitle": "Profit calculator",
@@ -455,6 +460,11 @@ globalThis.MST_MESSAGES = Object.freeze({
     "optOwnerLabel": "Owner key",
     "optOwnerActivate": "Activate",
     "optOwnerRemove": "Remove",
-    "ownerWrongKey": "Wrong key"
+    "ownerWrongKey": "Wrong key",
+    "welcomeTitleExpired": "Your PRO trial has ended",
+    "welcomeLeadExpired": "Keep using the free calculator or activate PRO. Here's how to get value from it:",
+    "welcomeTitleFree": "Netio is ready",
+    "welcomeLeadFree": "Use the free calculator or activate PRO whenever you want. Here's how to get value from it:",
+    "optOwnerPaste": "Paste and activate"
   }
 });

@@ -38,6 +38,7 @@ document.getElementById("login-btn").textContent = T("optLogin");
 document.getElementById("dashboard-btn").textContent = T("optDashboard");
 document.getElementById("lbl-owner").textContent = T("optOwnerLabel");
 document.getElementById("owner-activate").textContent = T("optOwnerActivate");
+document.getElementById("owner-paste").textContent = T("optOwnerPaste");
 document.getElementById("owner-remove").textContent = T("optOwnerRemove");
 document.getElementById("version-label").textContent = `${BRAND.name} v${chrome.runtime.getManifest().version}`;
 
@@ -131,9 +132,13 @@ async function loadSubscriptionStatus() {
 }
 loadSubscriptionStatus();
 
-// Owner key box: hidden until ?owner=KEY (auto-activates, then the param is
-// stripped from the URL) or five clicks on the version label. The key is never
-// echoed back: the input is cleared after every attempt.
+// Owner key box: hidden until five clicks on the version label. The key is
+// never echoed back: the input is cleared after every attempt. There is no
+// URL-parameter path any more: rewriting the URL afterwards does not remove
+// the committed history entry, so the key stayed in Chrome's history (v1.5.1
+// audit). "Pegar y activar" reads the clipboard on that click only (an
+// extension page may read it on a user gesture without extra permissions)
+// and never touches the URL.
 const ownerBox = document.getElementById("owner-box");
 const ownerInput = document.getElementById("owner-input");
 const ownerMsg = document.getElementById("owner-msg");
@@ -156,6 +161,20 @@ document.getElementById("version-label").addEventListener("click", () => {
   if (++versionClicks >= 5) ownerBox.hidden = false;
 });
 document.getElementById("owner-activate").addEventListener("click", () => tryOwnerKey(ownerInput.value));
+document.getElementById("owner-paste").addEventListener("click", async () => {
+  let text = "";
+  try {
+    text = await navigator.clipboard.readText();
+  } catch {
+    ownerInput.focus(); // clipboard blocked: the seller pastes by hand
+    return;
+  }
+  if (!String(text ?? "").trim()) {
+    ownerInput.focus();
+    return;
+  }
+  await tryOwnerKey(text);
+});
 ownerInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") tryOwnerKey(ownerInput.value);
 });
@@ -165,18 +184,6 @@ document.getElementById("owner-remove").addEventListener("click", async () => {
   ownerNote("");
   await loadSubscriptionStatus();
 });
-{
-  const params = new URLSearchParams(location.search);
-  if (params.has("owner")) {
-    const key = params.get("owner");
-    params.delete("owner");
-    const rest = params.toString();
-    history.replaceState(null, "", location.pathname + (rest ? `?${rest}` : "") + location.hash);
-    ownerBox.hidden = false;
-    tryOwnerKey(key);
-  }
-}
-
 // Anonymous analytics: the toggle and notice exist only in builds that have a
 // backend configured; ?debug also shows the local diagnostic line (queue, last
 // send status, HTTP code or error) so a broken backend is visible at once.

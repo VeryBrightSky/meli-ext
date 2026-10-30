@@ -10,10 +10,10 @@ globalThis.EXT_BRAND = Object.freeze({
   // Store-listing name (manifest "name" in release builds): descriptive and
   // keyword-matched to what sellers search on the Chrome Web Store. The
   // toolbar/short name stays "Netio" via manifest short_name.
-  storeName: "Netio: Calculadora de Comisiones y Ganancias Mercado Libre México",
+  storeName: "Netio: Calculadora de comisiones para vendedores de Mercado Libre",
   // Name used in manifest.json dev builds.
   manifestName: "Netio (dev)",
-  version: "1.5.1",
+  version: "1.5.2",
   description:
     "Calculadora de comisiones, ganancias y precios para vendedores de Mercado Libre México.",
   // ExtensionPay id (registered at extensionpay.com). Plans configured there:

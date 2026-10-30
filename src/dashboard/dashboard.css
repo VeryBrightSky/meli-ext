@@ -18,6 +18,7 @@ body {
 .head {
   display: flex;
   align-items: center;
+  flex-wrap: wrap; /* phone width: the buttons drop to a second line */
   gap: 10px;
   margin-bottom: 12px;
 }
@@ -267,9 +268,16 @@ tr.locked td:first-child {
   background: #e8f7ee;
 }
 
-/* v1.4.1: the table scrolls inside its card instead of spilling out */
-#content {
+/* v1.4.1: the table scrolls inside its card instead of spilling out.
+   v1.5.2: only the table scrolls (the summary and notes above it wrap), so a
+   360px phone never gets a page-wide horizontal scroll. */
+.table-scroll {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+#table[hidden] {
+  display: none;
 }
 
 td,

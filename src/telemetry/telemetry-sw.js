@@ -223,7 +223,6 @@ globalThis.MST_TELEMETRY_SW = (() => {
     }
 
     // --- flush -------------------------------------------------------------------------
-    let flushing = false;
     let timer = null;
     function scheduleFlush(st) {
       const q = st.view[K.queue] ?? [];
@@ -275,45 +274,53 @@ globalThis.MST_TELEMETRY_SW = (() => {
     // (network, 5xx, 429, 401/403/404 misconfig) keeps the queue.
     const POISON = new Set([400, 413, 422]);
 
-    async function flush() {
-      if (flushing) return { skipped: true };
-      flushing = true;
+    // One flush at a time. A caller that arrives while a flush is in flight
+    // (the debounce timer fired a moment earlier, or an explicit flush from a
+    // page) waits for that flush and gets its result, instead of a
+    // {skipped:true} that left the caller with nothing sent (v1.5.1 audit).
+    let inFlight = null;
+    function flush() {
+      if (!inFlight) {
+        inFlight = flushOnce().finally(() => {
+          inFlight = null;
+        });
+      }
+      return inFlight;
+    }
+
+    async function flushOnce() {
       let sent = 0;
-      try {
-        for (let i = 0; i < 4; i++) {
-          const info = await serial(async () => {
-            const st = await load();
-            if (!st.eff.enabled) return null;
-            const q = C.pruneQueue(st.view[K.queue], st.now);
-            if (q.length !== (st.view[K.queue] ?? []).length) {
-              await storage.set({ [K.queue]: q });
-            }
-            return q.length ? { cfg: st.eff.cfg, batch: C.takeBatch(q) } : null;
+      for (let i = 0; i < 4; i++) {
+        const info = await serial(async () => {
+          const st = await load();
+          if (!st.eff.enabled) return null;
+          const q = C.pruneQueue(st.view[K.queue], st.now);
+          if (q.length !== (st.view[K.queue] ?? []).length) {
+            await storage.set({ [K.queue]: q });
+          }
+          return q.length ? { cfg: st.eff.cfg, batch: C.takeBatch(q) } : null;
+        });
+        if (!info) break;
+        const res = await post(info.cfg, info.batch);
+        const more = await serial(async () => {
+          const st = await load();
+          if (!st.eff.enabled) return false; // opted out mid-flight: nothing to record
+          const drop = res.ok || POISON.has(res.status);
+          if (drop) {
+            const ids = new Set(info.batch.map((it) => it._id));
+            setView(st, K.queue, C.removeIds(C.pruneQueue(st.view[K.queue], st.now), ids));
+          }
+          setView(st, K.last, {
+            at: st.now,
+            status: res.status,
+            n: info.batch.length,
+            error: res.ok ? null : (drop ? `dropped: ${res.error}` : res.error)
           });
-          if (!info) break;
-          const res = await post(info.cfg, info.batch);
-          const more = await serial(async () => {
-            const st = await load();
-            if (!st.eff.enabled) return false; // opted out mid-flight: nothing to record
-            const drop = res.ok || POISON.has(res.status);
-            if (drop) {
-              const ids = new Set(info.batch.map((it) => it._id));
-              setView(st, K.queue, C.removeIds(C.pruneQueue(st.view[K.queue], st.now), ids));
-            }
-            setView(st, K.last, {
-              at: st.now,
-              status: res.status,
-              n: info.batch.length,
-              error: res.ok ? null : (drop ? `dropped: ${res.error}` : res.error)
-            });
-            await commit(st);
-            if (res.ok) sent += info.batch.length;
-            return drop && (st.view[K.queue] ?? []).length > 0;
-          });
-          if (!more) break;
-        }
-      } finally {
-        flushing = false;
+          await commit(st);
+          if (res.ok) sent += info.batch.length;
+          return drop && (st.view[K.queue] ?? []).length > 0;
+        });
+        if (!more) break;
       }
       return { sent };
     }

@@ -67,7 +67,7 @@ globalThis.MST_QUICKVIEW = (() => {
   function extractPrice(item) {
     for (const money of item.querySelectorAll(".andes-money-amount")) {
       // Skip crossed-out original prices ("precio anterior").
-      if (/previous/.test(money.className) || money.closest("s")) continue;
+      if (/previous/.test(money.className) || money.closest("s, del")) continue;
       const fraction = money.querySelector(".andes-money-amount__fraction");
       if (!fraction) continue;
       const whole = Number.parseInt(fraction.textContent.replace(/[^\d]/g, ""), 10);
@@ -81,33 +81,32 @@ globalThis.MST_QUICKVIEW = (() => {
     return null;
   }
 
-  // Free-shipping / MSI flags come from the result's own text. Our injected
-  // strip lives INSIDE the item, and its expanded panel prints "Envío gratis:
-  // Sí/No" (and the listing type), so reading item.innerText after injection
-  // would feed our own words back in. Flags are therefore cached per item at
-  // first read (before any strip exists), and a later read on an item that
-  // already carries a strip uses a clone with the strip removed.
+  // Free-shipping / MSI flags come from the result's own text, read from the
+  // price/installment/shipping elements when the card has them. Without them
+  // (layout drift) the fallback is the card text MINUS the title and the
+  // seller line: a title like "Laptop MSI Katana" or "ENVÍO GRATIS incluido"
+  // must not decide the listing type or the shipping flag. Our injected strip
+  // lives INSIDE the item and its expanded panel prints "Envío gratis: Sí/No"
+  // (and the listing type), so it is removed from the fallback text too and
+  // the flags are cached per item.
+  const SIGNAL_SELECTOR =
+    ".poly-price__installments, .poly-component__price, .poly-component__shipping";
+  const NOISE_SELECTOR = `.${STRIP_CLASS}, .poly-component__title, .poly-component__seller, h2, h3`;
   let flagsCache = new WeakMap();
   function itemFlags(item) {
     const cached = flagsCache.get(item);
     if (cached) return cached;
-    let text;
-    if (item.querySelector(`.${STRIP_CLASS}`)) {
-      const clone = item.cloneNode(true);
-      for (const own of clone.querySelectorAll(`.${STRIP_CLASS}`)) own.remove();
-      text = clone.textContent || "";
+    const signalEls = [...item.querySelectorAll(SIGNAL_SELECTOR)].filter(
+      (e) => !e.closest(`.${STRIP_CLASS}`)
+    );
+    let flags;
+    if (signalEls.length > 0) {
+      flags = UI.resultFlags({ scoped: signalEls.map((e) => e.textContent || "").join(" ") });
     } else {
-      text = item.innerText || "";
+      const clone = item.cloneNode(true);
+      for (const noise of clone.querySelectorAll(NOISE_SELECTOR)) noise.remove();
+      flags = UI.resultFlags({ body: clone.textContent || "" });
     }
-    const flags = {
-      // "Envío gratis" and the newer "Llega gratis hoy/mañana".
-      freeShipping: /(?:env[ií]o|llega) gratis/i.test(text),
-      // MSI is a Premium-only feature; absence is a weak signal, so this is a
-      // labeled guess in the UI.
-      listingTypeGuess: /meses sin intereses|mismo precio(?: en)? \d+ (?:meses|cuotas)|\bmsi\b/i.test(text)
-        ? "premium"
-        : "classic"
-    };
     flagsCache.set(item, flags);
     return flags;
   }
@@ -635,6 +634,30 @@ globalThis.MST_QUICKVIEW = (() => {
 
   // --- Scan & observe -----------------------------------------------------------
 
+  // Where the strip goes. In the list layout .poly-card__content grows with
+  // its children, so the strip sits inside it under the price. In the GRID
+  // layout (.poly-card--grid-card) the content box has a fixed height and
+  // overflow hidden, so a strip appended there is clipped or overlaps the
+  // price: the strip then goes on the result item itself (the <li>), after
+  // the card, where it is laid out in the flow. A content box that turns out
+  // fixed-height without the grid class (layout drift) is caught by one
+  // geometry read after the append and the strip is moved the same way.
+  function placeStrip(item, strip) {
+    const content = item.querySelector(".poly-card__content");
+    const grid =
+      item.matches(".poly-card--grid-card") || item.querySelector(".poly-card--grid-card") !== null;
+    if (!content || grid) {
+      item.appendChild(strip);
+      return;
+    }
+    content.appendChild(strip);
+    const stripRect = strip.getBoundingClientRect();
+    const boxRect = content.getBoundingClientRect();
+    if (stripRect.height > 0 && stripRect.bottom > boxRect.bottom + 1) {
+      item.appendChild(strip);
+    }
+  }
+
   function scan() {
     const { items, selector } = findItems();
     if (items.length === 0) return { injected: 0, total: 0, selector };
@@ -664,8 +687,7 @@ globalThis.MST_QUICKVIEW = (() => {
           processed.add(item);
           continue;
         }
-        const host = item.querySelector(".poly-card__content") ?? item;
-        host.appendChild(buildStrip(data));
+        placeStrip(item, buildStrip(data));
         injected++;
       } catch (err) {
         failed++;

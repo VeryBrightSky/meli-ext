@@ -653,6 +653,17 @@
   text-align: right;
 }
 
+/* v1.5.2: a shipping estimate filled by the card (not typed by the seller) */
+.mst-input--estimate {
+  color: rgba(0, 0, 0, 0.55);
+  font-style: italic;
+}
+
+.mst-input--estimate:focus {
+  color: rgba(0, 0, 0, 0.9);
+  font-style: normal;
+}
+
 .mst-input:focus,
 .mst-select:focus {
   outline: none;

@@ -676,5 +676,20 @@
   },
   "ownerWrongKey": {
     "message": "Clave incorrecta"
+  },
+  "welcomeTitleExpired": {
+    "message": "Tu prueba PRO ya terminó"
+  },
+  "welcomeLeadExpired": {
+    "message": "Puedes seguir usando la calculadora gratis o activar PRO. Así le sacas provecho:"
+  },
+  "welcomeTitleFree": {
+    "message": "Netio está listo"
+  },
+  "welcomeLeadFree": {
+    "message": "Puedes usar la calculadora gratis o activar PRO cuando quieras. Así le sacas provecho:"
+  },
+  "optOwnerPaste": {
+    "message": "Pegar y activar"
   }
 }

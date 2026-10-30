@@ -275,3 +275,36 @@ test("v1.4.3 options page uses localized Clásica/Premium labels, not hardcoded 
   assert.ok(!/>Clásica</.test(html) && !/>Premium</.test(html), "hardcoded option labels");
   assert.match(read("src/options/options.js"), /opt-classic[\s\S]*typeClassic/);
 });
+
+// v1.5.2 audit (E): the welcome page used `trialDaysLeft || 7`, so a reinstall
+// after an expired trial was told PRO was on for 7 days. The header copy is a
+// pure function of the entitlement status.
+test("v1.5.2 welcome copy: expired trial, paid/owner and active trial each get honest copy", () => {
+  const src = read("src/onboarding/welcome.js");
+  // Only the pure helper: the page IIFE below it needs a DOM.
+  new Function(src.slice(0, src.indexOf("(async () => {")))();
+  const copy = globalThis.MST_WELCOME_COPY;
+  const es = loadI18n("es-419");
+  const expired = copy({ pro: false, paid: false, trialActive: false, trialExpired: true, trialDaysLeft: 0 }, es.t);
+  assert.equal(expired.title, "Tu prueba PRO ya terminó");
+  assert.equal(expired.lead, "Puedes seguir usando la calculadora gratis o activar PRO. Así le sacas provecho:");
+  assert.equal(expired.pill, "Plan gratuito");
+  assert.ok(!/\d+ días/.test(expired.pill + expired.lead), "no day count after the trial");
+  const paid = copy({ pro: true, paid: true, trialActive: false, trialExpired: false, trialDaysLeft: 0 }, es.t);
+  assert.equal(paid.pill, "PRO activo");
+  assert.equal(paid.title, "Netio PRO está activo");
+  const owner = copy({ pro: true, paid: true, owner: true, trialActive: false, trialExpired: false, trialDaysLeft: 0 }, es.t);
+  assert.equal(owner.pill, "PRO activo");
+  const trial = copy({ pro: true, paid: false, trialActive: true, trialExpired: false, trialDaysLeft: 7, localTrial: true }, es.t);
+  assert.equal(trial.title, "Tu PRO está activado");
+  assert.ok(trial.lead.includes("7 días"));
+  assert.equal(trial.pill, "PRO · 7 días de prueba");
+  const last = copy({ pro: true, paid: false, trialActive: true, trialExpired: false, trialDaysLeft: 1 }, es.t);
+  assert.equal(last.pill, "PRO · último día de prueba");
+  // A lapsed subscriber (not a trial) gets the plain free copy, never "tu prueba terminó".
+  const lapsed = copy({ pro: false, paid: false, lapsed: true, trialActive: false, trialExpired: false, trialDaysLeft: 0 }, es.t);
+  assert.equal(lapsed.title, "Netio está listo");
+  const en = loadI18n("en");
+  assert.equal(copy({ trialExpired: true }, en.t).title, "Your PRO trial has ended");
+  assert.equal(copy({ trialExpired: true }, en.t).lead, "Keep using the free calculator or activate PRO. Here's how to get value from it:");
+});

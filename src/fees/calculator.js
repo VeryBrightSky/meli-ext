@@ -160,12 +160,16 @@ globalThis.MST_CALC = (() => {
       price = (base + fixed) / denom;
     }
     const feasible = (p) => p * denom + 1e-9 >= base + fixedCostFn(p);
-    const finish = (p) => {
+    // Walk up a cent at a time (bounded) from p until it truly covers; null
+    // when the walk runs out. The step at the minimum, or the rounding of a
+    // band solution onto a step, can leave the first cent price short.
+    const walkUp = (p, steps) => {
       let out = ceil2(Math.max(p, minPriceMXN));
-      // The step at the minimum (or rounding) can still leave it short;
-      // walk up a cent at a time (bounded) until it truly covers.
-      for (let i = 0; i < 5 && !feasible(out); i++) out = ceil2(out + 0.01);
-      return out;
+      for (let i = 0; i < steps; i++) {
+        if (feasible(out)) return out;
+        out = ceil2(out + 0.01);
+      }
+      return feasible(out) ? out : null;
     };
     // fixedCostFn is piecewise constant between `thresholds`, and NOT monotonic
     // (the fixed charge vanishes and the shipping discount starts at $299), so
@@ -174,13 +178,38 @@ globalThis.MST_CALC = (() => {
     // next band) intervals, so its minimum is always a band start or a band
     // solution: test them all and take the lowest that truly covers. Every
     // candidate re-evaluates fixedCostFn at its own price.
-    const candidates = [price, ...thresholds];
+    // Candidates are rounded UP to the cent BEFORE the feasibility test: a
+    // band solution like 198.99999999999997 is feasible as a float, but the
+    // displayed 199.00 sits in the next band with a higher charge, where it
+    // is not (v1.5.1 audit: the solver answered an infeasible 199.05 when
+    // 204.00 was the real answer). Rounding first keeps every candidate an
+    // honest price, and a candidate whose cent walk still falls short is
+    // dropped for the next one instead of being returned anyway.
+    const raw = [price, ...thresholds];
     for (const t of [0, ...thresholds]) {
       const p = (base + fixedCostFn(t)) / denom;
-      if (p >= t) candidates.push(p);
+      if (p >= t) raw.push(p);
     }
-    const ok = candidates.filter((p) => p > 0 && feasible(p)).sort((a, b) => a - b);
-    const out = ok.length ? finish(ok[0]) : finish(price);
+    const candidates = [...new Set(raw.filter((p) => p > 0).map((p) => ceil2(Math.max(p, minPriceMXN))))]
+      .sort((a, b) => a - b);
+    let out = null;
+    for (const c of candidates) {
+      if (feasible(c)) {
+        out = c;
+        break;
+      }
+      const walked = walkUp(c, 5);
+      if (walked !== null) {
+        out = walked;
+        break;
+      }
+    }
+    if (out === null) {
+      // Last resort: scan upward by cents from the cheapest candidate (or the
+      // fixed point) until something covers.
+      out = walkUp(candidates.length ? candidates[0] : price, 2000);
+      if (out === null) return null;
+    }
     if (!Number.isFinite(out) || out > Math.max((base + fixedCostFn(out)) * MAX_PRICE_MULTIPLE, minPriceMXN)) return null;
     return out;
   }
