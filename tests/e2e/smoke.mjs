@@ -246,16 +246,20 @@ try {
 
   // Answer-first summary + collapsed breakdown. v1.5.2 (I): with no shipping
   // set anywhere, an $827 listing (free shipping mandatory, seller pays) is
-  // headlined with the 0.3 kg Mercado Envíos estimate ($52.40) the sweet spot
-  // already assumed, instead of $0: 827 − 82.70 − 52.40 = 691.90.
-  await page.waitForFunction(() => (document.querySelector(".mst-summary__net")?.textContent ?? "").includes("$691.90"), { timeout: 5000 });
-  assert.equal(await page.$eval(".mst-summary__net", (e) => e.textContent), "Mercado Libre te deposita $691.90 por venta");
+  // headlined with the 0.3 kg Mercado Envíos estimate the sweet spot already
+  // assumed, instead of $0. v1.5.3: the estimate comes from the OFFICIAL
+  // table of the seller's reputation at the listing's price band; the default
+  // "Sin reputación" reads the amarilla table and $827 sits in the
+  // $499–998.99 band → $78.60 (v1.5.2 showed $52.40, the verde $299 column):
+  // 827 − 82.70 − 78.60 = 665.70.
+  await page.waitForFunction(() => (document.querySelector(".mst-summary__net")?.textContent ?? "").includes("$665.70"), { timeout: 5000 });
+  assert.equal(await page.$eval(".mst-summary__net", (e) => e.textContent), "Mercado Libre te deposita $665.70 por venta");
   assert.equal(await page.$eval("details.mst-breakdown", (d) => d.open), false, "breakdown collapsed by default");
   assert.ok(
     await page.$eval("details.mst-breakdown", (d) => d.textContent.includes("Comisión por venta")),
     "commission row lives inside the breakdown"
   );
-  pass("summary leads with 'Mercado Libre te deposita $691.90 por venta' (0.3 kg shipping estimate); fee breakdown collapsed by default");
+  pass("summary leads with 'Mercado Libre te deposita $665.70 por venta' (0.3 kg official estimate, sin reputación, $499–998.99 band); fee breakdown collapsed by default");
   // The estimate sits in the shipping row, marked as an estimate, editable.
   const shipEst = await page.$$eval(".mst-card input.mst-input", (inputs) => ({
     value: inputs[1].value,
@@ -263,10 +267,15 @@ try {
     title: inputs[1].title,
     disabled: inputs[1].disabled
   }));
-  assert.deepEqual(shipEst, { value: "52.40", estimate: "1", title: "Estimado", disabled: false });
+  assert.deepEqual(shipEst, { value: "78.60", estimate: "1", title: "Estimado", disabled: false });
   const estTag = await page.$eval(".mst-estimate-tag", (e) => ({ hidden: e.hidden, text: e.textContent, shown: e.offsetWidth > 0 }));
   assert.deepEqual(estTag, { hidden: false, text: "est.", shown: true });
-  pass("shipping row shows the autofilled 52.40 estimate (marked 'Estimado' + visible 'est.' tag, editable)");
+  pass("shipping row shows the autofilled 78.60 estimate (marked 'Estimado' + visible 'est.' tag, editable)");
+  // The estimate carries the 40% amarilla / sin reputación discount already;
+  // the row says so instead of subtracting anything again.
+  await openBreakdown(page);
+  assert.equal(await page.evaluate(rowValue("Descuento por reputación")), "Ya incluido en la tabla (40%)");
+  pass("reputation discount row: 'Ya incluido en la tabla (40%)' for the sin reputación estimate (nothing subtracted twice)");
 
   // Spanish UI must render Spanish (regression: chrome.i18n served English).
   assert.equal(await page.$eval(".mst-title", (e) => e.textContent), "Calculadora de ganancias");
@@ -278,8 +287,8 @@ try {
 
   assert.equal(await page.evaluate(rowValue("Comisión")), "−$82.70");
   assert.equal(await page.evaluate(rowValue("Costo total")), "10%");
-  assert.equal(await page.evaluate(rowValue("Recibes aprox.")), "$691.90");
-  pass("free fee card intact: 10% category via structured data, net $691.90 (827 − 82.70 − 52.40 est. shipping)");
+  assert.equal(await page.evaluate(rowValue("Recibes aprox.")), "$665.70");
+  pass("free fee card intact: 10% category via structured data, net $665.70 (827 − 82.70 − 78.60 est. shipping)");
 
   // Retenciones is FREE (accuracy feature), default off (row hidden/empty).
   assert.equal(await page.evaluate(rowValue("IVA retenido")), "");
@@ -288,28 +297,28 @@ try {
   await sleep(300);
   assert.equal(await page.evaluate(rowValue("IVA retenido")), "−$57.03");
   assert.equal(await page.evaluate(rowValue("ISR retenido")), "−$17.82");
-  assert.equal(await page.evaluate(rowValue("Neto después")), "$617.05"); // 691.90 − 74.85
-  pass("retenciones (free): IVA −$57.03, ISR −$17.82, neto después $617.05");
+  assert.equal(await page.evaluate(rowValue("Neto después")), "$590.85"); // 665.70 − 74.85
+  pass("retenciones (free): IVA −$57.03, ISR −$17.82, neto después $590.85");
 
   // v1.5.2 critic: with nothing configured, the dashboard applies the same
   // 0.3 kg estimate as the card, so both show the same ganancia for this
-  // listing (827 − 82.70 − 52.40 − 400 = 291.90).
+  // listing (v1.5.3 official table: 827 − 82.70 − 78.60 − 400 = 265.70).
   await typeInto(page, 2, "400"); // product cost (persists cost + meta, not the estimate)
   await openBreakdown(page);
   const cardProfit = await page.evaluate(rowValue("Ganancia"));
-  assert.ok(cardProfit.startsWith("$291.90"), `card profit: ${cardProfit}`);
+  assert.ok(cardProfit.startsWith("$265.70"), `card profit: ${cardProfit}`);
   {
     const d0 = await browser.newPage();
     await d0.goto(`chrome-extension://${extId}/src/dashboard/dashboard.html`, { waitUntil: "load" });
     await d0.waitForFunction(() => !document.getElementById("content")?.hidden, { timeout: 10000 });
     const rowText = await d0.$eval("#rows tr", (tr) => tr.textContent);
-    assert.ok(rowText.includes("$291.90"), `dashboard row: ${rowText}`);
+    assert.ok(rowText.includes("$265.70"), `dashboard row: ${rowText}`);
     const note = await d0.$eval("#shipping-note", (e) => e.textContent);
-    assert.equal(note, "Envío: estimado por peso de Mercado Envíos (0.3 kg si no elegiste peso). Cifras estimadas.");
+    assert.equal(note, "Envío: estimado con la tabla oficial de Mercado Envíos según peso, precio y reputación (0.3 kg si no elegiste peso). Cifras estimadas.");
     assert.ok(!note.includes("$0.00"));
     await d0.close();
   }
-  pass("card and dashboard agree on the shipping estimate: ganancia $291.90 in both, dashboard note says 'estimado'");
+  pass("card and dashboard agree on the shipping estimate: ganancia $265.70 in both, dashboard note says 'estimado'");
 
   await typeInto(page, 1, "50"); // shipping: typed, replaces the estimate
   assert.equal(await page.$$eval(".mst-card input.mst-input", (i) => i[1].dataset.estimate), "", "typed shipping is no longer marked as an estimate");
@@ -751,12 +760,15 @@ try {
   await setSelect("Peso (para estimar el envío)", "1");
   assert.equal(await page.$$eval(".mst-card input.mst-input", (i) => i[1].value), "50.00");
   pass("weight select keeps the seller's typed shipping ($50.00)");
+  // v1.5.3: the autofill reads the official amarilla / sin reputación table at
+  // the $499–998.99 band of this $827 listing (v1.5.2: verde $299 column
+  // 56.00 / 59.60).
   await typeInto(page, 1, "0");
   await setSelect("Peso (para estimar el envío)", "0.5");
-  assert.equal(await page.$$eval(".mst-card input.mst-input", (i) => i[1].value), "56.00");
+  assert.equal(await page.$$eval(".mst-card input.mst-input", (i) => i[1].value), "84.00");
   await setSelect("Peso (para estimar el envío)", "1");
-  assert.equal(await page.$$eval(".mst-card input.mst-input", (i) => i[1].value), "59.60");
-  pass("weight select autofills shipping when empty and keeps tracking weight until the seller types (0.5 kg $56.00 → 1 kg $59.60)");
+  assert.equal(await page.$$eval(".mst-card input.mst-input", (i) => i[1].value), "89.40");
+  pass("weight select autofills shipping when empty and keeps tracking weight until the seller types (0.5 kg $84.00 → 1 kg $89.40, sin reputación, $499 band)");
   await typeInto(page, 1, "50");
 
   // Category select changes the commission.
@@ -769,14 +781,28 @@ try {
   await setSelect("Categoría", "tech");
   assert.equal(await page.evaluate(rowValue("Comisión")), "−$82.70");
 
-  // Reputation subsidy row appears with free shipping + a green reputation.
+  // v1.5.3: reputation selects the official table. A typed cost is charged as
+  // typed (no discount row: v1.5.2 showed −$25.00 here, half of the typed 50);
+  // an autofilled estimate follows the chosen table and names its discount.
   await openBreakdown(page);
   await page.click(".mst-free-toggle");
   await sleep(200);
   await setSelect("Reputación del vendedor", "verde");
-  assert.equal(await page.evaluate(rowValue("Descuento por reputación")), "−$25.00"); // 50% of 50, shown as a reduction
-  pass("reputation verde + envío gratis → subsidy row −$25.00");
+  assert.equal(await page.evaluate(rowValue("Descuento por reputación")), "", "typed shipping gets no discount row");
+  assert.equal(await page.evaluate(rowValue("Recibes aprox.")), "$694.30"); // 827 − 82.70 − 50 typed, untouched by verde
+  await typeInto(page, 1, "0"); // clear the typed cost: the 1 kg estimate refills from the verde table
+  await setSelect("Peso (para estimar el envío)", "1");
+  assert.equal(await page.$$eval(".mst-card input.mst-input", (i) => i[1].value), "74.50"); // verde, 1 kg, $499–998.99
+  assert.equal(await page.evaluate(rowValue("Descuento por reputación")), "Ya incluido en la tabla (50%)");
+  await setSelect("Reputación del vendedor", "naranja");
+  assert.equal(await page.$$eval(".mst-card input.mst-input", (i) => i[1].value), "149.00"); // naranja, 1 kg, $499–998.99
+  assert.equal(await page.evaluate(rowValue("Descuento por reputación")), "", "no discount in the naranja table");
+  assert.equal(await page.evaluate(rowValue("Recibes aprox.")), "$595.30"); // 827 − 82.70 − 149
   await setSelect("Reputación del vendedor", "none");
+  assert.equal(await page.$$eval(".mst-card input.mst-input", (i) => i[1].value), "89.40"); // amarilla / sin reputación
+  assert.equal(await page.evaluate(rowValue("Descuento por reputación")), "Ya incluido en la tabla (40%)");
+  pass("reputation picks the official table: typed $50 stays $50 (no row); 1 kg estimate verde $74.50 (50% incluido) → naranja $149.00 (no row) → sin reputación $89.40 (40% incluido)");
+  await typeInto(page, 1, "50");
   await page.click(".mst-free-toggle");
   await sleep(200);
 

@@ -32,13 +32,14 @@ test("tech category quote is exact and matches the table", () => {
   assert.equal(q.fixedCostMXN, 0); // 827 >= 299
 });
 
-test("unknown category falls back to official ranges", () => {
+test("unknown category falls back to official ranges (ayuda _870, 2026-10-30: 8–17 / 11–21.5)", () => {
   const q = SOURCE.getQuote({ priceMXN: 827, listingTypeId: "classic", categoryGroupId: null });
   assert.equal(q.pctMin, 8);
-  assert.equal(q.pctMax, 16);
+  assert.equal(q.pctMax, 17);
   const p = SOURCE.getQuote({ priceMXN: 827, listingTypeId: "premium", categoryGroupId: null });
-  assert.equal(p.pctMin, 12.5);
-  assert.equal(p.pctMax, 20.5);
+  assert.equal(p.pctMin, 11);
+  assert.equal(p.pctMax, 21.5);
+  assert.ok(SOURCE.meta.sources.some((src) => src.url === "https://www.mercadolibre.com.mx/ayuda/Costos-de-vender-un-producto_870" && src.confidence === "official"));
 });
 
 test("fixed cost tiers and boundaries (official MX bands: 99/149/299)", () => {
@@ -84,8 +85,8 @@ test("breakdown math: range rates produce swapped net bounds", () => {
   const q = SOURCE.getQuote({ priceMXN: 1000, listingTypeId: "classic", categoryGroupId: null });
   const b = CALC.computeBreakdown(q, { priceMXN: 1000, shippingCostMXN: 0, productCostMXN: 0 });
   assert.equal(b.commissionMinMXN, 80); // 8%
-  assert.equal(b.commissionMaxMXN, 160); // 16%
-  assert.equal(b.netMinMXN, 840); // worst case = max commission
+  assert.equal(b.commissionMaxMXN, 170); // 17%
+  assert.equal(b.netMinMXN, 830); // worst case = max commission
   assert.equal(b.netMaxMXN, 920);
   assert.ok(b.netMinMXN <= b.netMaxMXN);
 });
@@ -218,7 +219,7 @@ test("effective rate combines commission and fixed charge as % of price", () => 
   const q3 = SOURCE.getQuote({ priceMXN: 1000, listingTypeId: "classic", categoryGroupId: null });
   const b3 = CALC.computeBreakdown(q3, { priceMXN: 1000, shippingCostMXN: 0, productCostMXN: 0 });
   assert.equal(b3.effectiveRateMinPct, 8);
-  assert.equal(b3.effectiveRateMaxPct, 16);
+  assert.equal(b3.effectiveRateMaxPct, 17);
 });
 
 test("exact display numbers: breakeven $500.00, target $642.86 (10% classic, cost 400, ship 50)", () => {
@@ -516,32 +517,59 @@ test("gate: offline Pro cache expires past the TTL (bounded staleness)", () => {
   assert.equal(GATE.isCacheUsable(null, now), false);
 });
 
-test("shipping subsidy: reputation reduces free-shipping cost at/above threshold", () => {
-  const S = CALC.subsidizedShipping;
-  // Below the threshold → seller pays all, regardless of reputation.
-  assert.equal(S({ fullShippingMXN: 100, priceMXN: 250, freeShipping: true, subsidyPct: 50, thresholdMXN: 299 }), 100);
-  // Not free shipping → seller pays all.
-  assert.equal(S({ fullShippingMXN: 100, priceMXN: 500, freeShipping: false, subsidyPct: 50, thresholdMXN: 299 }), 100);
-  // Free shipping AT the threshold → subsidy applies.
-  assert.equal(S({ fullShippingMXN: 100, priceMXN: 299, freeShipping: true, subsidyPct: 50, thresholdMXN: 299 }), 50);
-  // Free shipping above threshold, 40% (amarillo) → pays 60%.
-  assert.equal(S({ fullShippingMXN: 120, priceMXN: 500, freeShipping: true, subsidyPct: 40, thresholdMXN: 299 }), 72);
-  // 0% subsidy (naranja/roja) → pays full even when eligible.
-  assert.equal(S({ fullShippingMXN: 100, priceMXN: 500, freeShipping: true, subsidyPct: 0, thresholdMXN: 299 }), 100);
-  // Guards: zero full cost stays 0; subsidy clamps to [0,100].
-  assert.equal(S({ fullShippingMXN: 0, priceMXN: 500, freeShipping: true, subsidyPct: 50, thresholdMXN: 299 }), 0);
-  assert.equal(S({ fullShippingMXN: 100, priceMXN: 500, freeShipping: true, subsidyPct: 150, thresholdMXN: 299 }), 0);
+test("shipping: reputation selects the official table, no percentage is applied on top", () => {
+  // The old multiplicative subsidy is gone: the official tables already
+  // include the discount (50% verde, 40% amarilla / none, 0% naranja).
+  assert.equal(CALC.subsidizedShipping, undefined);
+  assert.equal(SOURCE.shippingSubsidy, undefined);
+  assert.equal(SOURCE.shippingByReputation.confidence, "official");
+  assert.deepEqual(SOURCE.shippingByReputation.tableFor, { verde: "verde", amarillo: "amarilla", naranja: "naranja", none: "amarilla" });
+  // verde 0.3 kg at $299: 52.40 (the old path halved it to 26.20).
+  assert.equal(SHIPPING.costForWeight(0.3, 299, "verde"), 52.4);
+  // amarilla (card id "amarillo") 0.3 kg optional free shipping below $299: 62.90.
+  assert.equal(SHIPPING.costForWeight(0.3, 150, "amarillo"), 62.9);
+  assert.equal(SHIPPING.costForWeight(0.3, 150, "amarilla"), 62.9);
+  // "none" (sin reputación) reads the amarilla table per the official page title.
+  assert.equal(SHIPPING.costForWeight(0.3, 150, "none"), 62.9);
+  assert.equal(SHIPPING.costForWeight(0.3, 827, "none"), 78.6);
+  assert.equal(SHIPPING.costForWeight(0.3, 827, undefined), 78.6);
+  // naranja 3 kg at $999: 190.
+  assert.equal(SHIPPING.costForWeight(3, 999, "naranja"), 190);
+  assert.equal(SHIPPING.costForWeight(3, 998.99, "naranja"), 177);
+  // 40 kg verde at $2000: 349 (the old table stopped at 30 kg).
+  assert.equal(SHIPPING.costForWeight(40, 2000, "verde"), 349);
+  assert.equal(SHIPPING.discountPctFor("verde"), 50);
+  assert.equal(SHIPPING.discountPctFor("amarillo"), 40);
+  assert.equal(SHIPPING.discountPctFor("none"), 40);
+  assert.equal(SHIPPING.discountPctFor("naranja"), 0);
 });
 
-test("shipping subsidy table: conservative estimate values are wired + labeled", () => {
-  const sub = SOURCE.shippingSubsidy;
-  assert.equal(sub.confidence, "estimate");
-  assert.equal(sub.thresholdMXN, 299);
-  const byId = Object.fromEntries(sub.levels.map((l) => [l.id, l.subsidyPct]));
-  assert.equal(byId.verde, 50); // conservative low end of the 50–60% range
-  assert.equal(byId.amarillo, 40);
-  assert.equal(byId.naranja, 0);
-  assert.equal(byId.none, 0);
+test("shipping: price bands step at $299, $499 and $999 and the optional column equals $299–498.99", () => {
+  for (const rep of ["verde", "amarillo", "naranja"]) {
+    for (const kg of [0.3, 1, 5, 30, 350]) {
+      const optional = SHIPPING.costForWeight(kg, 100, rep);
+      assert.equal(SHIPPING.costForWeight(kg, 0, rep), optional, `${rep} ${kg} $0`);
+      assert.equal(SHIPPING.costForWeight(kg, 298.99, rep), optional, `${rep} ${kg} $298.99`);
+      assert.equal(SHIPPING.costForWeight(kg, 299, rep), optional, `${rep} ${kg} $299`);
+      assert.equal(SHIPPING.costForWeight(kg, 498.99, rep), optional, `${rep} ${kg} $498.99`);
+      const mid = SHIPPING.costForWeight(kg, 499, rep);
+      const top = SHIPPING.costForWeight(kg, 999, rep);
+      assert.ok(mid >= optional, `${rep} ${kg}: $499 band below $299 band`);
+      assert.ok(top >= mid, `${rep} ${kg}: $999 band below $499 band`);
+      assert.equal(SHIPPING.costForWeight(kg, 998.99, rep), mid);
+      assert.equal(SHIPPING.costForWeight(kg, 1e6, rep), top);
+    }
+  }
+  assert.deepEqual([...SHIPPING.priceBandThresholds], [299, 499, 999]);
+  assert.deepEqual(SOURCE.getShippingThresholds(), [299, 499, 999]);
+  // Orange is strictly the undiscounted price; verde is half of it, amarilla 60%.
+  for (const [w, row] of globalThis.MST_SHIPPING_TABLE.tables.naranja.rows.entries()) {
+    for (const [c, orange] of row.entries()) {
+      assert.equal(globalThis.MST_SHIPPING_TABLE.tables.verde.rows[w][c], CALC.round2(orange * 0.5), `verde row ${w} col ${c}`);
+      // Amarilla values are rounded on the official page (e.g. 62.9 for 104.8 × 0.6 = 62.88).
+      assert.ok(Math.abs(globalThis.MST_SHIPPING_TABLE.tables.amarilla.rows[w][c] - orange * 0.6) < 0.11, `amarilla row ${w} col ${c}`);
+    }
+  }
 });
 
 test("MSI cost: seller financing charge is a % of price, guarded", () => {
@@ -560,22 +588,34 @@ test("MSI reference defaults are wired and clearly a reference (not authoritativ
   assert.deepEqual(byMonths, { 3: 5, 6: 7.5, 9: 10, 12: 13 });
 });
 
-test("shipping table: bracket lookup boundaries", () => {
-  assert.equal(SHIPPING.costForWeight(0.2), 52.4);
-  assert.equal(SHIPPING.costForWeight(0.3), 52.4); // inclusive upper bound
-  assert.equal(SHIPPING.costForWeight(0.31), 56.0);
-  assert.equal(SHIPPING.costForWeight(1), 59.6);
-  assert.equal(SHIPPING.costForWeight(10), 129.2);
-  assert.equal(SHIPPING.costForWeight(30), 225.2);
-  assert.equal(SHIPPING.costForWeight(31), null); // above the table
-  assert.equal(SHIPPING.costForWeight(0), null);
-  assert.equal(SHIPPING.costForWeight(-1), null);
+test("shipping table: weight bracket boundaries (verde, $299–498.99 band)", () => {
+  const v = (kg) => SHIPPING.costForWeight(kg, 299, "verde");
+  assert.equal(v(0.2), 52.4);
+  assert.equal(v(0.3), 52.4); // inclusive upper bound
+  assert.equal(v(0.31), 56.0);
+  assert.equal(v(1), 59.6);
+  assert.equal(v(10), 129.2);
+  assert.equal(v(30), 225.2);
+  assert.equal(v(31), 279.2); // 30–40 kg row (the old table returned null here)
+  assert.equal(v(350), 2516.8);
+  assert.equal(v(351), 2516.8); // "más de 350 kg" repeats the last row
+  assert.equal(v(0), null);
+  assert.equal(v(-1), null);
+  assert.equal(SHIPPING.costForWeight(NaN, 299, "verde"), null);
 });
 
-test("shipping table meta carries source citation and date", () => {
-  assert.equal(SHIPPING.meta.retrievedAt, "2026-06-12");
-  assert.ok(SHIPPING.meta.sources.length >= 1);
-  assert.equal(SHIPPING.brackets.length, 13);
+test("shipping table meta cites the three official pages, dated 2026-10-30", () => {
+  assert.equal(SHIPPING.meta.retrievedAt, "2026-10-30");
+  for (const id of ["40538", "40545", "40547"]) {
+    assert.ok(SHIPPING.meta.sources.some((s) => s.url === `https://www.mercadolibre.com.mx/ayuda/${id}` && s.confidence === "official"), id);
+  }
+  assert.equal(SHIPPING.brackets.length, 30); // finite rows for the weight select
+  assert.equal(SHIPPING.brackets[0].maxKg, 0.3);
+  assert.equal(SHIPPING.brackets[29].maxKg, 350);
+  for (const t of Object.values(globalThis.MST_SHIPPING_TABLE.tables)) {
+    assert.equal(t.rows.length, 31);
+    assert.ok(t.rows.every((r) => r.length === 6));
+  }
 });
 
 test("dashboard recomputes rows LIVE from current default shipping (bug 1)", () => {
@@ -711,9 +751,13 @@ test("marginHealth thresholds: <10 red, 10–25 yellow, ≥25 green", () => {
 
 test("fee table meta carries source citations and retrieval date", () => {
   assert.ok(SOURCE.meta.version.startsWith("2026-"));
-  assert.equal(SOURCE.meta.retrievedAt, "2026-06-12");
+  assert.equal(SOURCE.meta.retrievedAt, "2026-10-30");
   assert.ok(SOURCE.meta.sources.length >= 3);
   assert.ok(SOURCE.meta.sources.some((s) => s.confidence === "official"));
+  // The three official shipping tables are cited by the fee table too.
+  for (const id of ["40538", "40545", "40547"]) {
+    assert.ok(SOURCE.meta.sources.some((s) => s.url === `https://www.mercadolibre.com.mx/ayuda/${id}` && s.confidence === "official"), id);
+  }
 });
 
 test("gate: local reverse trial — active for 7 days from install, then expired", () => {
@@ -796,10 +840,11 @@ test("sweet spot: crossing $299 into paid free shipping is not a gain", () => {
 
 test("solveTargetPrice returns the LOWEST covering price around the $299 step (brute force)", () => {
   const fixed = SOURCE.fixedCostFnFor({ listingTypeId: "classic" });
-  const ship = (p) =>
-    CALC.subsidizedShipping({ fullShippingMXN: 120, priceMXN: p, freeShipping: p >= 299, subsidyPct: 50, thresholdMXN: 299 });
+  // The card's estimate path: official verde table for 2 kg at price p
+  // (67.60 up to $498.99, 84.50 from $499 and $999), charged everywhere.
+  const ship = (p) => SHIPPING.costForWeight(2, p, "verde");
   const fn = (p) => fixed(p) + ship(p);
-  const thresholds = [...new Set([...SOURCE.getFixedCostThresholds(null), 299])].sort((a, b) => a - b);
+  const thresholds = [...new Set([...SOURCE.getFixedCostThresholds(null), ...SOURCE.getShippingThresholds()])].sort((a, b) => a - b);
   for (const cost of [60, 120, 150, 170, 185, 200, 230]) {
     for (const margin of [0, 10, 30]) {
       const rate = 16;
@@ -815,7 +860,7 @@ test("solveTargetPrice returns the LOWEST covering price around the $299 step (b
   }
 });
 
-test("dashboard applies the reputation shipping discount and Full like the card", () => {
+test("dashboard charges a configured shipping as typed and reads the reputation table only for estimates, Full like the card", () => {
   const all = {
     "mst:cost:MLM9": 200,
     "mst:meta:MLM9": { title: "X", priceMXN: 500, listingTypeId: "classic", categoryGroupId: "tech", url: "u" },
@@ -824,8 +869,14 @@ test("dashboard applies the reputation shipping discount and Full like the card"
   const plain = DASH.computeRows(all, "mst", 100)[0];
   const verde = DASH.computeRows(all, "mst", 100, { reputationId: "verde" })[0];
   assert.equal(plain.b.shippingCostMXN, 100);
-  assert.equal(verde.b.shippingCostMXN, 50); // $299+ is always free shipping
-  // Below $299 the discount does not apply unless free shipping is on.
+  // The typed default already is what the seller pays: no 50% taken off it.
+  assert.equal(verde.b.shippingCostMXN, 100);
+  // With nothing configured, the estimate comes from the reputation's table
+  // at the listing's band: 2 kg at $500 → verde 84.50, none/amarilla 101.40, naranja 169.
+  assert.equal(DASH.computeRows(all, "mst", 0, { shippingUnset: true, reputationId: "verde" })[0].b.shippingCostMXN, 84.5);
+  assert.equal(DASH.computeRows(all, "mst", 0, { shippingUnset: true, reputationId: "none" })[0].b.shippingCostMXN, 101.4);
+  assert.equal(DASH.computeRows(all, "mst", 0, { shippingUnset: true, reputationId: "naranja" })[0].b.shippingCostMXN, 169);
+  // Below $299 a typed default is charged as typed.
   const low = { ...all, "mst:meta:MLM9": { ...all["mst:meta:MLM9"], priceMXN: 250 } };
   assert.equal(DASH.computeRows(low, "mst", 100, { reputationId: "verde" })[0].b.shippingCostMXN, 100);
   // Full: the quote takes the Full service cost for the saved weight.
@@ -1035,7 +1086,9 @@ test("v1.4.3 gate.refresh: an answer after the timeout is applied, cached and an
 // 204.00, the band solution of the $199 band.
 test("v1.5.2 solveTargetPrice: candidate rounded onto a higher band is not returned infeasible (199.05 → 204.00)", () => {
   const fixedFn = SOURCE.fixedCostFnFor({ listingTypeId: "classic", fullWeightKg: 0.3 });
-  const ship = (p) => CALC.subsidizedShipping({ fullShippingMXN: 52.4, priceMXN: p, freeShipping: p >= 299, subsidyPct: 50, thresholdMXN: 299 });
+  // Same shipping shape as the audit (52.40 below $299, 26.20 from $299),
+  // kept as a plain step so the regression stays about the rounding bug.
+  const ship = (p) => (p >= 299 ? 26.2 : 52.4);
   const fn = (p) => fixedFn(p) + ship(p);
   const got = CALC.solveTargetPrice({ costMXN: 35, shippingMXN: 0, marginPct: 30, ratePct: 10, fixedCostFn: fn, thresholds: [99, 199, 299], minPriceMXN: 35 });
   assert.equal(got, 204);
@@ -1044,36 +1097,45 @@ test("v1.5.2 solveTargetPrice: candidate rounded onto a higher band is not retur
 });
 
 // Brute force over a grid of inputs (Full weights, plain classic/premium,
-// reputation shipping, margins, rates): the answer must be feasible and no
-// cheaper cent price from $35 up may be feasible.
+// shipping typed / estimated from the official tables by reputation and
+// weight, margins, rates): the answer must be feasible and no cheaper cent
+// price from $35 up may be feasible.
 test("v1.5.2 solveTargetPrice: brute force grid, every answer feasible and minimal", () => {
   const combos = [];
   const fullWeights = [null, 0.3, 0.5, 1, 2];
+  // "typed:N" is a seller-typed cost (flat); "est:kg" the card's estimate path
+  // (official table at price p, charged everywhere); "none:kg" no cost set
+  // (official table only from $299, 0 below).
+  const shippings = ["typed:0", "typed:52.4", "typed:120", "est:0.3", "est:2", "none:0.3", "none:12"];
   for (const listingTypeId of ["classic", "premium"]) {
     for (const fullWeightKg of fullWeights) {
-      for (const shippingFull of [0, 52.4, 120]) {
-        for (const subsidyPct of [0, 50]) {
-          for (const cost of [20, 35, 60, 119, 150, 199, 250]) {
+      for (const shipping of shippings) {
+        for (const reputationId of ["verde", "none", "naranja"]) {
+          for (const cost of [20, 35, 60, 119, 150, 199, 250, 400, 850]) {
             for (const margin of [0, 30]) {
-              combos.push({ listingTypeId, fullWeightKg, shippingFull, subsidyPct, cost, margin });
+              combos.push({ listingTypeId, fullWeightKg, shipping, reputationId, cost, margin });
             }
           }
         }
       }
     }
   }
-  // 2 × 5 × 3 × 2 × 7 × 2 = 840 raw combos; sample every 4th plus the Full
-  // ones with the audit's shipping so the run stays under a second.
-  const picked = combos.filter((c, i) => i % 4 === 0 || (c.fullWeightKg === 0.3 && c.shippingFull === 52.4));
-  assert.ok(picked.length >= 200, `grid too small: ${picked.length}`);
+  // 2 × 5 × 7 × 3 × 9 × 2 = 3780 raw combos; sample every 9th plus the Full
+  // 0.3 kg estimate ones so the run stays a few seconds.
+  const picked = combos.filter((c, i) => i % 9 === 0 || (c.fullWeightKg === 0.3 && c.shipping === "est:0.3"));
+  assert.ok(picked.length >= 400, `grid too small: ${picked.length}`);
   let checked = 0;
   for (const c of picked) {
     const rate = c.listingTypeId === "premium" ? 16.5 : 10;
     const fixedFn = SOURCE.fixedCostFnFor({ listingTypeId: c.listingTypeId, fullWeightKg: c.fullWeightKg });
-    const ship = (p) =>
-      CALC.subsidizedShipping({ fullShippingMXN: c.shippingFull, priceMXN: p, freeShipping: p >= 299, subsidyPct: c.subsidyPct, thresholdMXN: 299 });
+    const [mode, arg] = c.shipping.split(":");
+    const n = Number(arg);
+    const ship =
+      mode === "typed" ? () => n
+        : mode === "est" ? (p) => SHIPPING.costForWeight(n, p, c.reputationId)
+        : (p) => (p >= 299 ? SHIPPING.costForWeight(n, p, c.reputationId) : 0);
     const fn = (p) => fixedFn(p) + ship(p);
-    const thresholds = [...new Set([...SOURCE.getFixedCostThresholds(c.fullWeightKg), 299])].sort((a, b) => a - b);
+    const thresholds = [...new Set([...SOURCE.getFixedCostThresholds(c.fullWeightKg), ...SOURCE.getShippingThresholds()])].sort((a, b) => a - b);
     const got = CALC.solveTargetPrice({ costMXN: c.cost, shippingMXN: 0, marginPct: c.margin, ratePct: rate, fixedCostFn: fn, thresholds, minPriceMXN: 35 });
     const denom = 1 - rate / 100 - c.margin / 100;
     const covers = (p) => p * denom + 1e-9 >= c.cost + fn(p);
@@ -1081,13 +1143,13 @@ test("v1.5.2 solveTargetPrice: brute force grid, every answer feasible and minim
     assert.ok(got !== null && Number.isFinite(got), `${label}: null`);
     assert.equal(got, CALC.round2(got), `${label}: ${got} not a cent price`);
     assert.ok(covers(got), `${label}: ${got} does not cover`);
-    const top = Math.min(Math.round(got * 100), 150000);
+    const top = Math.min(Math.round(got * 100), 250000);
     for (let cents = 3500; cents < top; cents++) {
       if (covers(cents / 100)) assert.fail(`${label}: ${cents / 100} covers but solver said ${got}`);
     }
     checked++;
   }
-  assert.ok(checked >= 200);
+  assert.ok(checked >= 400);
 });
 
 // v1.5.2 audit (A): the bare token "MSI" is a laptop brand, not an
@@ -1136,25 +1198,76 @@ test("v1.5.2 dashboard shipping parity: unset default takes the card's per-weigh
   assert.deepEqual(DASH.resolveShipping({ defaultShippingMXN: null }, { shippingCostMXN: 50 }), { value: 50, unset: false });
   assert.equal(DASH.resolveDefaultShipping({ defaultShippingMXN: null }, undefined), 0);
 
-  // Card math for the same listing with the autofilled 0.3 kg estimate.
-  const est = SHIPPING.costForWeight(0.3);
-  assert.equal(est, 52.4);
+  // Card math for the same listing with the autofilled 0.3 kg estimate: the
+  // default reputation "none" reads the amarilla table, $827 sits in the
+  // $499–998.99 band → 78.60 (v1.5.2 used 52.40, the verde $299 column).
+  const est = SHIPPING.costForWeight(0.3, 827, "none");
+  assert.equal(est, 78.6);
   const cardB = CALC.computeBreakdown(
     SOURCE.getQuote({ priceMXN: 827, listingTypeId: "classic", categoryGroupId: "tech", fullWeightKg: null }),
-    { priceMXN: 827, shippingCostMXN: CALC.subsidizedShipping({ fullShippingMXN: est, priceMXN: 827, freeShipping: true, subsidyPct: 0, thresholdMXN: 299 }), productCostMXN: 400 }
+    { priceMXN: 827, shippingCostMXN: est, productCostMXN: 400 }
   );
-  const row = DASH.computeRows(all, "mst", unset.value, { shippingUnset: unset.unset })[0];
+  const row = DASH.computeRows(all, "mst", unset.value, { shippingUnset: unset.unset, reputationId: "none" })[0];
   assert.equal(row.shippingEstimated, true);
-  assert.equal(row.b.shippingCostMXN, 52.4);
+  assert.equal(row.b.shippingCostMXN, 78.6);
   assert.equal(row.b.profitMinMXN, cardB.profitMinMXN);
-  assert.equal(row.b.profitMinMXN, 291.9); // 827 − 82.70 − 52.40 − 400
+  assert.equal(row.b.profitMinMXN, 265.7); // 827 − 82.70 − 78.60 − 400
   // Saved weight 1 kg → the 1 kg bracket, like the weight select.
-  const w = DASH.computeRows({ ...all, "mst:weight:MLM1": 1 }, "mst", 0, { shippingUnset: true })[0];
-  assert.equal(w.b.shippingCostMXN, SHIPPING.costForWeight(1));
+  const w = DASH.computeRows({ ...all, "mst:weight:MLM1": 1 }, "mst", 0, { shippingUnset: true, reputationId: "none" })[0];
+  assert.equal(w.b.shippingCostMXN, SHIPPING.costForWeight(1, 827, "none"));
+  assert.equal(w.b.shippingCostMXN, 89.4);
+  // Verde reads its own table: 65.50 at 0.3 kg in the $499 band.
+  assert.equal(DASH.computeRows(all, "mst", 0, { shippingUnset: true, reputationId: "verde" })[0].b.shippingCostMXN, 65.5);
   // Explicit 0 (unset:false) and listings under $299 are untouched.
   assert.equal(DASH.computeRows(all, "mst", 0, { shippingUnset: false })[0].b.shippingCostMXN, 0);
   const low = { ...all, "mst:meta:MLM1": { ...meta, priceMXN: 250 } };
   const lowRow = DASH.computeRows(low, "mst", 0, { shippingUnset: true })[0];
   assert.equal(lowRow.b.shippingCostMXN, 0);
   assert.equal(lowRow.shippingEstimated, false);
+});
+
+// v1.5.3: the 13 calculator cases from the web calculator audit
+// (scratchpad/seo/calculator-tests.csv, official_expected column, checked
+// against the official tables on 2026-10-30), run through the EXTENSION's
+// own path: fee source quote + official shipping table by reputation, price
+// band and weight + withholdings. Case 11's commission uses the ayuda page's
+// current Premium range (11–21.5%); the CSV was written with the old
+// 12.5–20.5 defaults, every other number is the CSV's official_expected.
+// Shipping applies as the card does: from $299 always; below $299 only when
+// the seller offers free shipping (optional column).
+test("v1.5.3 official calculator cases: the extension matches official_expected", () => {
+  const NO_RFC = { vatPct: 16, ivaRetPct: 16, isrRetPct: 20 };
+  const RFC = { vatPct: 16, ivaRetPct: SOURCE.withholdings.ivaRetPct, isrRetPct: SOURCE.withholdings.isrRetPct };
+  const CASES = [
+    { id: 1, in: { price: 149, cost: 55, cat: "tech", type: "classic", rep: "verde", kg: 0.3, free: true, rfc: true }, exp: { com: 14.9, fixed: 37, ship: 52.4, ret: 13.49, net: -23.79 } },
+    { id: 2, in: { price: 298.99, cost: 100, cat: "home-general", type: "classic", rep: "verde", kg: 0.5, free: true, rfc: true }, exp: { com: 44.85, fixed: 37, ship: 56, ret: 27.06, net: 34.08 } },
+    { id: 3, in: { price: 299, cost: 100, cat: "home-general", type: "classic", rep: "verde", kg: 0.5, free: false, rfc: true }, exp: { com: 44.85, fixed: 0, ship: 56, ret: 27.06, net: 71.09 } },
+    { id: 4, in: { price: 498.99, cost: 200, cat: "beauty-health", type: "premium", rep: "amarillo", kg: 1, free: false, rfc: false }, exp: { com: 92.31, fixed: 0, ship: 71.5, ret: 154.86, net: -19.68 } },
+    { id: 5, in: { price: 499, cost: 200, cat: "beauty-health", type: "premium", rep: "amarillo", kg: 1, free: false, rfc: false }, exp: { com: 92.32, fixed: 0, ship: 89.4, ret: 154.86, net: -37.58 } },
+    { id: 6, in: { price: 998.99, cost: 400, cat: "vehicles-industry", type: "classic", rep: "naranja", kg: 3, free: false, rfc: true }, exp: { com: 119.88, fixed: 0, ship: 177, ret: 90.43, net: 211.68 } },
+    { id: 7, in: { price: 999, cost: 400, cat: "vehicles-industry", type: "classic", rep: "naranja", kg: 3, free: false, rfc: true }, exp: { com: 119.88, fixed: 0, ship: 190, ret: 90.43, net: 198.69 } },
+    { id: 8, in: { price: 89, cost: 20, cat: "tech", type: "classic", rep: "verde", kg: 0.3, free: false, rfc: true }, exp: { com: 8.9, fixed: 25, ship: 0, ret: 8.06, net: 27.04 } },
+    { id: 9, in: { price: 99, cost: 30, cat: "home-general", type: "classic", rep: "amarillo", kg: 0.3, free: true, rfc: false }, exp: { com: 14.85, fixed: 30, ship: 62.9, ret: 30.73, net: -69.48 } },
+    { id: 10, in: { price: 98.99, cost: 30, cat: "tech", type: "classic", rep: "verde", kg: 1, free: true, rfc: true }, exp: { com: 9.9, fixed: 25, ship: 59.6, ret: 8.96, net: -34.47 } },
+    // Unknown category, Premium: official range 11–21.5% → 165 to 322.50 commission.
+    { id: 11, in: { price: 1500, cost: 700, cat: null, type: "premium", rep: "verde", kg: 2, free: false, rfc: true }, exp: { comMin: 165, comMax: 322.5, fixed: 0, ship: 84.5, ret: 135.78, netMin: 257.22, netMax: 414.72 } },
+    { id: 12, in: { price: 350, cost: 120, cat: "tech", type: "classic", rep: "amarillo", kg: 5, free: false, rfc: true }, exp: { com: 35, fixed: 0, ship: 105.6, ret: 31.68, net: 57.72 } },
+    { id: 13, in: { price: 2000, cost: 900, cat: "tools", type: "classic", rep: "verde", kg: 40, free: false, rfc: true }, exp: { com: 270, fixed: 0, ship: 349, ret: 181.03, net: 299.97 } }
+  ];
+  for (const c of CASES) {
+    const i = c.in;
+    const quote = SOURCE.getQuote({ priceMXN: i.price, listingTypeId: i.type, categoryGroupId: i.cat });
+    const applies = i.price >= SOURCE.freeShippingThresholdMXN || i.free;
+    const ship = applies ? SHIPPING.costForWeight(i.kg, i.price, i.rep) : 0;
+    const b = CALC.computeBreakdown(quote, { priceMXN: i.price, shippingCostMXN: ship, productCostMXN: i.cost });
+    const wh = CALC.computeWithholdings(i.price, i.rfc ? RFC : NO_RFC);
+    const e = c.exp;
+    assert.equal(b.commissionMinMXN, e.comMin ?? e.com, `case ${c.id} commission min`);
+    assert.equal(b.commissionMaxMXN, e.comMax ?? e.com, `case ${c.id} commission max`);
+    assert.equal(b.fixedCostMXN, e.fixed, `case ${c.id} fixed`);
+    assert.equal(ship, e.ship, `case ${c.id} shipping`);
+    assert.equal(wh.totalMXN, e.ret, `case ${c.id} withholdings`);
+    assert.equal(CALC.round2(b.netMinMXN - i.cost - wh.totalMXN), e.netMin ?? e.net, `case ${c.id} net min`);
+    assert.equal(CALC.round2(b.netMaxMXN - i.cost - wh.totalMXN), e.netMax ?? e.net, `case ${c.id} net max`);
+  }
 });
