@@ -1,0 +1,42 @@
+# Netio
+
+> Netio es una extensión de Chrome para vendedores de Mercado Libre México. Muestra la ganancia real por venta y por publicación (cargo por venta, costo fijo, envío, retenciones de ISR e IVA y costo del producto) debajo del precio de cada publicación y en cada resultado de búsqueda. Plan gratis; PRO 89 MXN al mes o 699 MXN al año, con 7 días de prueba sin tarjeta. No está afiliada a Mercado Libre. Las cifras son estimaciones; las tablas de envío son las oficiales consultadas el 2026-10-30.
+
+> Netio is a Chrome extension for Mercado Libre Mexico sellers. It shows real profit per sale and per listing (commission, fixed fee, shipping, ISR/IVA withholdings and product cost) under the price of every listing and on every search result. Free plan; PRO 89 MXN/month or 699 MXN/year with a 7-day trial, no card. Not affiliated with Mercado Libre. Figures are estimates; shipping tables are the official ones checked on 2026-10-30.
+
+Instalar / Install: https://chromewebstore.google.com/detail/netio/bjhikillfgbpblogloljjhejogfeajac
+Soporte / Support: vitowebpro@gmail.com
+
+## Páginas principales / Main pages
+- [Inicio (es-MX)](https://netiox.netlify.app/)
+- [Home (en)](https://netiox.netlify.app/en/)
+- [Calculadora gratis de comisiones y ganancias](https://netiox.netlify.app/calculadora/): Calculadora gratis de comisiones de Mercado Libre México: cargo por venta por categoría, costo fijo abajo de $299, envío por peso y reputación con las tablas oficiales, retenciones de ISR e IVA y tu ganancia neta por venta.
+
+## Guías de costos / Fee guides (es-MX)
+- [Cuánto cobra Mercado Libre por vender en 2026](https://netiox.netlify.app/guias/cuanto-cobra-mercado-libre-por-vender-2026/): Cuánto cobra Mercado Libre por vender en México en 2026: cargo por venta de 8% a 21.5%, costo fijo abajo de $299, envío por peso y reputación, y retenciones de ISR e IVA. Con ejemplo en pesos.
+- [Comisiones de Mercado Libre por categoría](https://netiox.netlify.app/guias/comisiones-mercado-libre-por-categoria/): Tabla de comisiones de Mercado Libre por categoría en México: Tecnología 10%, Vehículos 12%, Herramientas 13.5%, Belleza 14%, Hogar y moda 15% en Clásica, y de 12.5% a 19.5% en Premium. Porcentajes estimados, el exacto lo muestra Mercado Libre al publicar.
+- [Costo de envío en Mercado Libre para el vendedor](https://netiox.netlify.app/guias/costo-de-envio-mercado-libre-vendedor/): Cuánto paga el vendedor por envío en Mercado Libre México: tablas oficiales por reputación verde, amarilla y naranja, por peso y precio. Envío gratis obligatorio desde $299, opcional abajo. Peso volumétrico explicado.
+- [Mercado Libre Full: costos y cuándo conviene](https://netiox.netlify.app/guias/mercado-libre-full-costos-cuando-conviene/): Costos de Mercado Libre Full en México: almacenamiento diario por unidad, cargo por stock antiguo, cargo por sobrepasar espacio, colecta y retiro, más el cargo por venta y el envío normales. Cuándo conviene y cuándo no.
+- [Publicación Clásica vs Premium en Mercado Libre](https://netiox.netlify.app/guias/publicacion-clasica-vs-premium-mercado-libre/): Clásica cobra de 8% a 17% y Premium de 11% a 21.5%, pero Premium ofrece meses sin intereses hasta 18 meses y no paga costo fijo abajo de $299. Cuándo conviene cada una, con ejemplo en pesos y punto de equilibrio.
+- [Retenciones de ISR e IVA en Mercado Libre para vendedores](https://netiox.netlify.app/guias/retenciones-isr-iva-mercado-libre-vendedores/): Desde el 1 de enero de 2026 Mercado Libre retiene 2.5% de ISR y 8% de IVA a vendedores con RFC, y 16% de IVA y 20% de ISR sin RFC. Son acreditables. Ejemplo con $1,000 sin IVA y qué cambia al registrar tu RFC.
+
+## Paso a paso / How-to (es-MX)
+- [Cómo calcular tu ganancia real en Mercado Libre](https://netiox.netlify.app/como/calcular-tu-ganancia-real-en-mercado-libre/): Cómo calcular la ganancia real de una venta en Mercado Libre México en 6 pasos: precio, cargo por venta, costo fijo, envío por peso y reputación, retenciones de ISR e IVA y costo del producto. Con ejemplo de $450.
+- [Cómo poner precio a un producto en Mercado Libre](https://netiox.netlify.app/como/poner-precio-a-un-producto-en-mercado-libre/): Cómo poner precio en Mercado Libre México partiendo del margen que quieres: cargo por venta, costo fijo, envío y retenciones hacia atrás. Por qué $299 es un precio especial (envío gratis obligatorio, costo fijo desaparece) y cómo evitar los escalones de $99 y $149.
+- [Cómo saber qué publicaciones te hacen perder dinero](https://netiox.netlify.app/como/saber-que-publicaciones-te-hacen-perder-dinero/): Cómo detectar las publicaciones que pierden dinero en Mercado Libre México: revisa el costo fijo abajo de $299, el envío gratis en productos baratos, la reputación y las retenciones. Ejemplo de unos calcetines de $120 que pierden en cada venta.
+- [Cómo bajar tus costos de envío en Mercado Libre](https://netiox.netlify.app/como/bajar-costos-de-envio-mercado-libre/): Cuatro formas de pagar menos envío en Mercado Libre México, con las tablas oficiales: subir la reputación a verde (50% de descuento), bajar el peso volumétrico con un empaque más chico, decidir con cuidado el envío gratis abajo de $299 y evaluar Full para productos chicos.
+
+## Comparaciones / Comparisons (es-MX)
+- [Netio vs Excel para calcular tu ganancia en Mercado Libre](https://netiox.netlify.app/comparar/netio-vs-excel/): Comparación honesta entre Netio (extensión de Chrome) y una hoja de Excel para calcular la ganancia en Mercado Libre México: qué hace cada uno, qué se desactualiza, qué cuesta y en qué casos conviene seguir con la hoja.
+- [Netio vs el simulador de costos de Mercado Libre](https://netiox.netlify.app/comparar/netio-vs-simulador-de-costos-mercado-libre/): El simulador de costos oficial de Mercado Libre es gratis y exacto para tu cuenta. Netio es una estimación, pero la muestra en cada publicación y cada búsqueda sin salir de la página, con tu costo y tu ganancia. Cuándo usar cada uno.
+- [Netio vs Margen Real](https://netiox.netlify.app/comparar/netio-vs-margen-real/): Comparación de Netio con Margen Real, otra extensión de Chrome para calcular la ganancia en Mercado Libre México. Lo que pudimos verificar de cada una al 30 de octubre de 2026 y lo que no, sin inventar funciones ni precios.
+
+## Otras / Other
+- [Política de privacidad / Privacy policy](https://netiox.netlify.app/privacidad.html)
+- [Soporte / Support](https://netiox.netlify.app/soporte.html)
+
+## Fuentes oficiales citadas / Official sources cited (checked 2026-10-30)
+- Cargo por venta: https://www.mercadolibre.com.mx/ayuda/Costos-de-vender-un-producto_870
+- Envíos: https://www.mercadolibre.com.mx/ayuda/costos-envios-gratis_3287 (tablas: https://www.mercadolibre.com.mx/ayuda/40538, https://www.mercadolibre.com.mx/ayuda/40545, https://www.mercadolibre.com.mx/ayuda/40547)
+- Retenciones 2026: https://www.mercadopago.com.mx/blog/nuevas-retenciones-ventas-en-plataformas
+- Full: https://www.mercadolibre.com.mx/ayuda/costos-operar-full_20522

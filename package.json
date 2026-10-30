@@ -7,6 +7,9 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "build:release": "node scripts/build.mjs --release",
+    "build:site": "node scripts/build-site.mjs",
+    "verify:site": "node scripts/verify-site.mjs",
+    "test:site": "node scripts/build-site.mjs && node --test tests/site/calculator.test.mjs",
     "icons": "python3 scripts/gen-icons.py",
     "check": "node --check src/config/branding.js && node --check src/config/telemetry-config.js && node --check src/telemetry/telemetry-core.js && node --check src/telemetry/telemetry-sw.js && node --check src/telemetry/telemetry-client.js && node --check tools/analytics/lib.mjs && node --check src/content/safe.js && node --check src/config/locale-data.js && node --check src/config/i18n.js && node --check src/content/content.js && node --check src/content/card.js && node --check src/content/page-data.js && node --check src/content/format.js && node --check src/content/quickview.js && node --check src/content/upsell.js && node --check src/content/history.js && node --check src/fees/fee-table.js && node --check src/fees/shipping-table.js && node --check src/fees/calculator.js && node --check src/fees/fee-source.js && node --check src/fees/radar.js && node --check src/config/owner.js && node --check src/pro/gate.js && node --check src/background/service-worker.js && node --check src/options/options.js && node --check src/dashboard/dashboard-model.js && node --check src/dashboard/dashboard.js && node --check src/pro/live-reload.js && node --check src/onboarding/welcome.js && node -e \"JSON.parse(require('fs').readFileSync('manifest.json'))\" && echo OK",
     "test": "npm run check && node --test \"tests/**/*.test.mjs\"",

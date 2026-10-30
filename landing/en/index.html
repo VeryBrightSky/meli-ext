@@ -3,171 +3,76 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Netio: profit calculator for Mercado Libre Mexico</title>
-  <meta name="description" content="See your real profit on every Mercado Libre Mexico listing: commission, fixed fee, shipping and withholdings. Free Chrome extension with optional PRO." />
+  <title>Netio: Chrome extension for Mercado Libre Mexico sellers with real profit per sale</title>
+  <meta name="description" content="Chrome extension for Mercado Libre Mexico sellers: commission, fixed fee, shipping, withholdings and net profit under the price of every listing. Free on Chrome, optional PRO." />
   <meta name="theme-color" content="#2d3277" />
+  
   <link rel="canonical" href="https://netiox.netlify.app/en/" />
   <link rel="alternate" hreflang="es-MX" href="https://netiox.netlify.app/" />
   <link rel="alternate" hreflang="en" href="https://netiox.netlify.app/en/" />
   <link rel="alternate" hreflang="x-default" href="https://netiox.netlify.app/" />
-  <link rel="icon" href="../favicon.svg" type="image/svg+xml" />
-  <link rel="icon" href="../favicon-32.png" type="image/png" sizes="32x32" />
-  <link rel="apple-touch-icon" href="../apple-touch-icon.png" />
-
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Netio" />
   <meta property="og:locale" content="en_US" />
-  <meta property="og:locale:alternate" content="es_MX" />
   <meta property="og:url" content="https://netiox.netlify.app/en/" />
-  <meta property="og:title" content="Netio: know what you really earn on Mercado Libre" />
-  <meta property="og:description" content="Commission, fixed fee, shipping and net profit on every Mercado Libre Mexico listing. Free on Chrome." />
+  <meta property="og:title" content="Netio: the extension for Mercado Libre sellers that shows what you really earn" />
+  <meta property="og:description" content="Chrome extension for Mercado Libre Mexico sellers: commission, fixed fee, shipping, withholdings and net profit under the price of every listing. Free on Chrome, optional PRO." />
   <meta property="og:image" content="https://netiox.netlify.app/og-image.png" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
   <meta property="og:image:alt" content="Netio: profit calculator for Mercado Libre Mexico sellers" />
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="Netio: know what you really earn on Mercado Libre" />
-  <meta name="twitter:description" content="Commission, fixed fee, shipping and net profit on every listing. Free on Chrome." />
+  <meta name="twitter:title" content="Netio: the extension for Mercado Libre sellers that shows what you really earn" />
+  <meta name="twitter:description" content="Chrome extension for Mercado Libre Mexico sellers: commission, fixed fee, shipping, withholdings and net profit under the price of every listing. Free on Chrome, optional PRO." />
   <meta name="twitter:image" content="https://netiox.netlify.app/og-image.png" />
-  <meta name="twitter:image:alt" content="Netio: profit calculator for Mercado Libre Mexico sellers" />
-
-  <link rel="stylesheet" href="../styles.css" />
-
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "SoftwareApplication",
-    "name": "Netio",
-    "alternateName": "Netio: Fee calculator for Mercado Libre sellers",
-    "description": "Chrome extension that shows the commission, fixed fee, shipping and net profit of every Mercado Libre Mexico listing.",
-    "applicationCategory": "BusinessApplication",
-    "operatingSystem": "Chrome, ChromeOS, Windows, macOS, Linux",
-    "inLanguage": "en",
-    "url": "https://netiox.netlify.app/en/",
-    "downloadUrl": "https://chromewebstore.google.com/detail/netio/bjhikillfgbpblogloljjhejogfeajac",
-    "image": "https://netiox.netlify.app/og-image.png",
-    "offers": [
-      { "@type": "Offer", "name": "Free", "price": "0", "priceCurrency": "MXN" },
-      { "@type": "Offer", "name": "PRO monthly", "price": "89", "priceCurrency": "MXN" },
-      { "@type": "Offer", "name": "PRO yearly", "price": "699", "priceCurrency": "MXN" }
-    ]
-  }
-  </script>
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "FAQPage",
-    "inLanguage": "en",
-    "mainEntity": [
-      {
-        "@type": "Question",
-        "name": "Is Netio affiliated with Mercado Libre?",
-        "acceptedAnswer": {
-          "@type": "Answer",
-          "text": "No. Netio is an independent tool and has no relationship with Mercado Libre. It does not use a Mercado Libre API: the rates come from public seller guides, so the figures are estimates."
-        }
-      },
-      {
-        "@type": "Question",
-        "name": "Where is my data stored?",
-        "acceptedAnswer": {
-          "@type": "Answer",
-          "text": "In your browser. Your costs and products never leave your computer and Netio has no servers of its own. The only thing that goes out is the PRO payment, handled by ExtensionPay and Stripe, and only if you choose to pay."
-        }
-      },
-      {
-        "@type": "Question",
-        "name": "Do I need an RFC to use Netio?",
-        "acceptedAnswer": {
-          "@type": "Answer",
-          "text": "No. Netio does not ask for an RFC or any kind of account. If you have an RFC registered with Mercado Libre, Netio also shows the 2026 withholdings (8% IVA and 2.5% ISR). Confirm with your accountant how they apply to you."
-        }
-      },
-      {
-        "@type": "Question",
-        "name": "Which browsers does it work in?",
-        "acceptedAnswer": {
-          "@type": "Answer",
-          "text": "In desktop Chrome (Windows, Mac and Linux), including Chromebook. It should also work in desktop Chromium-based browsers such as Edge or Brave, though we mostly test on Chrome. It does not work on phones, or in Firefox or Safari."
-        }
-      },
-      {
-        "@type": "Question",
-        "name": "How does the PRO trial work?",
-        "acceptedAnswer": {
-          "@type": "Answer",
-          "text": "When you install Netio you get full PRO for 7 days. It asks for no email or card, and the trial runs in your own browser. When it ends, you keep the free plan and your saved costs."
-        }
-      },
-      {
-        "@type": "Question",
-        "name": "How much is PRO and how do I cancel?",
-        "acceptedAnswer": {
-          "@type": "Answer",
-          "text": "PRO costs $89 MXN per month or $699 MXN per year. To cancel, open Netio’s options and tap \"Manage subscription / pay\". You can cancel there at any time. More details on the Support page."
-        }
-      },
-      {
-        "@type": "Question",
-        "name": "Are the numbers exact?",
-        "acceptedAnswer": {
-          "@type": "Answer",
-          "text": "They are estimates. The exact percentage depends on your category and account, and the date of the rates appears on every card. Use them to decide with better information, not as an accounting figure."
-        }
-      }
-    ]
-  }
-  </script>
+  <link rel="stylesheet" href="/styles.css" />
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","@id":"https://netiox.netlify.app/#org","name":"Netio","url":"https://netiox.netlify.app/","logo":"https://netiox.netlify.app/icon-512.png","contactPoint":[{"@type":"ContactPoint","contactType":"customer support","email":"vitowebpro@gmail.com","availableLanguage":["es","en"]}]}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","@id":"https://netiox.netlify.app/#app","name":"Netio","applicationCategory":"BrowserApplication","operatingSystem":"Chrome","url":"https://chromewebstore.google.com/detail/netio/bjhikillfgbpblogloljjhejogfeajac","downloadUrl":"https://chromewebstore.google.com/detail/netio/bjhikillfgbpblogloljjhejogfeajac","image":"https://netiox.netlify.app/og-image.png","inLanguage":"es-MX","description":"Extensión de Chrome que muestra la ganancia real por venta y por publicación en Mercado Libre México: comisión, costo fijo, envío, retenciones y costo del producto.","publisher":{"@id":"https://netiox.netlify.app/#org"},"offers":[{"@type":"Offer","name":"Gratis","price":"0","priceCurrency":"MXN","url":"https://chromewebstore.google.com/detail/netio/bjhikillfgbpblogloljjhejogfeajac"},{"@type":"Offer","name":"PRO mensual","price":"89","priceCurrency":"MXN","url":"https://chromewebstore.google.com/detail/netio/bjhikillfgbpblogloljjhejogfeajac"},{"@type":"Offer","name":"PRO anual","price":"699","priceCurrency":"MXN","url":"https://chromewebstore.google.com/detail/netio/bjhikillfgbpblogloljjhejogfeajac"}]}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","@id":"https://netiox.netlify.app/en/#webpage","url":"https://netiox.netlify.app/en/","name":"Netio: Chrome extension for Mercado Libre Mexico sellers with real profit per sale","description":"Chrome extension for Mercado Libre Mexico sellers: commission, fixed fee, shipping, withholdings and net profit under the price of every listing. Free on Chrome, optional PRO.","inLanguage":"en","dateModified":"2026-10-30","isPartOf":{"@type":"WebSite","name":"Netio","url":"https://netiox.netlify.app/"},"publisher":{"@id":"https://netiox.netlify.app/#org"},"about":{"@id":"https://netiox.netlify.app/#app"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Inicio","item":"https://netiox.netlify.app/"}]}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","inLanguage":"en","mainEntity":[{"@type":"Question","name":"Is Netio affiliated with Mercado Libre?","acceptedAnswer":{"@type":"Answer","text":"No. Netio is an independent tool and has no relationship with Mercado Libre. It does not use a Mercado Libre API: the rates come from public seller guides and official help pages, so the figures are estimates."}},{"@type":"Question","name":"Where is my data stored?","acceptedAnswer":{"@type":"Answer","text":"In your browser. Your costs and products never leave your computer and Netio has no servers of its own. The only thing that goes out is the PRO payment, handled by ExtensionPay and Stripe, and only if you choose to pay."}},{"@type":"Question","name":"Do I need an RFC to use Netio?","acceptedAnswer":{"@type":"Answer","text":"No. Netio does not ask for an RFC or any kind of account. If you have an RFC registered with Mercado Libre, Netio also shows the 2026 withholdings (8% IVA and 2.5% ISR). Confirm with your accountant how they apply to you."}},{"@type":"Question","name":"Which browsers does it work in?","acceptedAnswer":{"@type":"Answer","text":"In desktop Chrome (Windows, Mac and Linux), including Chromebook. It should also work in desktop Chromium-based browsers such as Edge or Brave, though we mostly test on Chrome. It does not work on phones, or in Firefox or Safari."}},{"@type":"Question","name":"How does the PRO trial work?","acceptedAnswer":{"@type":"Answer","text":"When you install Netio you get full PRO for 7 days. It asks for no email or card, and the trial runs in your own browser. When it ends, you keep the free plan and your saved costs."}},{"@type":"Question","name":"How much is PRO and how do I cancel?","acceptedAnswer":{"@type":"Answer","text":"PRO costs $89.00 MXN per month or $699.00 MXN per year. To cancel, open Netio's options and tap \"Manage subscription / pay\". You can cancel there at any time. More details on the Support page."}},{"@type":"Question","name":"Are the numbers exact?","acceptedAnswer":{"@type":"Answer","text":"They are estimates. The exact percentage depends on your category and account, and the date of the rates appears on every card. Use them to decide with better information, not as an accounting figure."}}]}</script>
 </head>
 <body>
   <a class="skip" href="#contenido">Skip to content</a>
-
   <header class="top">
     <div class="wrap">
-      <a class="lockup" href="../" aria-label="Netio, home">
-        <img src="../netio-logo.svg" alt="" width="32" height="32" />
+      <a class="lockup" href="/" aria-label="Netio, home">
+        <img src="/netio-logo.svg" alt="" width="32" height="32" />
         <span>netio</span>
       </a>
       <nav aria-label="Main">
-        <a class="hide-sm" href="#ejemplo">The example</a>
-        <a class="hide-sm" href="#planes">Plans</a>
-        <a class="hide-sm" href="#faq">FAQ</a>
-        <a href="../" hreflang="es-MX" lang="es-MX">Español</a>
+        <a href="/calculadora/">Calculator (es)</a>
+        <a href="/guias/">Guides (es)</a>
+        <a href="/como/">How to (es)</a>
+        <a href="/comparar/">Compare (es)</a>
+        <a href="/" hreflang="es-MX" lang="es-MX">Español</a>
         <a class="btn btn-sm" href="https://chromewebstore.google.com/detail/netio/bjhikillfgbpblogloljjhejogfeajac?utm_source=landing&amp;utm_medium=site">Add to Chrome</a>
       </nav>
     </div>
   </header>
-
   <main id="contenido">
     <section class="hero">
       <div class="wrap hero-grid">
         <div>
           <p class="store"><i aria-hidden="true"></i> Now on the Chrome Web Store</p>
-          <h1>A $149 phone case can leave you <em>$10.30 in the hole</em>.</h1>
-          <p class="sub">Commission, fixed fee and shipping. Netio does the math on every Mercado Libre Mexico listing, before you set the price.</p>
+          <h1>The extension for Mercado Libre sellers that tells you what you really earn</h1>
+          <p class="sub answer">Netio is a free Chrome extension for Mercado Libre Mexico sellers. Under the price of every listing it shows the commission, the fixed fee, shipping, the 2026 withholdings and what you keep per sale after your cost. If you lose money, you see it in red before you list.</p>
           <div class="actions">
-            <a class="btn btn-go" href="https://chromewebstore.google.com/detail/netio/bjhikillfgbpblogloljjhejogfeajac?utm_source=landing&amp;utm_medium=site">
-              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm0 5.6a4.4 4.4 0 0 1 3.86 2.3H12a2.1 2.1 0 0 0-1.9 3l-1.86-3.2A4.39 4.39 0 0 1 12 7.6Zm-7.9 4.9 2 3.45a4.4 4.4 0 0 0 4.2 3.05h.2l1.9-3.3A2.1 2.1 0 0 1 9.9 12a2.1 2.1 0 0 1 .3-1.08L7.3 5.9a8 8 0 0 0-3.2 6.6Zm9.95 6.4a8 8 0 0 0 5.83-10.4H14.2A4.38 4.38 0 0 1 14.05 18.9ZM12 14.1A2.1 2.1 0 1 1 12 9.9a2.1 2.1 0 0 1 0 4.2Z"/></svg>
-              Add to Chrome, it is free
-            </a>
-            <a class="btn btn-line" href="#ejemplo">See the full breakdown</a>
+            <a class="btn btn-go" href="https://chromewebstore.google.com/detail/netio/bjhikillfgbpblogloljjhejogfeajac?utm_source=landing&amp;utm_medium=site"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm0 5.6a4.4 4.4 0 0 1 3.86 2.3H12a2.1 2.1 0 0 0-1.9 3l-1.86-3.2A4.39 4.39 0 0 1 12 7.6Zm-7.9 4.9 2 3.45a4.4 4.4 0 0 0 4.2 3.05h.2l1.9-3.3A2.1 2.1 0 0 1 9.9 12a2.1 2.1 0 0 1 .3-1.08L7.3 5.9a8 8 0 0 0-3.2 6.6Zm9.95 6.4a8 8 0 0 0 5.83-10.4H14.2A4.38 4.38 0 0 1 14.05 18.9ZM12 14.1A2.1 2.1 0 1 1 12 9.9a2.1 2.1 0 0 1 0 4.2Z"/></svg> Add to Chrome, it's free</a>
+            <a class="btn btn-line" href="#ejemplo">See the full math</a>
           </div>
-          <p class="fine">No account and no servers: your costs stay in your browser. You get PRO for 7 days on install, no card.</p>
+          <p class="fine">No account, no servers: your costs stay in your browser. You get PRO for 7 days on install, no card.</p>
         </div>
-
         <figure class="ticket">
-          <div class="ticket-head"><b>Phone case</b><span>Clásica, Technology</span></div>
-          <dl>
-            <div class="row"><dt>Sale price</dt><dd>$149.00</dd></div>
-            <div class="row"><dt>Commission <small>10% for this category</small></dt><dd>-$14.90</dd></div>
-            <div class="row"><dt>Fixed fee <small>listings from $149 to $298.99</small></dt><dd>-$37.00</dd></div>
-            <div class="row"><dt>Free shipping you pay for <small>up to 300 g</small></dt><dd>-$52.40</dd></div>
-            <div class="row"><dt>What the case cost you</dt><dd>-$55.00</dd></div>
-          </dl>
-          <div class="sum"><span class="k">Left per sale</span><span class="v loss">-$10.30</span></div>
-          <p class="verdict loss">You lose $10.30 every time it sells.</p>
-          <figcaption>Estimates using the rate tables Netio ships with (2026). Your exact percentage depends on your category and account.</figcaption>
-        </figure>
+  <div class="ticket-head"><b>Phone case</b><span>Clásica, Technology</span></div>
+  <dl><div class="row"><dt>Sale price</dt><dd>$149.00</dd></div><div class="row"><dt>Commission<small>10% for the category</small></dt><dd>-$14.90</dd></div><div class="row"><dt>Fixed fee<small>listings from $149 to $298.99</small></dt><dd>-$37.00</dd></div><div class="row"><dt>Free shipping you pay<small>up to 300 g, green reputation</small></dt><dd>-$52.40</dd></div><div class="row"><dt>What the case cost you</dt><dd>-$55.00</dd></div></dl>
+  <div class="sum"><span class="k">You keep per sale</span><span class="v loss">-$10.30</span></div>
+  <p class="verdict loss">You lose $10.30 every time it sells.</p>
+  <figcaption>Estimates with the rates Netio uses (2026 tables, before withholdings). Your exact percentage depends on your category and account.</figcaption>
+</figure>
       </div>
     </section>
 
@@ -175,45 +80,37 @@
       <div class="wrap">
         <h2>A $149 product: where your profit goes</h2>
         <div class="two">
-          <p class="muted">This is the typical case with cheap products. The commission looks small, but the fixed fee and shipping do not depend on the price, and on a $149 case they outweigh what you keep. Netio adds up all four and gives you the number in red or green.</p>
+          <p class="muted">This is the typical case for cheap products. The commission looks small, but the fixed fee and shipping do not depend on the price, and on a $149 case they weigh more than what you keep. Netio adds up all four and gives you the number in red or green.</p>
           <div>
             <ul class="walk">
-              <li><span>Price you listed it at<small>Clásica, Technology category</small></span><span>$149.00</span></li>
+              <li><span>Listed price<small>Clásica, Technology category</small></span><span>$149.00</span></li>
               <li><span>Mercado Libre commission<small>10% in this category</small></span><span class="loss-text">-$14.90</span></li>
               <li><span>Fixed fee per unit<small>Clásica from $149 to $298.99: $37. From $99 to $148.99: $30. Under $99: $25</small></span><span class="loss-text">-$37.00</span></li>
-              <li><span>Free shipping you offer<small>Package up to 300 g. Under $299 you pay all of it</small></span><span class="loss-text">-$52.40</span></li>
+              <li><span>Free shipping you offer<small>Package up to 300 g, green reputation, official table. Under $299 you pay it if you offer it</small></span><span class="loss-text">-$52.40</span></li>
               <li><span>What you paid for the case</span><span class="loss-text">-$55.00</span></li>
-              <li><span><b>Left for you</b></span><span class="loss-text">-$10.30</span></li>
+              <li><span><b>You keep</b></span><span class="loss-text">-$10.30</span></li>
             </ul>
-            <p class="muted">Commission, fixed fee and shipping eat $104.30 of the $149, that is 70%, and you still put in $10.30 from your own pocket. Now the same product at $299:</p>
+            <p class="muted">Commission, fixed fee and shipping take $104.30 of the $149, 70%, and you still put in $10.30 of your own. Now the same product at $299:</p>
           </div>
         </div>
-
         <div class="compare">
           <figure class="ticket">
-            <div class="ticket-head"><b>At $149</b><span>as it is today</span></div>
-            <dl>
-              <div class="row"><dt>Commission 10%</dt><dd>-$14.90</dd></div>
-              <div class="row"><dt>Fixed fee</dt><dd>-$37.00</dd></div>
-              <div class="row"><dt>Shipping (you pay all of it)</dt><dd>-$52.40</dd></div>
-              <div class="row"><dt>Your cost</dt><dd>-$55.00</dd></div>
-            </dl>
-            <div class="sum"><span class="k">Left for you</span><span class="v loss">-$10.30</span></div>
-            <p class="verdict loss">Margin: -6.9%</p>
-          </figure>
+  <div class="ticket-head"><b>At $149</b><span>as it is today</span></div>
+  <dl><div class="row"><dt>Commission 10%</dt><dd>-$14.90</dd></div><div class="row"><dt>Fixed fee</dt><dd>-$37.00</dd></div><div class="row"><dt>Shipping (you pay it all)</dt><dd>-$52.40</dd></div><div class="row"><dt>Your cost</dt><dd>-$55.00</dd></div></dl>
+  <div class="sum"><span class="k">You keep</span><span class="v loss">-$10.30</span></div>
+  <p class="verdict loss">Margin: -6.9%</p>
+  
+</figure>
           <figure class="ticket">
-            <div class="ticket-head"><b>At $299</b><span>minimum price for free shipping</span></div>
-            <dl>
-              <div class="row"><dt>Commission 10%</dt><dd>-$29.90</dd></div>
-              <div class="row"><dt>Fixed fee <small>no longer applies from $299</small></dt><dd>$0.00</dd></div>
-              <div class="row"><dt>Shipping <small>green reputation: Mercado Libre covers 50%</small></dt><dd>-$26.20</dd></div>
-              <div class="row"><dt>Your cost</dt><dd>-$55.00</dd></div>
-            </dl>
-            <div class="sum"><span class="k">Left for you</span><span class="v profit">$187.90</span></div>
-            <p class="verdict profit">Margin: 62.8%</p>
-          </figure>
+  <div class="ticket-head"><b>At $299</b><span>minimum price for free shipping</span></div>
+  <dl><div class="row"><dt>Commission 10%</dt><dd>-$29.90</dd></div><div class="row"><dt>Fixed fee<small>no longer applies from $299</small></dt><dd>$0.00</dd></div><div class="row"><dt>Shipping<small>official green table, 50% discount included</small></dt><dd>-$52.40</dd></div><div class="row"><dt>Your cost</dt><dd>-$55.00</dd></div></dl>
+  <div class="sum"><span class="k">You keep</span><span class="v profit">$161.70</span></div>
+  <p class="verdict profit">Margin: 54.1%</p>
+  
+</figure>
         </div>
-        <p class="small" style="margin-top:18px">We do not tell you what price to sell at or what to sell. We tell you what number comes out at each price, so you decide with the math done. Shipping subsidy by reputation is an estimate; Mercado Libre does not publish the exact percentage.</p>
+        <p class="small" style="margin-top:18px">We do not tell you what price to charge or what to sell. We tell you what number comes out at each price, so you decide with the math done. Shipping from the <a href="https://www.mercadolibre.com.mx/ayuda/costos-envios-gratis_3287">official Mercado Envíos tables</a> checked on October 30, 2026; withholdings not included here.</p>
+        <p><a class="btn btn-line" href="/calculadora/?precio=149&amp;costo=55&amp;cat=tech&amp;tipo=clasica&amp;rep=verde&amp;peso=0.3&amp;gratis=si&amp;rfc=si">Change the numbers in the calculator (Spanish)</a></p>
       </div>
     </section>
 
@@ -221,10 +118,21 @@
       <div class="wrap">
         <h2>How it works</h2>
         <ol class="steps">
-          <li><div><h3>Install Netio from the Chrome Web Store</h3><p>It is free. For the first 7 days you have full PRO, with no email and no card.</p></div></li>
-          <li><div><h3>Open a listing or a search on Mercado Libre Mexico</h3><p>The card appears under the price, with the commission, fixed fee and shipping already estimated. On search results you see the net for each product.</p></div></li>
-          <li><div><h3>Type what the product cost you</h3><p>Netio gives you your profit, your margin and the minimum price to avoid a loss. If it comes out red, you see it before you publish, not when the statement arrives.</p></div></li>
+          <li><div><h3>Install Netio from the Chrome Web Store</h3><p>It is free. For the first 7 days you have full PRO, no email and no card.</p></div></li>
+          <li><div><h3>Open a listing or a search on Mercado Libre Mexico</h3><p>The card appears under the price, with commission, fixed fee and shipping already estimated. On search results you see the net of every product.</p></div></li>
+          <li><div><h3>Type what the product cost you</h3><p>Netio gives you your profit, your margin and the minimum price to break even. If it is red, you see it before you list, not when the statement arrives.</p></div></li>
         </ol>
+      </div>
+    </section>
+
+    <section id="recursos">
+      <div class="wrap">
+        <h2>Do the math without installing anything</h2>
+        <p class="muted">The <a href="/calculadora/">free calculator</a> (Spanish) uses the same tables as the extension. These guides (Spanish) explain each fee with figures from the official pages:</p>
+        <div class="res-cols">
+          <div><h3>Fee guides</h3><ul><li><a href="/guias/cuanto-cobra-mercado-libre-por-vender-2026/" hreflang="es-MX" lang="es-MX">Cuánto cobra Mercado Libre por vender en 2026</a></li><li><a href="/guias/comisiones-mercado-libre-por-categoria/" hreflang="es-MX" lang="es-MX">Comisiones de Mercado Libre por categoría</a></li><li><a href="/guias/costo-de-envio-mercado-libre-vendedor/" hreflang="es-MX" lang="es-MX">Costo de envío en Mercado Libre para el vendedor</a></li><li><a href="/guias/mercado-libre-full-costos-cuando-conviene/" hreflang="es-MX" lang="es-MX">Mercado Libre Full: costos y cuándo conviene</a></li><li><a href="/guias/publicacion-clasica-vs-premium-mercado-libre/" hreflang="es-MX" lang="es-MX">Publicación Clásica vs Premium en Mercado Libre</a></li><li><a href="/guias/retenciones-isr-iva-mercado-libre-vendedores/" hreflang="es-MX" lang="es-MX">Retenciones de ISR e IVA en Mercado Libre para vendedores</a></li></ul></div>
+          <div><h3>Step by step</h3><ul><li><a href="/como/calcular-tu-ganancia-real-en-mercado-libre/" hreflang="es-MX" lang="es-MX">Cómo calcular tu ganancia real en Mercado Libre</a></li><li><a href="/como/poner-precio-a-un-producto-en-mercado-libre/" hreflang="es-MX" lang="es-MX">Cómo poner precio a un producto en Mercado Libre</a></li><li><a href="/como/saber-que-publicaciones-te-hacen-perder-dinero/" hreflang="es-MX" lang="es-MX">Cómo saber qué publicaciones te hacen perder dinero</a></li><li><a href="/como/bajar-costos-de-envio-mercado-libre/" hreflang="es-MX" lang="es-MX">Cómo bajar tus costos de envío en Mercado Libre</a></li></ul></div>
+        </div>
       </div>
     </section>
 
@@ -236,7 +144,7 @@
             <tr>
               <th scope="col"><span class="sr">Feature</span></th>
               <th scope="col">Free<small>forever</small></th>
-              <th scope="col">PRO<small>$89 MXN per month or $699 per year</small></th>
+              <th scope="col">PRO<small>$89.00 MXN per month or $699.00 per year</small></th>
             </tr>
           </thead>
           <tbody>
@@ -244,20 +152,21 @@
             <tr><th scope="row">Fixed fee on cheap products</th><td class="y">Yes</td><td class="y">Yes</td></tr>
             <tr><th scope="row">Your shipping, Mercado Envíos Full and reputation discount</th><td class="y">Yes</td><td class="y">Yes</td></tr>
             <tr><th scope="row">2026 withholdings (8% IVA and 2.5% ISR)</th><td class="y">Yes</td><td class="y">Yes</td></tr>
-            <tr><th scope="row">Profit, margin and minimum price to avoid a loss</th><td class="y">Yes</td><td class="y">Yes</td></tr>
-            <tr><th scope="row">Red alert when you are losing money</th><td class="y">Yes</td><td class="y">Yes</td></tr>
+            <tr><th scope="row">Profit, margin and break-even price</th><td class="y">Yes</td><td class="y">Yes</td></tr>
+            <tr><th scope="row">Red alert when you lose money</th><td class="y">Yes</td><td class="y">Yes</td></tr>
+            <tr><th scope="row">Radar preview on search results</th><td class="y">Yes</td><td class="y">Yes</td></tr>
             <tr><th scope="row">Target price for the margin you want</th><td class="n">No</td><td class="y">Yes</td></tr>
+            <tr><th scope="row">Sweet spot: when raising the price leaves more money</th><td class="n">No</td><td class="y">Yes</td></tr>
             <tr><th scope="row">Interest-free installments (MSI) calculator</th><td class="n">No</td><td class="y">Yes</td></tr>
             <tr><th scope="row">Clásica vs Premium, side by side</th><td class="n">No</td><td class="y">Yes</td></tr>
-            <tr><th scope="row">Profitability Radar on searches, with filter and CSV</th><td class="n">No</td><td class="y">Yes</td></tr>
+            <tr><th scope="row">Full Profitability Radar on searches, with filter and CSV</th><td class="n">No</td><td class="y">Yes</td></tr>
             <tr><th scope="row">Profit Dashboard with all your products</th><td class="n">No</td><td class="y">Yes</td></tr>
-            <tr><th scope="row">Try prices without touching the listing</th><td class="n">No</td><td class="y">Yes</td></tr>
           </tbody>
         </table>
         <div class="plan-note">
-          <p><b>Try PRO for 7 days, no card.</b> It starts on its own when you install. If you do not pay, you keep the free plan and your saved costs. The yearly plan saves 35%. Cancel any time from Netio&rsquo;s options.</p>
+          <p><b>Try PRO for 7 days, no card.</b> It starts on install. If you do not pay, you keep the free plan and your saved costs. Cancel any time from Netio's options.</p>
         </div>
-        <p style="margin-top:22px"><a class="btn btn-go" href="https://chromewebstore.google.com/detail/netio/bjhikillfgbpblogloljjhejogfeajac?utm_source=landing&amp;utm_medium=site">Try PRO free</a></p>
+        <p style="margin-top:22px"><a class="btn btn-go" href="https://chromewebstore.google.com/detail/netio/bjhikillfgbpblogloljjhejogfeajac?utm_source=landing&amp;utm_medium=site"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm0 5.6a4.4 4.4 0 0 1 3.86 2.3H12a2.1 2.1 0 0 0-1.9 3l-1.86-3.2A4.39 4.39 0 0 1 12 7.6Zm-7.9 4.9 2 3.45a4.4 4.4 0 0 0 4.2 3.05h.2l1.9-3.3A2.1 2.1 0 0 1 9.9 12a2.1 2.1 0 0 1 .3-1.08L7.3 5.9a8 8 0 0 0-3.2 6.6Zm9.95 6.4a8 8 0 0 0 5.83-10.4H14.2A4.38 4.38 0 0 1 14.05 18.9ZM12 14.1A2.1 2.1 0 1 1 12 9.9a2.1 2.1 0 0 1 0 4.2Z"/></svg> Try PRO free</a></p>
       </div>
     </section>
 
@@ -266,52 +175,18 @@
         <h2>Your numbers are yours</h2>
         <div class="quiet">
           <div><b>No servers</b><p>Your costs and products are stored in your browser. We have nowhere else to keep them.</p></div>
-          <div><b>No tracking</b><p>No cookies or analytics. We do not send links, prices or listing data anywhere.</p></div>
-          <div><b>Payment via Stripe</b><p>If you pay for PRO, ExtensionPay and Stripe process the charge. We never see your card. <a href="../privacidad.html#en">Privacy policy</a>.</p></div>
+          <div><b>No tracking</b><p>No cookies, no analytics. We do not send links, prices or data from your listings.</p></div>
+          <div><b>Payment via Stripe</b><p>If you pay for PRO, ExtensionPay and Stripe process the charge. We never see your card. <a href="/privacidad.html#en">Privacy policy</a>.</p></div>
         </div>
       </div>
     </section>
 
-    <section id="faq">
-      <div class="wrap">
-        <h2>Frequently asked questions</h2>
-        <div class="faq">
-          <details>
-            <summary>Is Netio affiliated with Mercado Libre?</summary>
-            <p>No. Netio is an independent tool and has no relationship with Mercado Libre. It does not use a Mercado Libre API: the rates come from public seller guides, so the figures are estimates.</p>
-          </details>
-          <details>
-            <summary>Where is my data stored?</summary>
-            <p>In your browser. Your costs and products never leave your computer and Netio has no servers of its own. The only thing that goes out is the PRO payment, handled by ExtensionPay and Stripe, and only if you choose to pay.</p>
-          </details>
-          <details>
-            <summary>Do I need an RFC to use Netio?</summary>
-            <p>No. Netio does not ask for an RFC or any kind of account. If you have an RFC registered with Mercado Libre, Netio also shows the 2026 withholdings (8% IVA and 2.5% ISR). Confirm with your accountant how they apply to you.</p>
-          </details>
-          <details>
-            <summary>Which browsers does it work in?</summary>
-            <p>In desktop Chrome (Windows, Mac and Linux), including Chromebook. It should also work in desktop Chromium-based browsers such as Edge or Brave, though we mostly test on Chrome. It does not work on phones, or in Firefox or Safari.</p>
-          </details>
-          <details>
-            <summary>How does the PRO trial work?</summary>
-            <p>When you install Netio you get full PRO for 7 days. It asks for no email or card, and the trial runs in your own browser. When it ends, you keep the free plan and your saved costs.</p>
-          </details>
-          <details>
-            <summary>How much is PRO and how do I cancel?</summary>
-            <p>PRO costs $89 MXN per month or $699 MXN per year. To cancel, open Netio&rsquo;s options and tap &ldquo;Manage subscription / pay&rdquo;. You can cancel there at any time. More details on the <a href="../soporte.html#en">Support page</a>.</p>
-          </details>
-          <details>
-            <summary>Are the numbers exact?</summary>
-            <p>They are estimates. The exact percentage depends on your category and account, and the date of the rates appears on every card. Use them to decide with better information, not as an accounting figure.</p>
-          </details>
-        </div>
-      </div>
-    </section>
+    <section class="faq-sec wrap" id="faq"><h2>Frequently asked questions</h2><div class="faq"><details><summary>Is Netio affiliated with Mercado Libre?</summary><p>No. Netio is an independent tool and has no relationship with Mercado Libre. It does not use a Mercado Libre API: the rates come from public seller guides and official help pages, so the figures are estimates.</p></details><details><summary>Where is my data stored?</summary><p>In your browser. Your costs and products never leave your computer and Netio has no servers of its own. The only thing that goes out is the PRO payment, handled by ExtensionPay and Stripe, and only if you choose to pay.</p></details><details><summary>Do I need an RFC to use Netio?</summary><p>No. Netio does not ask for an RFC or any kind of account. If you have an RFC registered with Mercado Libre, Netio also shows the 2026 withholdings (8% IVA and 2.5% ISR). Confirm with your accountant how they apply to you.</p></details><details><summary>Which browsers does it work in?</summary><p>In desktop Chrome (Windows, Mac and Linux), including Chromebook. It should also work in desktop Chromium-based browsers such as Edge or Brave, though we mostly test on Chrome. It does not work on phones, or in Firefox or Safari.</p></details><details><summary>How does the PRO trial work?</summary><p>When you install Netio you get full PRO for 7 days. It asks for no email or card, and the trial runs in your own browser. When it ends, you keep the free plan and your saved costs.</p></details><details><summary>How much is PRO and how do I cancel?</summary><p>PRO costs $89.00 MXN per month or $699.00 MXN per year. To cancel, open Netio's options and tap "Manage subscription / pay". You can cancel there at any time. More details on the <a href="/soporte.html#en">Support page</a>.</p></details><details><summary>Are the numbers exact?</summary><p>They are estimates. The exact percentage depends on your category and account, and the date of the rates appears on every card. Use them to decide with better information, not as an accounting figure.</p></details></div></section>
 
     <section id="quien">
       <div class="wrap who">
         <h2>Who makes Netio</h2>
-        <p class="muted">Netio is made by a small independent team that got tired of doing the math in a spreadsheet every time a price changed. We are not Mercado Libre and we do not work for them. If something does not add up, <a href="../soporte.html#en">write to us</a> and we will look into it.</p>
+        <p class="muted">Netio is made by a small independent team that got tired of doing the math in a spreadsheet every time a price changed. We are not Mercado Libre and we do not work for them. If something does not add up, <a href="/soporte.html#en">write to us</a> and we will look into it.</p>
       </div>
     </section>
 
@@ -321,28 +196,32 @@
           <h2>Check your next listing before you publish it.</h2>
           <p class="muted" style="margin:0">Free, on the Chrome Web Store. Faster than opening the spreadsheet.</p>
         </div>
-        <a class="btn btn-go" href="https://chromewebstore.google.com/detail/netio/bjhikillfgbpblogloljjhejogfeajac?utm_source=landing&amp;utm_medium=site">
-          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm0 5.6a4.4 4.4 0 0 1 3.86 2.3H12a2.1 2.1 0 0 0-1.9 3l-1.86-3.2A4.39 4.39 0 0 1 12 7.6Zm-7.9 4.9 2 3.45a4.4 4.4 0 0 0 4.2 3.05h.2l1.9-3.3A2.1 2.1 0 0 1 9.9 12a2.1 2.1 0 0 1 .3-1.08L7.3 5.9a8 8 0 0 0-3.2 6.6Zm9.95 6.4a8 8 0 0 0 5.83-10.4H14.2A4.38 4.38 0 0 1 14.05 18.9ZM12 14.1A2.1 2.1 0 1 1 12 9.9a2.1 2.1 0 0 1 0 4.2Z"/></svg>
-          Add to Chrome, it is free
-        </a>
+        <a class="btn btn-go" href="https://chromewebstore.google.com/detail/netio/bjhikillfgbpblogloljjhejogfeajac?utm_source=landing&amp;utm_medium=site"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm0 5.6a4.4 4.4 0 0 1 3.86 2.3H12a2.1 2.1 0 0 0-1.9 3l-1.86-3.2A4.39 4.39 0 0 1 12 7.6Zm-7.9 4.9 2 3.45a4.4 4.4 0 0 0 4.2 3.05h.2l1.9-3.3A2.1 2.1 0 0 1 9.9 12a2.1 2.1 0 0 1 .3-1.08L7.3 5.9a8 8 0 0 0-3.2 6.6Zm9.95 6.4a8 8 0 0 0 5.83-10.4H14.2A4.38 4.38 0 0 1 14.05 18.9ZM12 14.1A2.1 2.1 0 1 1 12 9.9a2.1 2.1 0 0 1 0 4.2Z"/></svg> Add to Chrome, it's free</a>
       </div>
     </section>
   </main>
-
   <footer>
     <div class="wrap">
-      <a class="lockup" href="../" aria-label="Netio, home">
-        <img src="../netio-logo.svg" alt="" width="28" height="28" />
+      <a class="lockup" href="/" aria-label="Netio, home">
+        <img src="/netio-logo.svg" alt="" width="28" height="28" />
         <span>netio</span>
       </a>
-      <p style="margin:0">Netio is an independent tool, not affiliated with Mercado Libre. Figures are estimates based on published rates.</p>
-      <div class="links">
-        <a href="../privacidad.html#en">Privacy</a>
-        <a href="../soporte.html#en">Support</a>
-        <a href="https://chromewebstore.google.com/detail/netio/bjhikillfgbpblogloljjhejogfeajac?utm_source=landing&amp;utm_medium=site">Chrome Web Store</a>
-        <a href="../" hreflang="es-MX" lang="es-MX">Español</a>
-      </div>
-      <p class="copy" style="margin:0">&copy; 2026 Netio</p>
+      <p class="not-aff">Netio is an independent tool, not affiliated with Mercado Libre. Figures are estimates based on published rates.</p>
+      <nav class="cols" aria-label="All pages">
+        <div><b>Guides (Spanish)</b><ul><li><a href="/guias/cuanto-cobra-mercado-libre-por-vender-2026/">Cuánto cobra Mercado Libre por vender</a></li><li><a href="/guias/comisiones-mercado-libre-por-categoria/">Comisiones por categoría</a></li><li><a href="/guias/costo-de-envio-mercado-libre-vendedor/">Costo de envío para el vendedor</a></li><li><a href="/guias/mercado-libre-full-costos-cuando-conviene/">Full: costos y cuándo conviene</a></li><li><a href="/guias/publicacion-clasica-vs-premium-mercado-libre/">Clásica vs Premium</a></li><li><a href="/guias/retenciones-isr-iva-mercado-libre-vendedores/">Retenciones de ISR e IVA</a></li></ul></div>
+        <div><b>How to (Spanish)</b><ul><li><a href="/como/calcular-tu-ganancia-real-en-mercado-libre/">Calcular tu ganancia real</a></li><li><a href="/como/poner-precio-a-un-producto-en-mercado-libre/">Poner precio a un producto</a></li><li><a href="/como/saber-que-publicaciones-te-hacen-perder-dinero/">Saber qué publicaciones pierden dinero</a></li><li><a href="/como/bajar-costos-de-envio-mercado-libre/">Bajar costos de envío</a></li></ul></div>
+        <div><b>Compare (Spanish)</b><ul><li><a href="/comparar/netio-vs-excel/">Netio vs Excel</a></li><li><a href="/comparar/netio-vs-simulador-de-costos-mercado-libre/">Netio vs simulador oficial</a></li><li><a href="/comparar/netio-vs-margen-real/">Netio vs Margen Real</a></li></ul></div>
+        <div><b>Netio</b><ul>
+          <li><a href="/calculadora/">Free calculator (Spanish)</a></li>
+          <li><a href="/">Home</a></li>
+          <li><a href="/privacidad.html">Privacy</a></li>
+          <li><a href="/soporte.html">Support</a></li>
+          <li><a href="https://chromewebstore.google.com/detail/netio/bjhikillfgbpblogloljjhejogfeajac?utm_source=landing&amp;utm_medium=site">Chrome Web Store</a></li>
+          <li><a href="/" hreflang="es-MX" lang="es-MX">Español</a></li>
+          <li><a href="/llms.txt">llms.txt</a></li>
+        </ul></div>
+      </nav>
+      <p class="copy">&copy; 2026 Netio. Contact: <a href="mailto:vitowebpro@gmail.com">vitowebpro@gmail.com</a></p>
     </div>
   </footer>
 </body>
