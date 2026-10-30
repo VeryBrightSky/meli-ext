@@ -121,19 +121,19 @@
 </head>
 <body>
   <a class="skip" href="#contenido">Saltar al contenido</a>
-  <div class="bg" aria-hidden="true"></div>
 
-  <header class="nav">
+  <header class="top">
     <div class="wrap">
       <a class="lockup" href="./" aria-label="Netio, inicio">
-        <img class="mark" src="netio-logo.svg" alt="" width="36" height="36" />
-        <span class="word">netio</span>
+        <img src="netio-logo.svg" alt="" width="32" height="32" />
+        <span>netio</span>
       </a>
-      <nav class="nav-right" aria-label="Principal">
-        <a class="nav-link hide-sm" href="#planes">Planes</a>
-        <a class="nav-link hide-sm" href="#faq">Preguntas</a>
-        <a class="nav-link" href="en/" hreflang="en" lang="en">English</a>
-        <a class="btn btn-green btn-sm" href="https://chromewebstore.google.com/detail/netio/bjhikillfgbpblogloljjhejogfeajac?utm_source=landing&amp;utm_medium=site">Agregar a Chrome</a>
+      <nav aria-label="Principal">
+        <a class="hide-sm" href="#ejemplo">El ejemplo</a>
+        <a class="hide-sm" href="#planes">Planes</a>
+        <a class="hide-sm" href="#faq">Preguntas</a>
+        <a href="en/" hreflang="en" lang="en">English</a>
+        <a class="btn btn-sm" href="https://chromewebstore.google.com/detail/netio/bjhikillfgbpblogloljjhejogfeajac?utm_source=landing&amp;utm_medium=site">Agregar a Chrome</a>
       </nav>
     </div>
   </header>
@@ -142,118 +142,139 @@
     <section class="hero">
       <div class="wrap hero-grid">
         <div>
-          <p class="pill"><span class="dot" aria-hidden="true"></span> Ya disponible en Chrome Web Store</p>
-          <h1>Ese producto barato quizá te hace <span class="loss">perder dinero</span></h1>
-          <p class="sub">Mercado Libre cobra comisión, costo fijo y envío. En los productos baratos eso puede ser más que tu ganancia. Netio te muestra el número real sobre cada publicación, antes de que fijes el precio.</p>
+          <p class="store"><i aria-hidden="true"></i> Ya disponible en Chrome Web Store</p>
+          <h1>Una funda de $149 te puede dejar <em>$10.30 abajo</em>.</h1>
+          <p class="sub">Comisión, costo fijo y envío. Netio hace la cuenta sobre cada publicación de Mercado Libre México, antes de que pongas el precio.</p>
           <div class="actions">
-            <a class="btn btn-green" href="https://chromewebstore.google.com/detail/netio/bjhikillfgbpblogloljjhejogfeajac?utm_source=landing&amp;utm_medium=site">
+            <a class="btn btn-go" href="https://chromewebstore.google.com/detail/netio/bjhikillfgbpblogloljjhejogfeajac?utm_source=landing&amp;utm_medium=site">
               <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm0 5.6a4.4 4.4 0 0 1 3.86 2.3H12a2.1 2.1 0 0 0-1.9 3l-1.86-3.2A4.39 4.39 0 0 1 12 7.6Zm-7.9 4.9 2 3.45a4.4 4.4 0 0 0 4.2 3.05h.2l1.9-3.3A2.1 2.1 0 0 1 9.9 12a2.1 2.1 0 0 1 .3-1.08L7.3 5.9a8 8 0 0 0-3.2 6.6Zm9.95 6.4a8 8 0 0 0 5.83-10.4H14.2A4.38 4.38 0 0 1 14.05 18.9ZM12 14.1A2.1 2.1 0 1 1 12 9.9a2.1 2.1 0 0 1 0 4.2Z"/></svg>
               Agregar a Chrome, es gratis
             </a>
-            <a class="btn btn-ghost" href="#como-funciona">Ver cómo funciona</a>
+            <a class="btn btn-line" href="#ejemplo">Ver la cuenta completa</a>
           </div>
-          <p class="reassure"><b>Gratis</b> para siempre en lo esencial. Sin cuenta. Tus costos se quedan en tu navegador.</p>
+          <p class="fine">Sin cuenta y sin servidores: tus costos se quedan en tu navegador. Al instalar tienes PRO 7 días, sin tarjeta.</p>
         </div>
 
-        <figure class="mock">
-          <div class="mock-head">
-            <span class="lockup"><img class="mark" src="netio-logo.svg" alt="" width="24" height="24" /><span class="word">netio</span></span>
-            <span class="tagline">Tu ganancia real</span>
-          </div>
+        <figure class="ticket">
+          <div class="ticket-head"><b>Funda para celular</b><span>Clásica, Tecnología</span></div>
           <dl>
-            <div class="row"><dt>Precio de venta</dt><dd>$120.00</dd></div>
-            <div class="row"><dt>Comisión</dt><dd>-$16.80</dd></div>
-            <div class="row"><dt>Costo fijo</dt><dd>-$25.00</dd></div>
-            <div class="row"><dt>Tu costo del producto</dt><dd>-$85.00</dd></div>
-            <div class="row total"><dt>Ganancia por venta</dt><dd>-$6.80</dd></div>
+            <div class="row"><dt>Precio de venta</dt><dd>$149.00</dd></div>
+            <div class="row"><dt>Comisión <small>10% de la categoría</small></dt><dd>-$14.90</dd></div>
+            <div class="row"><dt>Costo fijo <small>publicaciones de $149 a $298.99</small></dt><dd>-$37.00</dd></div>
+            <div class="row"><dt>Envío gratis que pagas tú <small>hasta 300 g</small></dt><dd>-$52.40</dd></div>
+            <div class="row"><dt>Lo que te costó la funda</dt><dd>-$55.00</dd></div>
           </dl>
-          <p class="alert">Pierdes $6.80 por venta a este precio.</p>
-          <figcaption>Ejemplo ilustrativo con cifras de muestra. Las tarifas reales dependen de tu categoría y tu cuenta.</figcaption>
+          <div class="sum"><span class="k">Te queda por venta</span><span class="v loss">-$10.30</span></div>
+          <p class="verdict loss">Pierdes $10.30 cada vez que se vende.</p>
+          <figcaption>Cifras estimadas con las tarifas que usa Netio (tablas de 2026). Tu porcentaje exacto depende de tu categoría y tu cuenta.</figcaption>
         </figure>
       </div>
     </section>
 
-    <section id="perdidas">
+    <section id="ejemplo">
       <div class="wrap">
-        <p class="eyebrow">El error más caro</p>
-        <h2>¿A dónde se va tu dinero?</h2>
-        <p class="lead">Un precio que parece bueno puede dejarte con números rojos. Netio junta todo en una sola tarjeta, dentro de la publicación.</p>
-        <div class="cards c4">
-          <div class="card loss"><div class="ico" aria-hidden="true">%</div><h3>Comisión</h3><p>Cambia según la categoría y si tu publicación es Clásica o Premium.</p></div>
-          <div class="card loss"><div class="ico" aria-hidden="true">$</div><h3>Costo fijo</h3><p>En muchos productos de precio bajo (por ejemplo, menos de $299) se suma un costo fijo por venta y se come tu margen.</p></div>
-          <div class="card loss"><div class="ico" aria-hidden="true">&#9654;</div><h3>Envío</h3><p>Tu costo de envío, Mercado Envíos Full y el descuento por reputación.</p></div>
-          <div class="card loss"><div class="ico" aria-hidden="true">&#9783;</div><h3>Retenciones 2026</h3><p>IVA 8% e ISR 2.5% si tienes RFC registrado en Mercado Libre.</p></div>
+        <h2>Producto de $149: así se va tu ganancia</h2>
+        <div class="two">
+          <p class="muted">Es el caso típico de los productos baratos. La comisión se ve chica, pero el costo fijo y el envío no dependen del precio, y en una funda de $149 pesan más que lo que te queda. Netio suma las cuatro cosas y te dice el número en rojo o en verde.</p>
+          <div>
+            <ul class="walk">
+              <li><span>Precio al que la publicaste<small>Clásica, categoría Tecnología</small></span><span>$149.00</span></li>
+              <li><span>Comisión de Mercado Libre<small>10% en esta categoría</small></span><span class="loss-text">-$14.90</span></li>
+              <li><span>Costo fijo por unidad<small>Clásica de $149 a $298.99: $37. De $99 a $148.99: $30. Menos de $99: $25</small></span><span class="loss-text">-$37.00</span></li>
+              <li><span>Envío gratis que ofreces<small>Paquete de hasta 300 g. Abajo de $299 lo pagas completo tú</small></span><span class="loss-text">-$52.40</span></li>
+              <li><span>Lo que pagaste por la funda</span><span class="loss-text">-$55.00</span></li>
+              <li><span><b>Te queda</b></span><span class="loss-text">-$10.30</span></li>
+            </ul>
+            <p class="muted">Mercado Libre se queda con $104.30 de los $149, el 70%, y tú pones $10.30 de tu bolsa. Ahora el mismo producto a $299:</p>
+          </div>
         </div>
+
+        <div class="compare">
+          <figure class="ticket">
+            <div class="ticket-head"><b>A $149</b><span>como está hoy</span></div>
+            <dl>
+              <div class="row"><dt>Comisión 10%</dt><dd>-$14.90</dd></div>
+              <div class="row"><dt>Costo fijo</dt><dd>-$37.00</dd></div>
+              <div class="row"><dt>Envío (lo pagas todo)</dt><dd>-$52.40</dd></div>
+              <div class="row"><dt>Tu costo</dt><dd>-$55.00</dd></div>
+            </dl>
+            <div class="sum"><span class="k">Te queda</span><span class="v loss">-$10.30</span></div>
+            <p class="verdict loss">Margen: -6.9%</p>
+          </figure>
+          <figure class="ticket">
+            <div class="ticket-head"><b>A $299</b><span>precio mínimo para envío gratis</span></div>
+            <dl>
+              <div class="row"><dt>Comisión 10%</dt><dd>-$29.90</dd></div>
+              <div class="row"><dt>Costo fijo <small>desde $299 ya no aplica</small></dt><dd>$0.00</dd></div>
+              <div class="row"><dt>Envío <small>reputación verde: Mercado Libre pone el 50%</small></dt><dd>-$26.20</dd></div>
+              <div class="row"><dt>Tu costo</dt><dd>-$55.00</dd></div>
+            </dl>
+            <div class="sum"><span class="k">Te queda</span><span class="v profit">$187.90</span></div>
+            <p class="verdict profit">Margen: 62.8%</p>
+          </figure>
+        </div>
+        <p class="small" style="margin-top:18px">No te decimos a qué precio vender ni qué vender. Te decimos qué número sale con cada precio, para que lo decidas tú con la cuenta hecha. Subsidio de envío por reputación: estimado, Mercado Libre no publica el porcentaje exacto.</p>
       </div>
     </section>
 
     <section id="como-funciona">
       <div class="wrap">
-        <p class="eyebrow">Cómo funciona</p>
-        <h2>Tres pasos y ya ves tu ganancia</h2>
+        <h2>Cómo funciona</h2>
         <ol class="steps">
-          <li><h3>Instálalo desde Chrome Web Store</h3><p>Es gratis. Al instalar tienes PRO completo por 7 días, sin correo y sin tarjeta.</p></li>
-          <li><h3>Abre una publicación o una búsqueda</h3><p>La tarjeta de Netio aparece debajo del precio en Mercado Libre México. En los resultados de búsqueda ves un resumen de cada producto.</p></li>
-          <li><h3>Escribe tu costo y revisa el número</h3><p>Netio calcula tu ganancia neta, tu margen y el precio mínimo para no perder. Si pierdes dinero, te lo marca en rojo.</p></li>
+          <li><div><h3>Instala Netio desde Chrome Web Store</h3><p>Es gratis. Los primeros 7 días tienes PRO completo, sin correo y sin tarjeta.</p></div></li>
+          <li><div><h3>Abre una publicación o una búsqueda en Mercado Libre México</h3><p>La tarjeta aparece debajo del precio, con la comisión, el costo fijo y el envío ya estimados. En los resultados de búsqueda ves el neto de cada producto.</p></div></li>
+          <li><div><h3>Escribe lo que te costó el producto</h3><p>Netio te da tu ganancia, tu margen y el precio mínimo para no perder. Si sale en rojo, lo ves antes de publicar, no cuando llega el estado de cuenta.</p></div></li>
         </ol>
       </div>
     </section>
 
     <section id="planes">
-      <div class="wrap center">
-        <p class="eyebrow">Planes</p>
-        <h2>Empieza gratis. Crece con PRO.</h2>
-        <p class="lead">Lo esencial para vender con ganancia no cuesta nada. PRO es para quien quiere optimizar cada precio.</p>
-        <div class="plans">
-          <div class="plan">
-            <div class="plan-head"><span class="plan-name">Gratis</span><span class="tag">SIEMPRE</span></div>
-            <p class="price"><b>$0</b></p>
-            <ul>
-              <li>Comisión estimada por categoría (Clásica y Premium)</li>
-              <li>Costo fijo de los productos baratos</li>
-              <li>Ganancia y margen por venta</li>
-              <li>Precio mínimo para no perder</li>
-              <li>Aviso en rojo cuando una publicación te hace perder dinero</li>
-              <li>Tu envío, Mercado Envíos Full y descuento por reputación</li>
-              <li>Retenciones 2026 (IVA 8% e ISR 2.5%)</li>
-              <li>Resumen de neto en cada resultado de búsqueda</li>
-            </ul>
-          </div>
-          <div class="plan pro">
-            <div class="plan-head"><span class="plan-name">PRO</span><span class="tag">PRUEBA 7 DÍAS</span></div>
-            <p class="price"><b>$89 MXN</b> al mes, o <b>$699 MXN</b> al año</p>
-            <ul>
-              <li>Todo lo del plan gratis</li>
-              <li>Precio objetivo: a cuánto publicar para ganar el margen que quieres</li>
-              <li>Calculadora de meses sin intereses</li>
-              <li>Clásica vs Premium, lado a lado</li>
-              <li>Radar de Rentabilidad en las búsquedas, con filtro y exportación a CSV</li>
-              <li>Tablero de Ganancias con todos tus productos</li>
-              <li>Prueba precios sin tocar tu publicación</li>
-            </ul>
-            <p class="trial"><b>Prueba PRO 7 días sin tarjeta.</b> Empieza al instalar, sin correo. El plan anual ($699 MXN) ahorra 35% frente al mensual. Cancela cuando quieras.</p>
-            <a class="btn btn-green" href="https://chromewebstore.google.com/detail/netio/bjhikillfgbpblogloljjhejogfeajac?utm_source=landing&amp;utm_medium=site">Probar PRO gratis</a>
-          </div>
+      <div class="wrap">
+        <h2>Lo esencial es gratis. PRO es para afinar cada precio.</h2>
+        <table class="plans">
+          <thead>
+            <tr>
+              <th scope="col"><span class="sr">Función</span></th>
+              <th scope="col">Gratis<small>para siempre</small></th>
+              <th scope="col">PRO<small>$89 MXN al mes o $699 al año</small></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><th scope="row">Comisión estimada por categoría, Clásica y Premium</th><td class="y">Sí</td><td class="y">Sí</td></tr>
+            <tr><th scope="row">Costo fijo de los productos baratos</th><td class="y">Sí</td><td class="y">Sí</td></tr>
+            <tr><th scope="row">Tu envío, Mercado Envíos Full y descuento por reputación</th><td class="y">Sí</td><td class="y">Sí</td></tr>
+            <tr><th scope="row">Retenciones 2026 (IVA 8% e ISR 2.5%)</th><td class="y">Sí</td><td class="y">Sí</td></tr>
+            <tr><th scope="row">Ganancia, margen y precio mínimo para no perder</th><td class="y">Sí</td><td class="y">Sí</td></tr>
+            <tr><th scope="row">Aviso en rojo cuando pierdes dinero</th><td class="y">Sí</td><td class="y">Sí</td></tr>
+            <tr><th scope="row">Precio objetivo para el margen que quieres</th><td class="n">No</td><td class="y">Sí</td></tr>
+            <tr><th scope="row">Calculadora de meses sin intereses</th><td class="n">No</td><td class="y">Sí</td></tr>
+            <tr><th scope="row">Clásica vs Premium, lado a lado</th><td class="n">No</td><td class="y">Sí</td></tr>
+            <tr><th scope="row">Radar de Rentabilidad en búsquedas, con filtro y CSV</th><td class="n">No</td><td class="y">Sí</td></tr>
+            <tr><th scope="row">Tablero de Ganancias con todos tus productos</th><td class="n">No</td><td class="y">Sí</td></tr>
+            <tr><th scope="row">Probar precios sin tocar la publicación</th><td class="n">No</td><td class="y">Sí</td></tr>
+          </tbody>
+        </table>
+        <div class="plan-note">
+          <p><b>Prueba PRO 7 días sin tarjeta.</b> Empieza sola al instalar. Si no pagas, te quedas con el plan gratis y con tus costos guardados. El plan anual ahorra 35%. Cancela cuando quieras desde las opciones de Netio.</p>
+        </div>
+        <p style="margin-top:22px"><a class="btn btn-go" href="https://chromewebstore.google.com/detail/netio/bjhikillfgbpblogloljjhejogfeajac?utm_source=landing&amp;utm_medium=site">Probar PRO gratis</a></p>
+      </div>
+    </section>
+
+    <section id="privacidad">
+      <div class="wrap">
+        <h2>Tus números son tuyos</h2>
+        <div class="quiet">
+          <div><b>Sin servidores</b><p>Tus costos y productos se guardan en tu navegador. No tenemos dónde más guardarlos.</p></div>
+          <div><b>Sin seguimiento</b><p>Sin cookies ni analítica. No enviamos enlaces, precios ni datos de tus publicaciones.</p></div>
+          <div><b>Pago con Stripe</b><p>Si pagas PRO, ExtensionPay y Stripe procesan el cobro. Nosotros nunca vemos tu tarjeta. <a href="privacidad.html">Política de privacidad</a>.</p></div>
         </div>
       </div>
     </section>
 
-    <section class="trust">
-      <div class="wrap">
-        <p class="eyebrow">Privacidad primero</p>
-        <h2>Tus números son tuyos</h2>
-        <ul>
-          <li><b>Sin servidores propios</b>Tus costos y productos se guardan solo en tu navegador.</li>
-          <li><b>Sin seguimiento</b>Sin cookies, sin analítica y sin enviar enlaces, precios ni datos de tus publicaciones.</li>
-          <li><b>Pagos con Stripe</b>Si decides pagar PRO, ExtensionPay y Stripe procesan el pago. Nosotros nunca vemos tu tarjeta. Lee la <a href="privacidad.html">política de privacidad</a>.</li>
-        </ul>
-      </div>
-    </section>
-
     <section id="faq">
-      <div class="wrap center">
-        <p class="eyebrow">Preguntas frecuentes</p>
-        <h2>Lo que más nos preguntan</h2>
+      <div class="wrap">
+        <h2>Preguntas frecuentes</h2>
         <div class="faq">
           <details>
             <summary>¿Netio está afiliado a Mercado Libre?</summary>
@@ -287,17 +308,23 @@
       </div>
     </section>
 
-    <section class="final">
+    <section id="quien">
+      <div class="wrap who">
+        <h2>Quién hace Netio</h2>
+        <p class="muted">Netio lo hace un equipo chico, de forma independiente, que se cansó de hacer la cuenta en una hoja de cálculo cada vez que cambiaba un precio. No somos Mercado Libre y no trabajamos para ellos. Si algo no cuadra, <a href="soporte.html">escríbenos</a> y lo revisamos.</p>
+      </div>
+    </section>
+
+    <section class="close">
       <div class="wrap">
-        <div class="panel">
-          <h2>Deja de vender a ciegas</h2>
-          <p class="lead">Instálalo en segundos y revisa tu próxima publicación. Gratis.</p>
-          <a class="btn btn-green" href="https://chromewebstore.google.com/detail/netio/bjhikillfgbpblogloljjhejogfeajac?utm_source=landing&amp;utm_medium=site">
-            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm0 5.6a4.4 4.4 0 0 1 3.86 2.3H12a2.1 2.1 0 0 0-1.9 3l-1.86-3.2A4.39 4.39 0 0 1 12 7.6Zm-7.9 4.9 2 3.45a4.4 4.4 0 0 0 4.2 3.05h.2l1.9-3.3A2.1 2.1 0 0 1 9.9 12a2.1 2.1 0 0 1 .3-1.08L7.3 5.9a8 8 0 0 0-3.2 6.6Zm9.95 6.4a8 8 0 0 0 5.83-10.4H14.2A4.38 4.38 0 0 1 14.05 18.9ZM12 14.1A2.1 2.1 0 1 1 12 9.9a2.1 2.1 0 0 1 0 4.2Z"/></svg>
-            Agregar a Chrome, es gratis
-          </a>
-          <p class="reassure">Ya disponible en Chrome Web Store</p>
+        <div>
+          <h2>Revisa tu próxima publicación antes de subirla.</h2>
+          <p class="muted" style="margin:0">Gratis, en Chrome Web Store. Tarda menos que abrir la hoja de cálculo.</p>
         </div>
+        <a class="btn btn-go" href="https://chromewebstore.google.com/detail/netio/bjhikillfgbpblogloljjhejogfeajac?utm_source=landing&amp;utm_medium=site">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm0 5.6a4.4 4.4 0 0 1 3.86 2.3H12a2.1 2.1 0 0 0-1.9 3l-1.86-3.2A4.39 4.39 0 0 1 12 7.6Zm-7.9 4.9 2 3.45a4.4 4.4 0 0 0 4.2 3.05h.2l1.9-3.3A2.1 2.1 0 0 1 9.9 12a2.1 2.1 0 0 1 .3-1.08L7.3 5.9a8 8 0 0 0-3.2 6.6Zm9.95 6.4a8 8 0 0 0 5.83-10.4H14.2A4.38 4.38 0 0 1 14.05 18.9ZM12 14.1A2.1 2.1 0 1 1 12 9.9a2.1 2.1 0 0 1 0 4.2Z"/></svg>
+          Agregar a Chrome, es gratis
+        </a>
       </div>
     </section>
   </main>
@@ -305,17 +332,17 @@
   <footer>
     <div class="wrap">
       <a class="lockup" href="./" aria-label="Netio, inicio">
-        <img class="mark" src="netio-logo.svg" alt="" width="28" height="28" />
-        <span class="word">netio</span>
+        <img src="netio-logo.svg" alt="" width="28" height="28" />
+        <span>netio</span>
       </a>
-      <p class="disclaimer">Netio es una herramienta independiente, no afiliada a Mercado Libre. Las cifras son estimaciones basadas en tarifas publicadas.</p>
+      <p style="margin:0">Netio es una herramienta independiente, no afiliada a Mercado Libre. Las cifras son estimaciones basadas en tarifas publicadas.</p>
       <div class="links">
         <a href="privacidad.html">Privacidad</a>
         <a href="soporte.html">Soporte</a>
         <a href="https://chromewebstore.google.com/detail/netio/bjhikillfgbpblogloljjhejogfeajac?utm_source=landing&amp;utm_medium=site">Chrome Web Store</a>
         <a href="en/" hreflang="en" lang="en">English</a>
       </div>
-      <p class="copy">&copy; 2026 Netio</p>
+      <p class="copy" style="margin:0">&copy; 2026 Netio</p>
     </div>
   </footer>
 </body>
