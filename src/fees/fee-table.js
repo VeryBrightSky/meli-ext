@@ -10,14 +10,34 @@
 
 globalThis.MST_FEE_TABLE = Object.freeze({
   meta: {
-    version: "2026-06-12.2",
+    version: "2026-10-30.1",
     site: "MLM",
     currency: "MXN",
-    retrievedAt: "2026-06-12",
+    retrievedAt: "2026-10-30",
     sources: [
       {
         url: "https://www.mercadolibre.com.mx/ayuda/Costos-de-vender-un-producto_870",
-        note: "Official: Clásica 8–16%, Premium 12.5–20.5% (MSI hasta 18 meses), precio mínimo $35.",
+        note: "Official (consultada 2026-10-30): Clásica entre 8% y 17%, Premium entre 11% y 21.5% (MSI hasta 18 meses), precio mínimo $35.",
+        confidence: "official"
+      },
+      {
+        url: "https://www.mercadolibre.com.mx/ayuda/costos-envios-gratis_3287",
+        note: "Official (consultada 2026-10-30): el costo de envío aplica a toda venta, se calcula por peso (físico o volumétrico) y precio, con bonificación por reputación ya incluida en las tablas; envío gratis obligatorio desde $299, opcional abajo.",
+        confidence: "official"
+      },
+      {
+        url: "https://www.mercadolibre.com.mx/ayuda/40538",
+        note: "Official (consultada 2026-10-30): tabla de envío reputación verde / MercadoLíder (50% incluido). Ver shipping-table.js.",
+        confidence: "official"
+      },
+      {
+        url: "https://www.mercadolibre.com.mx/ayuda/40545",
+        note: "Official (consultada 2026-10-30): tabla de envío reputación amarilla o sin reputación (40% incluido). Ver shipping-table.js.",
+        confidence: "official"
+      },
+      {
+        url: "https://www.mercadolibre.com.mx/ayuda/40547",
+        note: "Official (consultada 2026-10-30): tabla de envío reputación naranja o roja (sin bonificación). Ver shipping-table.js.",
         confidence: "official"
       },
       {
@@ -45,14 +65,17 @@ globalThis.MST_FEE_TABLE = Object.freeze({
       "MELI ya no publica el porcentaje exacto por categoría; los valores por grupo son de fuentes secundarias.",
       "Costo fijo por unidad: SOLO Clásica (verificado jun 2026; Premium exento a cualquier precio).",
       "Tramos del costo fijo (consenso multi-fuente jun 2026, MELI no publica los límites exactos): $0–98.99→$25, $99–148.99→$30, $149–298.99→$37, $0 desde $299.",
-      "Vendedores Full: desde el 6 abr 2026, los productos < $299 pagan un costo de servicio variable por peso y tramo de precio en lugar del costo fijo (ver shipping-table.js fullServiceCost)."
+      "Vendedores Full: desde el 6 abr 2026, los productos < $299 pagan un costo de servicio variable por peso y tramo de precio en lugar del costo fijo (ver shipping-table.js fullServiceCost).",
+      "Envío: las tablas oficiales por reputación (verde / amarilla o sin reputación / naranja o roja) ya incluyen la bonificación; la reputación elige la tabla, no se descuenta un porcentaje encima (ver shipping-table.js)."
     ]
   },
 
-  // Official bounds — used when the category is unknown.
+  // Official bounds — used when the category is unknown. Source: ayuda
+  // Costos-de-vender-un-producto_870 (2026-10-30): Clásica "Entre 8% y 17%",
+  // Premium "Entre 11% y 21.5%".
   defaults: {
-    classic: { pctMin: 8, pctMax: 16, confidence: "official" },
-    premium: { pctMin: 12.5, pctMax: 20.5, confidence: "official" }
+    classic: { pctMin: 8, pctMax: 17, confidence: "official" },
+    premium: { pctMin: 11, pctMax: 21.5, confidence: "official" }
   },
 
   minPriceMXN: 35,
@@ -83,27 +106,14 @@ globalThis.MST_FEE_TABLE = Object.freeze({
     confidence: "secondary"
   },
 
-  // Mercado Envíos free-shipping subsidy by seller reputation. On free-shipping
-  // items at/above freeShippingThresholdMXN, MELI covers part of the shipping
-  // cost by reputation; below the threshold the seller pays it all.
-  // ESTIMATE — MELI does not publish exact percentages and they vary by period
-  // and program; ranges are approximate and are labeled as an estimate in the
-  // UI. Point values use the CONSERVATIVE (low) end of each range so the net
-  // payout stays worst-case (never overstates the subsidy / understates cost).
-  shippingSubsidy: {
+  // Seller shipping cost by reputation lives in shipping-table.js (official
+  // tables, discount already included). There is no separate subsidy
+  // percentage any more: reputation selects the table.
+  shippingByReputation: {
+    confidence: "official",
     thresholdMXN: 299,
-    confidence: "estimate",
-    note: "Aproximado; MELI no publica el porcentaje exacto y varía por periodo/programa.",
-    levels: [
-      // MercadoLíder / reputación Verde: ~50–60% → conservative 50.
-      { id: "verde", subsidyPct: 50, rangePct: [50, 60] },
-      // Reputación Amarilla: ~40%.
-      { id: "amarillo", subsidyPct: 40, rangePct: [40, 40] },
-      // Naranja / Roja: sin bonificación.
-      { id: "naranja", subsidyPct: 0, rangePct: [0, 0] },
-      // Sin reputación registrada / no aplica.
-      { id: "none", subsidyPct: 0, rangePct: [0, 0] }
-    ]
+    // Card reputation ids → official table id.
+    tableFor: { verde: "verde", amarillo: "amarilla", naranja: "naranja", none: "amarilla" }
   },
 
   // Meses sin intereses (MSI) financing charge to the SELLER. MELI / Mercado

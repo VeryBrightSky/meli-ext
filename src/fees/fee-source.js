@@ -92,8 +92,11 @@ globalThis.MST_FEE_SOURCE = (() => {
     getFixedCost: fixedCostFor,
     fixedCostFnFor,
     withholdings: table.withholdings,
-    shippingSubsidy: table.shippingSubsidy,
+    shippingByReputation: table.shippingByReputation,
     msiReference: table.msiReference,
+    // Listing prices where the seller's shipping cost steps ($299 free
+    // shipping becomes mandatory; $499 and $999 start higher official bands).
+    getShippingThresholds: () => [...globalThis.MST_SHIPPING.priceBandThresholds],
     // Prices where the fixed charge steps (sweet-spot / solver candidates).
     // Full sellers pay the Full service-cost tiers (99/199/299), not the
     // classic fixed-charge tiers (99/149/299).

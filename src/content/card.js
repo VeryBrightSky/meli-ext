@@ -347,39 +347,58 @@ globalThis.MST_CARD = (() => {
     if (!optShipSet && !(state.shippingCostMXN > 0)) applyShippingEstimate();
   }
 
-  // Fill the shipping row with the Mercado Envíos estimate for the chosen
-  // weight (or 0.3 kg) when the seller has not typed a cost. Returns true
-  // when a value was filled.
+  // Does the seller pay Mercado Envíos at price p? From $299 free shipping is
+  // mandatory; below it only when they offer free shipping (optional).
+  const shippingApplies = (p, forceFree = false) =>
+    forceFree || state.freeShipping || p >= SOURCE.freeShippingThresholdMXN;
+
+  // Official seller cost for a weight at price p from the table the chosen
+  // reputation reads (discount already included; below $299 the "envío
+  // gratis opcional" column). 0 when the table has no row.
+  const tableShipping = (kg, p) =>
+    globalThis.MST_SHIPPING.costForWeight(kg, p, state.reputationId) ?? 0;
+
+  // Fill the shipping row with the official Mercado Envíos estimate for the
+  // chosen weight (or 0.3 kg) at the current price and reputation when the
+  // seller has not typed a cost and shipping applies. Returns true when a
+  // value was filled.
   function applyShippingEstimate() {
-    if (!(state.priceMXN >= SOURCE.freeShippingThresholdMXN)) return false;
+    if (!shippingApplies(state.priceMXN)) return false;
     if (state.shippingCostMXN > 0 && !state.shippingAutofilled) return false;
-    const kg = state.weightKg > 0 ? state.weightKg : 0.3;
-    const cost = globalThis.MST_SHIPPING.costForWeight(kg);
-    if (cost === null || !(cost > 0)) return false;
+    const cost = tableShipping(state.weightKg > 0 ? state.weightKg : 0.3, state.priceMXN);
+    if (!(cost > 0)) return false;
     state.shippingCostMXN = cost;
     state.shippingAutofilled = true;
     return true;
   }
 
+  // An autofilled estimate follows the price band, weight and reputation
+  // (the official tables step at $299, $499 and $999); a typed cost never
+  // moves. Returns true when the shown value changed.
+  function refreshShippingEstimate() {
+    if (!state.shippingAutofilled) return false;
+    const next = tableShipping(state.weightKg > 0 ? state.weightKg : 0.3, state.priceMXN);
+    if (!(next > 0) || next === state.shippingCostMXN) return false;
+    state.shippingCostMXN = next;
+    return true;
+  }
+
   // --- Update (no DOM rebuilding) ---------------------------------------------
 
-  // What the seller pays to ship at price p. The reputation discount only
-  // applies to free-shipping items at/above $299, so this is a step function
-  // of price, and the reverse solver must evaluate it at the price it returns.
+  // What the seller pays to ship at price p. A typed cost is charged as is
+  // (the official tables already include the reputation discount, so nothing
+  // is subtracted from it). An estimate is read from the official table at
+  // price p, so it is a step function of price ($299 / $499 / $999 bands) and
+  // the reverse solver must evaluate it at the price it returns.
   function shipAt(p, { forceFree = false, fallbackKg = 0 } = {}) {
-    const subsidyPct =
-      SOURCE.shippingSubsidy.levels.find((l) => l.id === state.reputationId)?.subsidyPct || 0;
-    let full = state.shippingCostMXN;
-    if (!(full > 0) && fallbackKg > 0) full = globalThis.MST_SHIPPING.costForWeight(fallbackKg) ?? 0;
-    return CALC.subsidizedShipping({
-      fullShippingMXN: full,
-      priceMXN: p,
-      // Free shipping is mandatory at/above the threshold, so the discount
-      // applies there whether or not the seller ticked the box.
-      freeShipping: forceFree || state.freeShipping || p >= SOURCE.freeShippingThresholdMXN,
-      subsidyPct,
-      thresholdMXN: SOURCE.shippingSubsidy.thresholdMXN
-    });
+    if (state.shippingCostMXN > 0 && !state.shippingAutofilled) return state.shippingCostMXN;
+    const kg = state.weightKg > 0 ? state.weightKg : state.shippingAutofilled ? 0.3 : fallbackKg;
+    if (!(kg > 0)) return 0;
+    // An autofilled estimate was placed in the shipping row because shipping
+    // applied; like a typed cost it stays charged at every what-if price.
+    // Without one, shipping only counts where it applies.
+    if (!state.shippingAutofilled && !shippingApplies(p, forceFree)) return 0;
+    return tableShipping(kg, p);
   }
 
   function computeCurrent() {
@@ -389,15 +408,7 @@ globalThis.MST_CARD = (() => {
       categoryGroupId: state.categoryGroupId,
       fullWeightKg: fullWeightKg()
     });
-    const subsidyPct =
-      SOURCE.shippingSubsidy.levels.find((l) => l.id === state.reputationId)?.subsidyPct || 0;
-    const effectiveShipping = CALC.subsidizedShipping({
-      fullShippingMXN: state.shippingCostMXN,
-      priceMXN: state.priceMXN,
-      freeShipping: state.freeShipping || state.priceMXN >= SOURCE.freeShippingThresholdMXN,
-      subsidyPct,
-      thresholdMXN: SOURCE.shippingSubsidy.thresholdMXN
-    });
+    const effectiveShipping = shipAt(state.priceMXN);
     const b = CALC.computeBreakdown(quote, {
       priceMXN: state.priceMXN,
       shippingCostMXN: effectiveShipping,
@@ -453,6 +464,9 @@ globalThis.MST_CARD = (() => {
   }
 
   function updateBody(flash) {
+    // A what-if price can cross an official band ($299 / $499 / $999): an
+    // autofilled estimate follows it before anything is computed.
+    if (refreshShippingEstimate()) refs.shippingInput?.syncFromState();
     const { quote, b, effectiveShipping } = computeCurrent();
 
     const pro = state.pro;
@@ -482,20 +496,15 @@ globalThis.MST_CARD = (() => {
     // Pro: actionable (click applies the price). Free: the gain is shown for
     // real, the price is what PRO unlocks.
     // Crossing $299 makes free shipping mandatory: from there the seller pays
-    // shipping (their typed cost, else an estimate for the chosen weight or
-    // the smallest bracket), so a fixed-charge drop that shipping eats is not
-    // a sweet spot.
-    const threshold = SOURCE.freeShippingThresholdMXN;
-    const shipNow = effectiveShipping;
+    // shipping (their typed cost, else the official estimate for the chosen
+    // weight or the smallest bracket at the target price), so a fixed-charge
+    // drop that shipping eats is not a sweet spot.
     const spot = CALC.findSweetSpot({
       priceMXN: state.priceMXN,
       ratePct: quote.pctMax,
       fixedCostFn,
       thresholds: SOURCE.getFixedCostThresholds(fullWeightKg()),
-      shippingFn: (p) =>
-        p >= threshold && state.priceMXN < threshold
-          ? shipAt(p, { forceFree: true, fallbackKg: state.weightKg > 0 ? state.weightKg : 0.3 })
-          : shipNow
+      shippingFn: (p) => shipAt(p, { fallbackKg: state.weightKg > 0 ? state.weightKg : 0.3 })
     });
     refs.sweetspot.style.display = spot ? "" : "none";
     if (spot) {
@@ -668,16 +677,16 @@ globalThis.MST_CARD = (() => {
       flash
     );
 
-    // Shipping subsidy: informational, only when a subsidy actually applies.
-    const subsidyApplies = effectiveShipping < state.shippingCostMXN;
-    refs.shippingSubsidy.root.style.display = subsidyApplies ? "" : "none";
-    if (subsidyApplies) {
-      patchRow(
-        refs.shippingSubsidy,
-        null,
-        fmtCharge(CALC.round2(state.shippingCostMXN - effectiveShipping)),
-        flash
-      );
+    // Reputation discount: informational. The official table already includes
+    // it, so the row only says which discount the shown estimate carries;
+    // a typed cost is the seller's own number and gets no row.
+    const discountPct = globalThis.MST_SHIPPING.discountPctFor(state.reputationId);
+    const discountShown = state.shippingAutofilled && effectiveShipping > 0 && discountPct > 0;
+    refs.shippingSubsidy.root.style.display = discountShown ? "" : "none";
+    if (discountShown) {
+      patchRow(refs.shippingSubsidy, null, T("shippingDiscountIncluded", [String(discountPct)]), flash);
+    } else {
+      refs.shippingSubsidy.value.textContent = ""; // never leave a stale percentage behind
     }
 
     patchRow(refs.net, null, fmtRange(b.netMinMXN, b.netMaxMXN), flash);
@@ -717,18 +726,22 @@ globalThis.MST_CARD = (() => {
     // Breakeven + target price (reverse calculator). Range rates produce a
     // price range; the WORST case (pctMax) is the safe number to act on.
     const hasCost = state.productCostMXN > 0;
-    // Shipping is folded into the step function (the reputation discount
-    // switches on at $299), so the solver charges it at the price it returns.
+    // Shipping is folded into the step function (free shipping becomes the
+    // seller's cost at $299 and the official tables step again at $499 and
+    // $999), so the solver charges it at the price it returns. With no
+    // typed cost or estimate, the answer still pays shipping where it
+    // applies, for the chosen weight or the smallest bracket (0.3 kg).
     const solveThresholds = [
-      ...new Set([...SOURCE.getFixedCostThresholds(fullWeightKg()), SOURCE.shippingSubsidy.thresholdMXN])
+      ...new Set([...SOURCE.getFixedCostThresholds(fullWeightKg()), ...SOURCE.getShippingThresholds()])
     ].sort((a, c) => a - c);
+    const solveShipping = (p) => shipAt(p, { fallbackKg: state.weightKg > 0 ? state.weightKg : 0.3 });
     const solve = (ratePct, marginPct) =>
       CALC.solveTargetPrice({
         costMXN: state.productCostMXN,
         shippingMXN: 0,
         marginPct,
         ratePct,
-        fixedCostFn: (p) => fixedCostFn(p) + shipAt(p),
+        fixedCostFn: (p) => fixedCostFn(p) + solveShipping(p),
         thresholds: solveThresholds,
         minPriceMXN: SOURCE.minPriceMXN ?? 0
       });
@@ -1184,8 +1197,9 @@ globalThis.MST_CARD = (() => {
     fullRow.append(el("span", `${PREFIX}-row__label`, T("rowFull")), fullCheck);
     body.appendChild(fullRow);
 
-    // Seller reputation → Mercado Envíos subsidy (free feature). Only affects
-    // free-shipping items ≥ $299; picks the subsidy % for the effective cost.
+    // Seller reputation → which official Mercado Envíos table the shipping
+    // estimate reads (free feature). The tables already include the
+    // reputation discount (50% verde, 40% amarilla or none, 0% naranja).
     const repRow = el("div", `${PREFIX}-row`);
     repRow.appendChild(el("span", `${PREFIX}-row__label`, T("rowReputation")));
     const repSel = document.createElement("select");
@@ -1201,6 +1215,8 @@ globalThis.MST_CARD = (() => {
     }
     repSel.addEventListener("change", () => {
       state.reputationId = repSel.value || "none";
+      // An autofilled estimate follows the reputation's table; a typed cost stays.
+      if (refreshShippingEstimate()) refs.shippingInput.syncFromState();
       update();
       save("sync", { reputationId: state.reputationId });
     });
@@ -1208,13 +1224,23 @@ globalThis.MST_CARD = (() => {
     repRow.appendChild(repSel);
     body.appendChild(repRow);
 
-    // Free-shipping toggle: seller offers free shipping (enables the subsidy).
+    // Free-shipping toggle: the seller offers free shipping below $299
+    // (optional there; mandatory from $299). Offering it means paying the
+    // official "envío gratis opcional" column, so with no typed cost the
+    // estimate is filled when ticked and removed again when unticked.
     const freeRow = el("label", `${PREFIX}-row ${PREFIX}-toggle-row`);
     const freeCheck = document.createElement("input");
     freeCheck.type = "checkbox";
     freeCheck.className = `${PREFIX}-free-toggle`;
     freeCheck.addEventListener("change", () => {
       state.freeShipping = freeCheck.checked;
+      if (state.freeShipping) {
+        if (applyShippingEstimate()) refs.shippingInput.syncFromState();
+      } else if (state.shippingAutofilled && !(state.priceMXN >= SOURCE.freeShippingThresholdMXN)) {
+        state.shippingCostMXN = 0;
+        state.shippingAutofilled = false;
+        refs.shippingInput.syncFromState();
+      }
       update();
       save("sync", { freeShipping: state.freeShipping });
     });
@@ -1258,7 +1284,8 @@ globalThis.MST_CARD = (() => {
     shipRow.append(estTag, refs.shippingInput);
     body.appendChild(shipRow);
 
-    // Shipping subsidy (labeled estimate). Shown only when it actually applies.
+    // Reputation discount carried by the shown estimate. Shown only for an
+    // autofilled estimate from a discounted table (verde, amarilla / none).
     refs.shippingSubsidy = buildRow(T("rowShippingSubsidy"));
     body.appendChild(refs.shippingSubsidy.root);
 

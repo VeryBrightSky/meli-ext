@@ -172,7 +172,8 @@ globalThis.MST_CALC = (() => {
       return feasible(out) ? out : null;
     };
     // fixedCostFn is piecewise constant between `thresholds`, and NOT monotonic
-    // (the fixed charge vanishes and the shipping discount starts at $299), so
+    // (the fixed charge vanishes at $299 while shipping switches on there and
+    // steps up again at the $499 and $999 official bands), so
     // the fixed-point price above can sit in a higher band than the cheapest
     // answer. The feasible set is a union of [max(band start, band solution),
     // next band) intervals, so its minimum is always a band start or a band
@@ -260,18 +261,6 @@ globalThis.MST_CALC = (() => {
     };
   }
 
-  // Seller's effective Mercado Envíos cost after the reputation-based free-
-  // shipping subsidy. Only free-shipping items at/above the threshold are
-  // subsidized; below it (or when shipping isn't free) the seller pays the full
-  // cost. LABELED ESTIMATE — the subsidy percentage is approximate.
-  function subsidizedShipping({ fullShippingMXN, priceMXN, freeShipping, subsidyPct, thresholdMXN = 299 }) {
-    const full = fullShippingMXN > 0 ? fullShippingMXN : 0;
-    if (full === 0) return 0;
-    if (!freeShipping || !(priceMXN >= thresholdMXN)) return full;
-    const pct = Math.max(0, Math.min(100, subsidyPct || 0));
-    return round2(full * (1 - pct / 100));
-  }
-
   // Meses sin intereses (MSI) financing charge to the seller: a percentage of
   // the sale price, charged when the listing offers installments. The rate is
   // the SELLER'S OWN account rate (entered in the card); we only apply it.
@@ -287,7 +276,6 @@ globalThis.MST_CALC = (() => {
     solveTargetPrice,
     findSweetSpot,
     computeWithholdings,
-    subsidizedShipping,
     msiCost,
     round2,
     parseMoney

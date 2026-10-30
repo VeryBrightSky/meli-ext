@@ -6,7 +6,7 @@
     "message": "Estimate"
   },
   "badgeTooltip": {
-    "message": "Estimate based on Mercado Libre's published rates (retrieved $1). The exact percentage depends on your category and account. Excludes IVA and ISR withholdings and actual Mercado Envíos costs, which vary with your reputation."
+    "message": "Estimate based on Mercado Libre's published rates (retrieved $1). The exact percentage depends on your category and account. Excludes IVA and ISR withholdings; the estimated shipping comes from the official table for your reputation and may change with volumetric weight."
   },
   "rowPrice": {
     "message": "Sale price"
@@ -309,7 +309,10 @@
     "message": "I offer free shipping"
   },
   "rowShippingSubsidy": {
-    "message": "Shipping subsidy (est.)"
+    "message": "Reputation discount"
+  },
+  "shippingDiscountIncluded": {
+    "message": "Already in the table ($1%)"
   },
   "upsellMonthly": {
     "message": "Activate PRO · $$89 a month"
@@ -693,7 +696,7 @@
     "message": "Paste and activate"
   },
   "dashShippingNoteEstimate": {
-    "message": "Shipping: Mercado Envíos estimate by weight (0.3 kg when no weight is chosen). Figures are estimates."
+    "message": "Shipping: official Mercado Envíos table by weight, price and reputation (0.3 kg when no weight is chosen). Figures are estimates."
   },
   "shippingEstimateTag": {
     "message": "est."

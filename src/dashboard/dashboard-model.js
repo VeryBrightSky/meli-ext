@@ -25,12 +25,13 @@ globalThis.MST_DASH = (() => {
   const resolveDefaultShipping = (syncSettings, localDefaults) =>
     resolveShipping(syncSettings, localDefaults).value;
 
-  // The same estimate the card autofills: Mercado Envíos cost for the saved
-  // weight, or the smallest bracket (0.3 kg).
-  function estimatedShipping(weightKg) {
+  // The same estimate the card autofills: official Mercado Envíos cost for
+  // the saved weight (or the smallest bracket, 0.3 kg) at the listing's price
+  // band, from the table the seller's reputation reads (discount included).
+  function estimatedShipping(weightKg, priceMXN, reputationId) {
     const SHIP = globalThis.MST_SHIPPING;
     if (!SHIP) return 0;
-    const cost = SHIP.costForWeight(weightKg > 0 ? weightKg : 0.3);
+    const cost = SHIP.costForWeight(weightKg > 0 ? weightKg : 0.3, priceMXN, reputationId);
     return cost > 0 ? cost : 0;
   }
 
@@ -38,7 +39,7 @@ globalThis.MST_DASH = (() => {
   // saved listing that has a cost + meta, recomputed at `defaultShipping`.
   // opts: the account-wide card settings from storage.sync
   // ({ usesFull, reputationId, freeShipping }), so a row's profit matches the
-  // card for the same listing (Full fees, reputation shipping discount).
+  // card for the same listing (Full fees, reputation shipping table).
   // opts.shippingUnset: no shipping configured anywhere; $299+ listings then
   // take the per-weight estimate, like the card (v1.5.2 parity).
   function computeRows(all, prefix, defaultShipping, opts = {}) {
@@ -64,26 +65,21 @@ globalThis.MST_DASH = (() => {
       // Full mode with no service-cost row for this weight: skip the listing
       // rather than count the missing fee as $0.
       if (quote.fixedCostUnavailable) continue;
-      const threshold = SOURCE.shippingSubsidy?.thresholdMXN ?? 299;
-      const subsidyPct =
-        SOURCE.shippingSubsidy?.levels?.find((l) => l.id === opts.reputationId)?.subsidyPct || 0;
-      const fullShipping =
-        opts.shippingUnset === true && meta.priceMXN >= SOURCE.freeShippingThresholdMXN
-          ? estimatedShipping(weight)
-          : defaultShipping;
-      const shipping = CALC.subsidizedShipping({
-        fullShippingMXN: fullShipping,
-        priceMXN: meta.priceMXN,
-        freeShipping: opts.freeShipping === true || meta.priceMXN >= SOURCE.freeShippingThresholdMXN,
-        subsidyPct,
-        thresholdMXN: threshold
-      });
+      // A configured default shipping is what the seller pays, as typed (the
+      // official tables already include the reputation discount, so nothing
+      // is subtracted from it). With nothing configured, $299+ listings take
+      // the official estimate for the saved weight, price band and reputation.
+      const estimated =
+        opts.shippingUnset === true && meta.priceMXN >= SOURCE.freeShippingThresholdMXN;
+      const shipping = estimated
+        ? estimatedShipping(weight, meta.priceMXN, opts.reputationId)
+        : defaultShipping;
       const b = CALC.computeBreakdown(quote, {
         priceMXN: meta.priceMXN,
         shippingCostMXN: shipping,
         productCostMXN: cost
       });
-      rows.push({ itemId, meta, cost, sales, b, shippingEstimated: fullShipping !== defaultShipping });
+      rows.push({ itemId, meta, cost, sales, b, shippingEstimated: estimated });
     }
     return rows;
   }

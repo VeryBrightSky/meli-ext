@@ -4,7 +4,7 @@ globalThis.MST_MESSAGES = Object.freeze({
   "es_419": {
     "cardTitle": "Calculadora de ganancias",
     "badgeEstimate": "Estimado",
-    "badgeTooltip": "Estimación basada en las tarifas publicadas por Mercado Libre (consultadas el $1). El porcentaje exacto depende de tu categoría y cuenta. No incluye las retenciones de IVA e ISR ni el costo real de Mercado Envíos, que varía según tu reputación.",
+    "badgeTooltip": "Estimación basada en las tarifas publicadas por Mercado Libre (consultadas el $1). El porcentaje exacto depende de tu categoría y cuenta. No incluye las retenciones de IVA e ISR; el envío estimado sale de la tabla oficial de tu reputación y puede variar con el peso volumétrico.",
     "rowPrice": "Precio de venta",
     "rowListingType": "Tipo de publicación",
     "typeClassic": "Clásica",
@@ -105,7 +105,8 @@ globalThis.MST_MESSAGES = Object.freeze({
     "repNaranja": "Naranja / Roja",
     "repNone": "Sin reputación",
     "rowFreeShipping": "Ofrezco envío gratis",
-    "rowShippingSubsidy": "Descuento por reputación (est.)",
+    "rowShippingSubsidy": "Descuento por reputación",
+    "shippingDiscountIncluded": "Ya incluido en la tabla ($1%)",
     "upsellMonthly": "Activar PRO · $$89 al mes",
     "upsellYearly": "$$699 al año (≈ $$58 al mes)",
     "dashTotalsLabel": "Totales · productos: $1",
@@ -233,13 +234,13 @@ globalThis.MST_MESSAGES = Object.freeze({
     "welcomeTitleFree": "Netio está listo",
     "welcomeLeadFree": "Puedes usar la calculadora gratis o activar PRO cuando quieras. Así le sacas provecho:",
     "optOwnerPaste": "Pegar y activar",
-    "dashShippingNoteEstimate": "Envío: estimado por peso de Mercado Envíos (0.3 kg si no elegiste peso). Cifras estimadas.",
+    "dashShippingNoteEstimate": "Envío: estimado con la tabla oficial de Mercado Envíos según peso, precio y reputación (0.3 kg si no elegiste peso). Cifras estimadas.",
     "shippingEstimateTag": "est."
   },
   "en": {
     "cardTitle": "Profit calculator",
     "badgeEstimate": "Estimate",
-    "badgeTooltip": "Estimate based on Mercado Libre's published rates (retrieved $1). The exact percentage depends on your category and account. Excludes IVA and ISR withholdings and actual Mercado Envíos costs, which vary with your reputation.",
+    "badgeTooltip": "Estimate based on Mercado Libre's published rates (retrieved $1). The exact percentage depends on your category and account. Excludes IVA and ISR withholdings; the estimated shipping comes from the official table for your reputation and may change with volumetric weight.",
     "rowPrice": "Sale price",
     "rowListingType": "Listing type",
     "typeClassic": "Clásica",
@@ -340,7 +341,8 @@ globalThis.MST_MESSAGES = Object.freeze({
     "repNaranja": "Orange / Red",
     "repNone": "No reputation",
     "rowFreeShipping": "I offer free shipping",
-    "rowShippingSubsidy": "Shipping subsidy (est.)",
+    "rowShippingSubsidy": "Reputation discount",
+    "shippingDiscountIncluded": "Already in the table ($1%)",
     "upsellMonthly": "Activate PRO · $$89 a month",
     "upsellYearly": "$$699 a year (works out to $$58 a month)",
     "dashTotalsLabel": "Totals · products: $1",
@@ -468,7 +470,7 @@ globalThis.MST_MESSAGES = Object.freeze({
     "welcomeTitleFree": "Netio is ready",
     "welcomeLeadFree": "Use the free calculator or activate PRO whenever you want. Here's how to get value from it:",
     "optOwnerPaste": "Paste and activate",
-    "dashShippingNoteEstimate": "Shipping: Mercado Envíos estimate by weight (0.3 kg when no weight is chosen). Figures are estimates.",
+    "dashShippingNoteEstimate": "Shipping: official Mercado Envíos table by weight, price and reputation (0.3 kg when no weight is chosen). Figures are estimates.",
     "shippingEstimateTag": "est."
   }
 });

@@ -58,9 +58,11 @@ export const CASES = [
   { id: 10, note: "boundary $98.99: fixed $25; verde 1 kg optional free shipping",
     in: { priceMXN: 98.99, costMXN: 30, categoryGroupId: "tech", listingTypeId: "classic", reputation: "verde", weightKg: 1, offersFree: true, hasRFC: true },
     exp: { com: 9.9, fixed: 25, ship: 59.6, iva: 6.83, isr: 2.13, ret: 8.96, pre: -25.51, net: -34.47, margin: -34.82 } },
-  { id: 11, note: "unknown category: Premium default range 12.5-20.5%; verde 2 kg band desde $999",
+  // Premium default range per ayuda _870 on 2026-10-30: 11% to 21.5%
+  // (the first audit used the older 12.5 to 20.5 defaults: 187.5 to 307.5).
+  { id: 11, note: "unknown category: Premium default range 11-21.5%; verde 2 kg band desde $999",
     in: { priceMXN: 1500, costMXN: 700, categoryGroupId: null, listingTypeId: "premium", reputation: "verde", weightKg: 2, offersFree: false, hasRFC: true },
-    exp: { comMin: 187.5, comMax: 307.5, fixed: 0, ship: 84.5, iva: 103.45, isr: 32.33, ret: 135.78, preMin: 408, preMax: 528, netMin: 272.22, netMax: 392.22, marginMin: 18.15, marginMax: 26.15 } },
+    exp: { comMin: 165, comMax: 322.5, fixed: 0, ship: 84.5, iva: 103.45, isr: 32.33, ret: 135.78, preMin: 393, preMax: 550.5, netMin: 257.22, netMax: 414.72, marginMin: 17.15, marginMax: 27.65 } },
   { id: 12, note: "amarilla 5 kg at $350 (band $299-498.99)",
     in: { priceMXN: 350, costMXN: 120, categoryGroupId: "tech", listingTypeId: "classic", reputation: "amarilla", weightKg: 5, offersFree: false, hasRFC: true },
     exp: { com: 35, fixed: 0, ship: 105.6, iva: 24.14, isr: 7.54, ret: 31.68, pre: 89.4, net: 57.72, margin: 16.49 } },
@@ -69,16 +71,15 @@ export const CASES = [
     exp: { com: 270, fixed: 0, ship: 349, iva: 137.93, isr: 43.1, ret: 181.03, pre: 481, net: 299.97, margin: 15 } }
 ];
 
-// The extension's own path for the same inputs: fee-source quote + its single
-// shipping table + reputation subsidy (shipping-table.js, fee-table.js).
+// The extension's own path for the same inputs: fee-source quote + the
+// official shipping tables by reputation, price band and weight
+// (shipping-table.js, v1.5.3). The card id for yellow is "amarillo".
 export function extensionResult(inp) {
   const quote = SOURCE.getQuote({ priceMXN: inp.priceMXN, listingTypeId: inp.listingTypeId, categoryGroupId: inp.categoryGroupId });
-  const full = SHIP_EXT.costForWeight(inp.weightKg);
-  const subsidyPct = SOURCE.shippingSubsidy.levels.find((l) => l.id === (inp.reputation === "amarilla" ? "amarillo" : inp.reputation))?.subsidyPct || 0;
+  const rep = inp.reputation === "amarilla" ? "amarillo" : inp.reputation;
   let shipping;
-  if (full === null) shipping = null;
-  else if (inp.priceMXN < 299 && !inp.offersFree) shipping = 0; // the card does not autofill below $299
-  else shipping = CALC.subsidizedShipping({ fullShippingMXN: full, priceMXN: inp.priceMXN, freeShipping: true, subsidyPct, thresholdMXN: 299 });
+  if (inp.priceMXN < 299 && !inp.offersFree) shipping = 0; // the card charges no shipping below $299 unless free shipping is offered
+  else shipping = SHIP_EXT.costForWeight(inp.weightKg, inp.priceMXN, rep);
   const bd = CALC.computeBreakdown(quote, { priceMXN: inp.priceMXN, shippingCostMXN: shipping ?? 0, productCostMXN: inp.costMXN });
   const wh = CALC.computeWithholdings(inp.priceMXN, inp.hasRFC ? WEB.RATES_RFC : WEB.RATES_NO_RFC);
   return {
@@ -122,11 +123,15 @@ test("official table sanity: optional free-shipping column equals the $299-498.9
   assert.equal(S.sellerCost({ priceMXN: 50, weightKg: 0, reputation: "verde" }), null);
 });
 
-test("extension path differs from the official tables where documented", () => {
-  // verde at $299: extension halves an already-discounted value.
-  const ext = extensionResult(CASES[2].in);
-  assert.equal(ext.shippingMXN, 28);
+test("extension path agrees with the web calculator on every case (v1.5.3 official tables)", () => {
+  // verde at $299: 56 on both (v1.5.2 halved it to 28).
+  assert.equal(extensionResult(CASES[2].in).shippingMXN, 56);
   assert.equal(WEB.compute(CASES[2].in).shippingMXN, 56);
-  // below $299 with optional free shipping and verde: both agree.
-  assert.equal(extensionResult(CASES[0].in).shippingMXN, 52.4);
+  for (const c of CASES) {
+    const e = extensionResult(c.in);
+    const w = WEB.compute(c.in);
+    assert.equal(e.shippingMXN, w.shippingMXN, `case ${c.id} shipping`);
+    assert.equal(e.netMinMXN, w.netMinMXN, `case ${c.id} net min`);
+    assert.equal(e.netMaxMXN, w.netMaxMXN, `case ${c.id} net max`);
+  }
 });
