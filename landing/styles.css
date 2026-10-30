@@ -94,7 +94,7 @@ p { margin: 0 0 1em; max-width: var(--measure); }
 .btn-go:hover { background: var(--profit-ink); border-color: var(--profit-ink); }
 .btn-line { background: transparent; color: var(--ink); border-color: var(--ink-3); }
 .btn-line:hover { background: var(--paper-2); border-color: var(--ink); }
-.btn-sm { padding: 8px 14px; min-height: 40px; font-size: 0.92rem; }
+.btn-sm { padding: 8px 14px; min-height: 40px; font-size: 0.92rem; white-space: nowrap; }
 @media (prefers-color-scheme: dark) {
   .btn { background: #e9ebfb; border-color: #e9ebfb; color: var(--brand); }
   .btn:hover { background: #fff; border-color: #fff; }
