@@ -661,5 +661,20 @@
   },
   "welcomeNoteTelemetry": {
     "message": "Your costs and products are saved in your browser; we never see your prices or the pages you visit. We only send anonymous usage counters (you can turn them off) and the PRO payment goes through ExtensionPay."
+  },
+  "statusOwner": {
+    "message": "Owner mode active"
+  },
+  "optOwnerLabel": {
+    "message": "Owner key"
+  },
+  "optOwnerActivate": {
+    "message": "Activate"
+  },
+  "optOwnerRemove": {
+    "message": "Remove"
+  },
+  "ownerWrongKey": {
+    "message": "Wrong key"
   }
 }

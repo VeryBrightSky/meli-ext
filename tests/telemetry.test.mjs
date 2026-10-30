@@ -396,13 +396,13 @@ test("enable-telemetry: key validation and landing page config injection", async
   assert.throws(() => applyAdiosConfig("<html></html>", "u", "k"));
 });
 
-test("version 1.5.0 is consistent across branding, package and manifest", () => {
+test("version 1.5.1 is consistent across branding, package and manifest", () => {
   new Function(readFileSync(join(root, "src/config/branding.js"), "utf8"))();
   const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
   const man = JSON.parse(readFileSync(join(root, "manifest.json"), "utf8"));
-  assert.equal(globalThis.EXT_BRAND.version, "1.5.0");
-  assert.equal(pkg.version, "1.5.0");
-  assert.equal(man.version, "1.5.0");
+  assert.equal(globalThis.EXT_BRAND.version, "1.5.1");
+  assert.equal(pkg.version, "1.5.1");
+  assert.equal(man.version, "1.5.1");
   assert.deepEqual(man.permissions, ["storage"]);
   assert.deepEqual(man.host_permissions, ["https://extensionpay.com/*"]);
 });

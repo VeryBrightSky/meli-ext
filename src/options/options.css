@@ -149,3 +149,45 @@ body {
 .telemetry [hidden] {
   display: none !important;
 }
+
+.owner {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.owner__label {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.55);
+}
+
+.owner__row {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.owner__row input {
+  flex: 1;
+  min-width: 0;
+  font-family: inherit;
+  font-size: 13px;
+  padding: 5px 8px;
+  border: 1px solid rgba(0, 0, 0, 0.17);
+  border-radius: 6px;
+}
+
+.owner__row button {
+  font-family: inherit;
+  font-size: 13px;
+  padding: 5px 10px;
+  border: 1px solid rgba(0, 0, 0, 0.17);
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.hint--version {
+  cursor: default;
+  user-select: none;
+}

@@ -222,7 +222,12 @@ globalThis.MST_MESSAGES = Object.freeze({
     "telemetryNoticeLink": "Ver qué enviamos",
     "telemetryNoticeOff": "Desactivar",
     "telemetryOffDone": "Listo, ya no enviamos nada.",
-    "welcomeNoteTelemetry": "Tus costos y productos se guardan en tu navegador; no vemos tus precios ni las páginas que visitas. Solo enviamos contadores anónimos de uso (puedes desactivarlos) y el pago de PRO pasa por ExtensionPay."
+    "welcomeNoteTelemetry": "Tus costos y productos se guardan en tu navegador; no vemos tus precios ni las páginas que visitas. Solo enviamos contadores anónimos de uso (puedes desactivarlos) y el pago de PRO pasa por ExtensionPay.",
+    "statusOwner": "Modo propietario activo",
+    "optOwnerLabel": "Clave de propietario",
+    "optOwnerActivate": "Activar",
+    "optOwnerRemove": "Quitar",
+    "ownerWrongKey": "Clave incorrecta"
   },
   "en": {
     "cardTitle": "Profit calculator",
@@ -445,6 +450,11 @@ globalThis.MST_MESSAGES = Object.freeze({
     "telemetryNoticeLink": "See what we send",
     "telemetryNoticeOff": "Turn off",
     "telemetryOffDone": "Done, nothing is sent anymore.",
-    "welcomeNoteTelemetry": "Your costs and products are saved in your browser; we never see your prices or the pages you visit. We only send anonymous usage counters (you can turn them off) and the PRO payment goes through ExtensionPay."
+    "welcomeNoteTelemetry": "Your costs and products are saved in your browser; we never see your prices or the pages you visit. We only send anonymous usage counters (you can turn them off) and the PRO payment goes through ExtensionPay.",
+    "statusOwner": "Owner mode active",
+    "optOwnerLabel": "Owner key",
+    "optOwnerActivate": "Activate",
+    "optOwnerRemove": "Remove",
+    "ownerWrongKey": "Wrong key"
   }
 });

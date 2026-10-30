@@ -74,6 +74,7 @@ globalThis.MST_GATE = (() => {
   // developer can tell whether a gate change moved anything.
   const METRICS_KEY = "mst:metrics";
   function track(event) {
+    if (current.owner) return;
     try {
       chrome.storage.local.get(METRICS_KEY).then((stored) => {
         const m = { ...(stored?.[METRICS_KEY] ?? {}) };
@@ -145,7 +146,21 @@ globalThis.MST_GATE = (() => {
 
   // Read storage, merge the (possibly null) fresh ExtPay answer with the cache
   // and the local reverse trial, cache a fresh answer, and set `current`.
+  const ownerActive = async () => {
+    try {
+      return Boolean(await globalThis.MST_OWNER?.isActive());
+    } catch {
+      return false;
+    }
+  };
+
   async function resolveCurrent(fresh) {
+    // Re-verified against the key hash on every computation: a flag or hash
+    // pasted into storage proves nothing.
+    if (await ownerActive()) {
+      current = { pro: true, paid: true, lapsed: false, trialActive: false, trialExpired: false, trialDaysLeft: 0, localTrial: false, owner: true, source: "owner" };
+      return current;
+    }
     const PREFIX = globalThis.EXT_BRAND?.cssPrefix ?? "mst";
     const CACHE_KEY = `${PREFIX}:proStatus`;
     const OVERRIDE_KEY = `${PREFIX}:proOverride`;
@@ -214,6 +229,8 @@ globalThis.MST_GATE = (() => {
     let fresh = null;
     let timedOut = false;
     let pending = null;
+    // Owner mode never asks ExtensionPay anything.
+    if (await ownerActive()) return resolveCurrent(null);
     try {
       pending = Promise.resolve(chrome.runtime.sendMessage({ type: "getProStatus" }));
       const res = await Promise.race([
@@ -248,6 +265,7 @@ globalThis.MST_GATE = (() => {
   }
 
   const isPro = () => current.pro;
+  const isOwner = () => current.owner === true;
   const status = () => current;
   // Never throws or rejects: an orphaned context ("Extension context
   // invalidated") answers {ok:false} like any other failure.
@@ -286,6 +304,7 @@ globalThis.MST_GATE = (() => {
     isCacheUsable,
     refresh,
     isPro,
+    isOwner,
     status,
     track,
     openUpgrade,

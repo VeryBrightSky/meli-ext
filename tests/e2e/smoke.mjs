@@ -1236,7 +1236,7 @@ try {
   for (const r of all) {
     assert.deepEqual(Object.keys(r).sort(), COLS);
     assert.match(r.install_id, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
-    assert.equal(r.ext_version, "1.5.0");
+    assert.equal(r.ext_version, "1.5.1");
     for (const v of Object.values(r.props)) assert.match(String(v), /^[a-z0-9._:+-]{1,24}$/);
   }
   assert.equal(new Set(all.map((r) => r.install_id)).size, 1, "one random install id");
@@ -1288,6 +1288,118 @@ try {
   await ext.close();
   mock.close();
 
+  // ================= PHASE 11: v1.5.1 owner key =================================
+  console.log("\nPHASE 11 - OWNER KEY (throwaway key via ?owner=, PRO everywhere, silent analytics)");
+  {
+    const { createHash, randomBytes } = await import("node:crypto");
+    const ownerKey = randomBytes(32).toString("hex"); // throwaway; never the real key
+    const ownerHash = createHash("sha256").update(ownerKey, "utf8").digest("hex");
+    const o = await browser.newPage();
+    await o.goto(`chrome-extension://${extId}/src/options/options.html`, { waitUntil: "load" });
+    await o.evaluate(async (hash) => {
+      await chrome.storage.local.remove(["mst:proOverride", "mst:proStatus", "mst:ownerKey", "mst:tq", "mst:tday", "mst:tcounts", "mst:iid", "mst:tflags"]);
+      await chrome.storage.local.set({ "mst:installedAt": Date.now() - 9 * 24 * 3600 * 1000, "mst:ownerHashOverride": hash });
+    }, ownerHash);
+
+    // Normal user, trial over: not owner, free status line.
+    await o.reload({ waitUntil: "load" });
+    await o.waitForFunction(() => document.getElementById("sub-status").textContent !== "…");
+    assert.equal(await o.$eval("#owner-box", (e) => e.hidden), true, "owner box hidden by default");
+    pass("owner box hidden for normal users");
+
+    // Wrong key via URL param: "Clave incorrecta", param stripped, no unlock.
+    await o.goto(`chrome-extension://${extId}/src/options/options.html?owner=${"z".repeat(40)}`, { waitUntil: "load" });
+    await o.waitForFunction(() => !document.getElementById("owner-msg").hidden, { timeout: 5000 });
+    assert.equal(await o.$eval("#owner-msg", (e) => e.textContent), "Clave incorrecta");
+    assert.ok(!o.url().includes("owner="), "owner param stripped from the URL");
+    assert.equal((await o.evaluate(() => chrome.storage.local.get("mst:ownerKey")))["mst:ownerKey"], undefined);
+    pass("wrong key: 'Clave incorrecta', param stripped, nothing stored");
+
+    // Right key: auto-activates, status line says owner mode, key not in DOM.
+    await o.goto(`chrome-extension://${extId}/src/options/options.html?owner=${ownerKey}&debug=1`, { waitUntil: "load" });
+    await o.waitForFunction(() => document.getElementById("sub-status").textContent === "Modo propietario activo", { timeout: 8000 });
+    assert.ok(!o.url().includes(ownerKey) && !o.url().includes("owner="), "key stripped from the URL");
+    assert.ok(o.url().includes("debug=1"), "other params kept");
+    assert.equal(await o.$eval("#owner-input", (e) => e.value), "", "input cleared");
+    assert.ok(!(await o.content()).includes(ownerKey), "key never echoed in the DOM");
+    pass("right key: 'Modo propietario activo', key stripped from URL and DOM");
+
+    // Toolbar badge reads PRO.
+    const swT = await browser.waitForTarget((t) => t.type() === "service_worker" && t.url().startsWith("chrome-extension://"));
+    await sleep(500);
+    assert.equal(await (await swT.worker()).evaluate(() => chrome.action.getBadgeText({})), "PRO");
+    pass("badge shows PRO in owner mode");
+
+    // Listing page: full PRO UI, no teaser, no trial/win-back bar, no upsell.
+    const op = tap(await browser.newPage(), "owner");
+    await op.goto(PRODUCT_URL, { waitUntil: "load" });
+    await op.waitForSelector("#mst-card-root", { visible: true, timeout: 20000 });
+    await typeInto(op, 2, "400");
+    await sleep(500);
+    const ui = await op.evaluate(() => ({
+      teaser: document.querySelectorAll(".mst-row--teaser").length,
+      bar: [...document.querySelectorAll(".mst-trialbar")].some((b) => !b.hidden && b.offsetHeight > 0),
+      upsellOpen: [...document.querySelectorAll(".mst-upsell")].some((u) => !u.hidden),
+      chips: document.querySelectorAll(".mst-prochip").length,
+      review: document.querySelectorAll(".mst-review").length
+    }));
+    assert.equal(ui.teaser, 0, "no teasers");
+    assert.equal(ui.bar, false, "no trial/win-back bar");
+    assert.equal(ui.upsellOpen, false, "no upsell");
+    assert.equal(ui.review, 0, "no review ask");
+    assert.ok(await op.evaluate(rowValue("Precio para ganar 30%")), "target price visible");
+    pass("listing page: PRO unlocked, no teaser/trial bar/upsell/review ask");
+    await op.close();
+
+    // Dashboard: no free-preview upsell.
+    const od = await browser.newPage();
+    await od.goto(`chrome-extension://${extId}/src/dashboard/dashboard.html`, { waitUntil: "load" });
+    await sleep(1500);
+    assert.equal(await od.$eval("#upsell", (e) => e.hidden), true, "dashboard has no paywall for the owner");
+    await od.close();
+    const ow = await browser.newPage();
+    await ow.goto(`chrome-extension://${extId}/src/onboarding/welcome.html`, { waitUntil: "load" });
+    await sleep(800);
+    await ow.close();
+    pass("dashboard shows no paywall for the owner; welcome loads");
+
+    // Analytics: nothing collected for the owner.
+    const sendO = (m) => o.evaluate((x) => chrome.runtime.sendMessage(x), m);
+    await sendO({ type: "track", event: "card_seen", props: { page: "product" } });
+    const stO = await sendO({ type: "telemetryState", payload: { debug: true } });
+    assert.equal(stO.data.owner, true);
+    assert.equal(stO.data.enabled, false);
+    const leftovers = await o.evaluate(() => chrome.storage.local.get(["mst:tq", "mst:iid", "mst:tcounts", "mst:tday"]));
+    assert.deepEqual(leftovers, {}, "no analytics state for the owner");
+    pass("owner mode: analytics silent, no queue/install id/counters");
+
+    // Tampered flags do nothing; key removal locks again.
+    await o.evaluate(() => chrome.storage.local.remove("mst:ownerKey"));
+    await o.evaluate(() => chrome.storage.local.set({ "mst:ownerKey": true, "mst:owner": true }));
+    await o.reload({ waitUntil: "load" });
+    await o.waitForFunction(() => document.getElementById("sub-status").textContent !== "…");
+    assert.notEqual(await o.$eval("#sub-status", (e) => e.textContent), "Modo propietario activo");
+    await o.evaluate(() => chrome.storage.local.remove(["mst:owner", "mst:ownerKey"]));
+    pass("tampered flag does not unlock; removed key locks");
+
+    // Reset keeps the key.
+    await o.goto(`chrome-extension://${extId}/src/options/options.html?owner=${ownerKey}`, { waitUntil: "load" });
+    await o.waitForFunction(() => document.getElementById("sub-status").textContent === "Modo propietario activo", { timeout: 8000 });
+    o.once("dialog", (d) => d.accept());
+    await o.click("#reset-btn");
+    await sleep(800);
+    assert.equal((await o.evaluate(() => chrome.storage.local.get("mst:ownerKey")))["mst:ownerKey"], ownerKey, "Reset keeps the owner key");
+    // Quitar removes it.
+    await o.click("#owner-box #owner-remove").catch(() => {});
+    await o.evaluate(() => chrome.storage.local.remove(["mst:ownerKey", "mst:ownerHashOverride"]));
+    pass("Reset keeps the owner key");
+    await o.close();
+  }
+
+  // Owner-mode switches broadcast "proChanged": the background listing tab
+  // rebuilds its card (slowly, while hidden). Let it settle before reloading.
+  await upPage.bringToFront();
+  await upPage.waitForFunction(() => !!document.querySelector("#mst-card-root"), { timeout: 20000, polling: 250 });
   // (runs before the reload test: headless Chrome cannot re-register the extension after runtime.reload)
   // Extension reloaded under an open tab: the orphaned card says so and the
   // button brings the page back with the new version.

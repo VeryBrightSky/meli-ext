@@ -6,6 +6,7 @@
 
 importScripts(
   "../config/branding.js",
+  "../config/owner.js",
   "../pro/gate.js",
   "../vendor/extpay.js",
   "../config/telemetry-config.js",
@@ -61,7 +62,8 @@ const telemetry = globalThis.MST_TELEMETRY_SW.create({
   installedKey: INSTALLED_KEY,
   landingUrl: globalThis.EXT_BRAND.landingUrl,
   setUninstallURL: (url) => chrome.runtime.setUninstallURL(url),
-  getTrialState: currentTrialState
+  getTrialState: currentTrialState,
+  isOwner: () => globalThis.MST_OWNER.isActive()
 });
 const quietly = (p) => p?.catch?.((err) => console.warn("[Netio] analytics step failed:", err));
 // Every worker start: refresh the survey URL and flush anything left over.
@@ -124,6 +126,12 @@ chrome.runtime.onInstalled.addListener(async (details) => {
 chrome.runtime.onStartup.addListener(() => refreshBadge());
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === "local" && (changes[INSTALLED_KEY] || changes[`${PREFIX}:proStatus`])) refreshBadge();
+  if (area === "local" && (changes[globalThis.MST_OWNER.STORAGE_KEY] || changes[globalThis.MST_OWNER.HASH_OVERRIDE_KEY])) {
+    // Owner mode switched: purge/restore analytics state, badge, open tabs.
+    quietly(telemetry.init());
+    refreshBadge();
+    broadcastProChanged();
+  }
   if (area === "sync" && changes.extensionpay_user) {
     userCache = null;
     refreshBadge();
@@ -135,6 +143,11 @@ chrome.storage.onChanged.addListener((changes, area) => {
 // the caller already fetched it so a page view costs ONE request, not two.
 async function refreshBadge(user) {
   try {
+    if (await globalThis.MST_OWNER.isActive()) {
+      await chrome.action.setBadgeText({ text: "PRO" });
+      await chrome.action.setBadgeBackgroundColor({ color: "#00A650" });
+      return;
+    }
     const stored = await chrome.storage.local.get(INSTALLED_KEY);
     let base = { pro: false, paid: false, trialActive: false, trialExpired: false, trialDaysLeft: 0 };
     try {
@@ -168,6 +181,10 @@ const handlers = {
   ping: async () => ({ pong: true, version: chrome.runtime.getManifest().version }),
 
   getProStatus: async () => {
+    // Owner mode: entitled without asking ExtensionPay anything.
+    if (await globalThis.MST_OWNER.isActive()) {
+      return { pro: true, paid: true, lapsed: false, trialActive: false, trialExpired: false, trialDaysLeft: 0, trialStartedAt: null, owner: true };
+    }
     const user = await getUserCached(); // throws offline → caller uses cache
     const s = globalThis.MST_GATE.computeProStatus(user, Date.now());
     refreshBadge(user);

@@ -36,6 +36,10 @@ document.getElementById("lbl-subscription").textContent = T("optSubscription");
 document.getElementById("manage-btn").textContent = T("optManage");
 document.getElementById("login-btn").textContent = T("optLogin");
 document.getElementById("dashboard-btn").textContent = T("optDashboard");
+document.getElementById("lbl-owner").textContent = T("optOwnerLabel");
+document.getElementById("owner-activate").textContent = T("optOwnerActivate");
+document.getElementById("owner-remove").textContent = T("optOwnerRemove");
+document.getElementById("version-label").textContent = `${BRAND.name} v${chrome.runtime.getManifest().version}`;
 
 const cardEnabled = document.getElementById("card-enabled");
 const stripsEnabled = document.getElementById("strips-enabled");
@@ -100,7 +104,9 @@ async function loadSubscriptionStatus() {
   const statusEl = document.getElementById("sub-status");
   // Merged status (ExtPay + local reverse trial) — the same one the card uses.
   const s = await globalThis.MST_GATE.refresh();
-  statusEl.textContent = s.paid
+  statusEl.textContent = s.owner
+    ? T("statusOwner")
+    : s.paid
     ? T("statusPro")
     : s.trialActive
       ? (s.localTrial
@@ -124,6 +130,52 @@ async function loadSubscriptionStatus() {
   }
 }
 loadSubscriptionStatus();
+
+// Owner key box: hidden until ?owner=KEY (auto-activates, then the param is
+// stripped from the URL) or five clicks on the version label. The key is never
+// echoed back: the input is cleared after every attempt.
+const ownerBox = document.getElementById("owner-box");
+const ownerInput = document.getElementById("owner-input");
+const ownerMsg = document.getElementById("owner-msg");
+let lastOwnerTry = 0;
+function ownerNote(text) {
+  ownerMsg.textContent = text;
+  ownerMsg.hidden = !text;
+}
+async function tryOwnerKey(key) {
+  const now = Date.now();
+  if (now - lastOwnerTry < 1000) return; // 1 try per second
+  lastOwnerTry = now;
+  const ok = await globalThis.MST_OWNER.activate(String(key ?? "").trim());
+  ownerInput.value = "";
+  ownerNote(ok ? "" : T("ownerWrongKey"));
+  if (ok) await loadSubscriptionStatus();
+}
+let versionClicks = 0;
+document.getElementById("version-label").addEventListener("click", () => {
+  if (++versionClicks >= 5) ownerBox.hidden = false;
+});
+document.getElementById("owner-activate").addEventListener("click", () => tryOwnerKey(ownerInput.value));
+ownerInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") tryOwnerKey(ownerInput.value);
+});
+document.getElementById("owner-remove").addEventListener("click", async () => {
+  await globalThis.MST_OWNER.remove();
+  ownerInput.value = "";
+  ownerNote("");
+  await loadSubscriptionStatus();
+});
+{
+  const params = new URLSearchParams(location.search);
+  if (params.has("owner")) {
+    const key = params.get("owner");
+    params.delete("owner");
+    const rest = params.toString();
+    history.replaceState(null, "", location.pathname + (rest ? `?${rest}` : "") + location.hash);
+    ownerBox.hidden = false;
+    tryOwnerKey(key);
+  }
+}
 
 // Anonymous analytics: the toggle and notice exist only in builds that have a
 // backend configured; ?debug also shows the local diagnostic line (queue, last
@@ -190,6 +242,8 @@ loadTelemetry().catch(() => {});
 const KEEP_LOCAL = new Set([
   `${BRAND.cssPrefix}:installedAt`,
   `${BRAND.cssPrefix}:metrics`,
+  globalThis.MST_OWNER.STORAGE_KEY,
+  globalThis.MST_OWNER.HASH_OVERRIDE_KEY,
   ...Object.values(globalThis.MST_TELEMETRY_CORE.KEYS)
 ]);
 async function removeOwnKeys(area, extraKeys = []) {

@@ -661,5 +661,20 @@
   },
   "welcomeNoteTelemetry": {
     "message": "Tus costos y productos se guardan en tu navegador; no vemos tus precios ni las páginas que visitas. Solo enviamos contadores anónimos de uso (puedes desactivarlos) y el pago de PRO pasa por ExtensionPay."
+  },
+  "statusOwner": {
+    "message": "Modo propietario activo"
+  },
+  "optOwnerLabel": {
+    "message": "Clave de propietario"
+  },
+  "optOwnerActivate": {
+    "message": "Activar"
+  },
+  "optOwnerRemove": {
+    "message": "Quitar"
+  },
+  "ownerWrongKey": {
+    "message": "Clave incorrecta"
   }
 }

@@ -870,7 +870,7 @@ globalThis.MST_CARD = (() => {
     // ranking and no MX competitor has more than a handful.
     const REVIEW_KEY = `${PREFIX}:reviewAsk`;
     chrome.storage.local.get(null).then((all) => {
-      if (!all || all[REVIEW_KEY]) return;
+      if (!all || all[REVIEW_KEY] || globalThis.MST_GATE.isOwner()) return;
       const used = Object.keys(all).filter((k) => k.startsWith(`${PREFIX}:cost:`) && Number(all[k]) > 0).length;
       if (used < 3) return;
       const ask = el("div", `${PREFIX}-review`);

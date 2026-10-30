@@ -43,15 +43,37 @@ globalThis.MST_TELEMETRY_SW = (() => {
       const qa = override ? C.normalizeConfig(override, { allowLoopbackHttp: true }) : null;
       const cfg = qa ?? C.normalizeConfig(deps.config);
       const optedOut = stored[K.enabled] === false;
+      // Owner mode: the owner's own usage is never recorded or sent. Verified
+      // by the caller-supplied check (key hash), never by a storage flag.
+      let owner = false;
+      try {
+        owner = Boolean(await deps.isOwner?.());
+      } catch {
+        owner = false;
+      }
       return {
         stored,
         view: { ...stored },
         patch: {},
-        eff: { cfg, optedOut, enabled: Boolean(cfg) && !optedOut, qa: Boolean(qa) },
+        eff: { cfg, optedOut, owner, enabled: Boolean(cfg) && !optedOut && !owner, qa: Boolean(qa) },
         now: now(),
         urlDirty: false,
         wantFlush: false
       };
+    }
+    // Owner mode: drop everything collected so far (queue, counters, day,
+    // install id) so nothing from the owner's browser can ever be sent.
+    async function purgeOwner(st) {
+      if (!st.eff.owner) return false;
+      const keys = [K.iid, K.queue, K.last, K.flags, K.day, COUNTS_KEY].filter((k) => st.stored[k] !== undefined);
+      if (timer) timers.clear(timer);
+      timer = null;
+      if (keys.length) await storage.remove(keys);
+      for (const k of keys) {
+        delete st.view[k];
+        delete st.patch[k];
+      }
+      return true;
     }
     const setView = (st, key, value) => {
       st.view[key] = value;
@@ -162,6 +184,7 @@ globalThis.MST_TELEMETRY_SW = (() => {
         const clean = C.sanitizeEvent(event, props);
         if (!clean) return { ok: false, reason: "rejected" };
         const st = await load();
+        if (await purgeOwner(st)) return { ok: true, queued: false, reason: "owner" };
         bumpCounts(st, clean);
         if (!st.eff.enabled) {
           await commit(st);
@@ -179,6 +202,7 @@ globalThis.MST_TELEMETRY_SW = (() => {
     function count(key, arg) {
       return serial(async () => {
         const st = await load();
+        if (await purgeOwner(st)) return { ok: true, queued: false };
         if (!st.eff.enabled) return { ok: true, queued: false };
         let day = await ensureDay(st);
         day = { ...day };
@@ -322,6 +346,7 @@ globalThis.MST_TELEMETRY_SW = (() => {
     function onInstalled(details) {
       return serial(async () => {
         const st = await load();
+        await purgeOwner(st);
         if (st.eff.enabled) {
           if (details?.reason === "install") {
             emit(st, "install", {});
@@ -347,6 +372,7 @@ globalThis.MST_TELEMETRY_SW = (() => {
     function init() {
       return serial(async () => {
         const st = await load();
+        await purgeOwner(st);
         st.urlDirty = true;
         await commit(st);
       });
@@ -367,7 +393,7 @@ globalThis.MST_TELEMETRY_SW = (() => {
       return serial(async () => {
         const st = await load();
         setView(st, K.enabled, on !== false);
-        st.eff = { ...st.eff, optedOut: on === false, enabled: Boolean(st.eff.cfg) && on !== false };
+        st.eff = { ...st.eff, optedOut: on === false, enabled: Boolean(st.eff.cfg) && on !== false && !st.eff.owner };
         if (!st.eff.enabled) {
           // Opt-out: unsent data is deleted and nothing more is collected.
           if (timer) timers.clear(timer);
@@ -396,6 +422,7 @@ globalThis.MST_TELEMETRY_SW = (() => {
         const out = {
           configured: Boolean(st.eff.cfg),
           enabled: st.eff.enabled,
+          owner: st.eff.owner,
           noticeSeen: st.view[K.noticeSeen] === true
         };
         if (debug) {

@@ -139,6 +139,21 @@ if (release) {
   writeFileSync(telPath, telStripped);
   console.log("release: analytics QA override stripped from telemetry-sw.js");
 
+  // Owner key: the QA hash override (e2e uses a throwaway key) is stripped, so
+  // in the store build ONLY the baked-in hash can unlock owner mode.
+  const ownerPath = join(dist, "src/config/owner.js");
+  const ownerSrc = readFileSync(ownerPath, "utf8");
+  const ownerStripped = ownerSrc.replace(
+    "hash = stored?.[HASH_OVERRIDE_KEY] || hash;",
+    "// QA hash override stripped in release builds"
+  );
+  if (ownerStripped === ownerSrc) {
+    console.error("FATAL: could not strip the QA hash override from owner.js");
+    process.exit(1);
+  }
+  writeFileSync(ownerPath, ownerStripped);
+  console.log("release: QA hash override stripped from owner.js");
+
   // A build with a backend baked in is written ONLY to release/ under a
   // different name, so the plain dormant zip in the repo root is never
   // replaced by (or confused with) one that carries the analytics key.

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Netio (dev)",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "description": "Calculadora de comisiones, ganancias y precios para vendedores de Mercado Libre México.",
   "default_locale": "es_419",
   "icons": {
@@ -47,6 +47,7 @@
         "src/fees/calculator.js",
         "src/fees/fee-source.js",
         "src/fees/radar.js",
+        "src/config/owner.js",
         "src/pro/gate.js",
         "src/content/format.js",
         "src/content/upsell.js",
