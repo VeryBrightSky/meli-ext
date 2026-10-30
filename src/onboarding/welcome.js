@@ -5,7 +5,7 @@
 (async () => {
   const BRAND = globalThis.EXT_BRAND;
   const T = globalThis.MST_I18N.t;
-  document.title = `${BRAND.name} — ${T("welcomeTitle")}`;
+  document.title = `${BRAND.name} · ${T("welcomeTitle")}`;
   document.getElementById("brand-logo").src = chrome.runtime.getURL("src/assets/icons/icon48.png");
 
   const s = await globalThis.MST_GATE.refresh();

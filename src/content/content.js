@@ -61,6 +61,7 @@
   //   product (catalog): https://www.mercadolibre.com.mx/{slug}/p/MLM{id}
   //   product (item):    https://articulo.mercadolibre.com.mx/MLM-{id}-{slug}
   //                      https://www.mercadolibre.com.mx/MLM-{id}-{slug}
+  //   product (unified): https://www.mercadolibre.com.mx/{slug}/up/MLMU{id}
   //   search:            https://listado.mercadolibre.com.mx/{query}
   function detectPageType() {
     const { hostname, pathname } = window.location;
@@ -68,6 +69,8 @@
     if (hostname === "listado.mercadolibre.com.mx") return PageType.SEARCH;
     if (hostname === "www.mercadolibre.com.mx") {
       if (/\/p\/MLM\d+/.test(pathname)) return PageType.PRODUCT;
+      // Unified product pages (user-product ids): /{slug}/up/MLMU123…
+      if (/\/up\/MLMU\d+/.test(pathname)) return PageType.PRODUCT;
       if (/^\/MLM-\d+/.test(pathname)) return PageType.PRODUCT;
       // Client-side search results can render under www. (SPA nav from a PDP).
       if (document.querySelector(".ui-search-layout, .ui-search-results")) {
@@ -257,21 +260,32 @@
         return;
       }
       log("no visible price block yet, watching for it…");
+      let scheduled = null;
       const stop = () => {
         observer.disconnect();
         clearTimeout(timer);
+        clearTimeout(scheduled);
         resolve(null);
       };
       const observer = observeUntilCleanup(
         "anchor-wait",
         () => {
-          const found = findProductAnchor();
-          if (found) {
-            observer.disconnect();
-            clearTimeout(timer);
-            log("visible price block appeared after initial load");
-            resolve(found);
-          }
+          // Coalesce: a hydrating page fires hundreds of mutation batches, and
+          // each lookup does layout reads. One check per 150ms is plenty.
+          if (scheduled !== null) return;
+          scheduled = setTimeout(
+            SAFE.wrap("anchor-wait-check", () => {
+              scheduled = null;
+              const found = findProductAnchor();
+              if (found) {
+                observer.disconnect();
+                clearTimeout(timer);
+                log("visible price block appeared after initial load");
+                resolve(found);
+              }
+            }),
+            150
+          );
         },
         document.documentElement,
         {
@@ -364,6 +378,26 @@
   const MAX_REINJECTS = 5;
   const REINJECT_WINDOW_MS = 15000;
 
+  // Follow in-page price changes (variant picked, promo started): re-read the
+  // page and let the card move its page price. Rate-limited; the card keeps a
+  // seller's what-if price and only moves when it was tracking the page.
+  let lastPriceCheck = 0;
+  function refreshPagePrice() {
+    if (!pageData?.price) return;
+    const now = Date.now();
+    if (now - lastPriceCheck < 500) return;
+    lastPriceCheck = now;
+    const found = findProductAnchor();
+    if (!found) return;
+    const data = SAFE.run("page-data-refresh", () => globalThis.MST_PAGE.collect(found.el, { quiet: true }), null);
+    if (!data?.price || data.itemId !== pageData.itemId) return;
+    if (data.price.value === pageData.price.value) return;
+    log(`page price changed ${pageData.price.value} → ${data.price.value}`);
+    pageData = data;
+    globalThis.MST_CARD.refreshFromPage(data);
+    globalThis.MST_HISTORY.record(data.itemId, data.price.value).catch(() => {});
+  }
+
   function watchCardPersistence() {
     let reinjects = 0;
     let windowStart = 0;
@@ -407,8 +441,12 @@
         pendingTimer = setTimeout(
           SAFE.wrap("card-recover", () => {
             pending = false;
+            if (!SAFE.alive()) return; // orphaned script: the reload notice handles it
             const card = document.getElementById(CARD_ID);
-            if (card && isVisible(card)) return;
+            if (card && isVisible(card)) {
+              refreshPagePrice();
+              return;
+            }
             // Never yank the card out from under a user mid-edit; defer until
             // focus leaves (a later mutation retriggers recovery).
             if (card && card.contains(document.activeElement)) return;
@@ -426,6 +464,7 @@
         childList: true,
         subtree: true,
         attributes: true,
+        characterData: true, // price digits are often swapped in place
         attributeFilter: ["class", "style", "hidden"]
       }
     );
@@ -515,7 +554,7 @@
         }
         if (initial) await waitForPageSettled();
         if (isStale(gen)) return;
-        globalThis.MST_QUICKVIEW.init();
+        globalThis.MST_QUICKVIEW.init().catch((err) => warn("quick view init failed:", err));
         onCleanup(() => globalThis.MST_QUICKVIEW.destroy());
         break;
       default:
@@ -536,6 +575,14 @@
     let lastHref = pageKey();
 
     const onNavigated = SAFE.wrap("spa-nav", () => {
+      if (!SAFE.alive()) {
+        // The extension was updated/reloaded under this tab: every chrome.*
+        // call would throw from here on. Stop polling and tell the seller.
+        clearInterval(urlTimer);
+        runCleanups();
+        globalThis.MST_CARD.showStale();
+        return;
+      }
       if (pageKey() === lastHref) return;
       lastHref = pageKey();
       const gen = ++generation;
@@ -557,7 +604,7 @@
       );
     });
 
-    setInterval(onNavigated, 1000);
+    const urlTimer = setInterval(onNavigated, 1000);
     window.addEventListener("popstate", () => setTimeout(onNavigated, 50));
   }
 
@@ -565,16 +612,22 @@
   // successful "Ya pagué" login): rebuild in place so the seller sees PRO the
   // moment they come back to this tab, without a reload.
   function startProWatcher() {
+    const rebuild = (why) => {
+      ++generation;
+      log(`${why} → rebuilding`);
+      clearTimeout(renavTimer);
+      runCleanups();
+      removeInjectedUi();
+      pageData = null;
+      route({ initial: false }).catch((err) => warn("route after entitlement change failed:", err));
+    };
+    // A status that landed after the 1.5s timeout and changed the entitlement
+    // (paying user on a slow connection) rebuilds the same way.
+    globalThis.MST_GATE.onChange(() => SAFE.alive() && rebuild("late entitlement answer"));
     try {
       chrome.runtime.onMessage.addListener((message) => {
         if (message?.type !== "proChanged") return;
-        ++generation;
-        log("entitlement changed → rebuilding");
-        clearTimeout(renavTimer);
-        runCleanups();
-        removeInjectedUi();
-        pageData = null;
-        route({ initial: false }).catch((err) => warn("route after proChanged failed:", err));
+        rebuild("entitlement changed");
       });
     } catch {
       // runtime unavailable (e.g. extension reloaded) — next navigation re-routes

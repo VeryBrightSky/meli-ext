@@ -43,6 +43,9 @@ globalThis.MST_DASH = (() => {
         categoryGroupId: meta.categoryGroupId,
         fullWeightKg
       });
+      // Full mode with no service-cost row for this weight: skip the listing
+      // rather than count the missing fee as $0.
+      if (quote.fixedCostUnavailable) continue;
       const threshold = SOURCE.shippingSubsidy?.thresholdMXN ?? 299;
       const subsidyPct =
         SOURCE.shippingSubsidy?.levels?.find((l) => l.id === opts.reputationId)?.subsidyPct || 0;

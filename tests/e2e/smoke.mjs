@@ -64,6 +64,12 @@ fixtures.productNoMeta = fixtures.product.replace(
 );
 // A product page with NO recognizable price block at all (every anchor
 // strategy misses). The extension must keep waiting silently, never inject.
+// A listing priced in USD (explicit page currency): fee tables are MXN, so
+// the extension must not render a card for it.
+fixtures.productUsd = fixtures.product.replace(
+  /<meta itemprop="price"[^>]*>/i,
+  '<meta itemprop="price" content="827" /><meta itemprop="priceCurrency" content="USD" />'
+);
 fixtures.productNoAnchor = fixtures.productNoPrice.replace(
   /ui-pdp-price/g,
   "ui-pdp-x"
@@ -81,7 +87,9 @@ const server = createServer(
           ? fixtures.productNoMeta
           : url.includes("noanchor")
             ? fixtures.productNoAnchor
-            : fixtures.product;
+            : url.includes("usdcur")
+              ? fixtures.productUsd
+              : fixtures.product;
     res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
     res.end(body);
   }
@@ -311,7 +319,8 @@ try {
   assert.ok(!upsellText.includes("$750.00"), "panel must not leak the blurred target price");
   assert.ok(upsellText.includes("$89 al mes"), "upsell missing monthly price");
   assert.ok(upsellText.includes("$699 al año"), "upsell missing yearly price");
-  assert.ok(upsellText.includes("equivale a $58 al mes"), "upsell missing yearly monthly-equivalent");
+  assert.ok(upsellText.includes("≈ $58 al mes"), "upsell missing yearly monthly-equivalent");
+  assert.ok(upsellText.includes("Ya pagué: iniciar sesión"), "upsell missing the 'already paid' login link");
   // Panel opens next to the clicked teaser, not at the bottom of the card.
   assert.equal(
     await page.$eval(".mst-upsell", (p) => p.previousElementSibling?.classList.contains("mst-row--teaser")),
@@ -429,7 +438,8 @@ try {
   // One saved product → within the free limit, so it renders unblurred.
   assert.equal(await dash.$$eval("#rows tr", (trs) => trs.length), 1);
   assert.equal(await dash.$$eval("#rows tr.locked", (trs) => trs.length), 0);
-  pass("dashboard (free): table renders with the first products visible + upsell below");
+  assert.equal(await dash.$eval("#login-link", (a) => a.textContent), "Ya pagué: iniciar sesión");
+  pass("dashboard (free): table renders with the first products visible + upsell below (with 'Ya pagué' login link)");
 
   // QA override + sales seed; options default shipping = 0 (meta/cost were
   // written by the real card in phase 1).
@@ -686,7 +696,7 @@ try {
   await page.click(".mst-free-toggle");
   await sleep(200);
   await setSelect("Reputación del vendedor", "verde");
-  assert.equal(await page.evaluate(rowValue("Descuento en envío por reputación")), "−$25.00"); // 50% of 50, shown as a reduction
+  assert.equal(await page.evaluate(rowValue("Descuento por reputación")), "−$25.00"); // 50% of 50, shown as a reduction
   pass("reputation verde + envío gratis → subsidy row −$25.00");
   await setSelect("Reputación del vendedor", "none");
   await page.click(".mst-free-toggle");
@@ -710,21 +720,37 @@ try {
   const opts = await browser.newPage();
   await opts.goto(`chrome-extension://${extId}/src/options/options.html`, { waitUntil: "load" });
   await opts.evaluate(async () => {
-    await chrome.storage.sync.set({ extensionpay_sentinel: "keep-me" });
+    await chrome.storage.sync.set({ extensionpay_sentinel: "keep-me", breakdownOpen: true, showWithholdings: true });
   });
   const before = await opts.evaluate(async () => (await chrome.storage.local.get(["mst:installedAt", "mst:cost:MLM12345678"])));
   assert.ok(before["mst:cost:MLM12345678"] > 0, "precondition: saved cost");
+  // v1.4.3: Reset asks first. Cancel keeps everything; accept wipes.
+  let confirmText = null;
+  let acceptReset = false;
+  opts.on("dialog", async (d) => {
+    confirmText = d.message();
+    if (acceptReset) await d.accept();
+    else await d.dismiss();
+  });
+  await opts.click("#reset-btn");
+  await sleep(300);
+  assert.ok(confirmText?.includes("No se puede deshacer"), `confirm text: ${confirmText}`);
+  const kept = await opts.evaluate(async () => (await chrome.storage.local.get("mst:cost:MLM12345678"))["mst:cost:MLM12345678"]);
+  assert.equal(kept, before["mst:cost:MLM12345678"], "cancelling the confirm must keep saved costs");
+  acceptReset = true;
   await opts.click("#reset-btn");
   await sleep(500);
   const after = await opts.evaluate(async () => ({
     local: await chrome.storage.local.get(["mst:installedAt", "mst:cost:MLM12345678", "mst:proOverride"]),
-    sync: await chrome.storage.sync.get(["extensionpay_sentinel", "cardEnabled"])
+    sync: await chrome.storage.sync.get(["extensionpay_sentinel", "cardEnabled", "breakdownOpen", "showWithholdings"])
   }));
   assert.equal(after.local["mst:installedAt"], before["mst:installedAt"], "install stamp must survive reset");
   assert.equal(after.local["mst:cost:MLM12345678"], undefined, "saved cost must be removed");
   assert.equal(after.local["mst:proOverride"], undefined, "override is Netio data → removed");
   assert.equal(after.sync.extensionpay_sentinel, "keep-me", "ExtPay keys must survive reset");
   assert.equal(after.sync.cardEnabled, true, "defaults restored");
+  assert.equal(after.sync.breakdownOpen, undefined, "breakdownOpen reset");
+  assert.equal(after.sync.showWithholdings, undefined, "showWithholdings reset");
   pass("options Reset removes only Netio data (ExtPay keys + install stamp kept, no trial restart)");
   // Re-seed what later phases rely on.
   await opts.evaluate(async () => {
@@ -868,6 +894,56 @@ try {
   );
   pass('radar "solo rentables" dims 1 loser → "Exportar rentables (2)"');
 
+  // ---- v1.4.3: CSV keeps losses numeric; own strip text never flips flags;
+  // ---- cost field keeps focus across the re-init --------------------------
+  await search.click(".mst-radar__only"); // back to "all results"
+  await sleep(100);
+  // Expand the 2nd result's strip: its panel prints "Envío gratis: No". Reading
+  // the item text AFTER that used to match our own label and flip it to Sí.
+  await search.$$eval(".mst-strip__bar", (bars) => bars[1].click());
+  await sleep(150);
+  await search.focus(".mst-radar__cost");
+  await search.$eval(".mst-radar__cost", (el) => {
+    el.value = "99"; // 99% acquisition cost: every result loses money
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await sleep(600);
+  const focusInfo = await search.evaluate(() => ({
+    cls: document.activeElement?.className ?? "",
+    val: document.activeElement?.value ?? null
+  }));
+  assert.ok(focusInfo.cls.includes("mst-radar__cost") && focusInfo.val === "99", `focus after re-init: ${JSON.stringify(focusInfo)}`);
+  pass("acquisition cost field keeps focus + value after the strips re-init");
+
+  const dlDir2 = mkdtempSync(join(tmpdir(), "meli-e2e-dl-"));
+  await cdp.send("Browser.setDownloadBehavior", { behavior: "allow", downloadPath: dlDir2 });
+  await search.$$eval(".mst-strip__bar", (bars) => bars[1].click()); // expanded again after re-init
+  await sleep(100);
+  await search.click(".mst-export__btn");
+  let csvFile2 = null;
+  for (let i = 0; i < 50 && !csvFile2; i++) {
+    await sleep(100);
+    csvFile2 = readdirSync(dlDir2).find((f) => f.endsWith(".csv"));
+  }
+  assert.ok(csvFile2, "second CSV download");
+  const csv2 = readFileSync(join(dlDir2, csvFile2), "utf8");
+  rmSync(dlDir2, { recursive: true, force: true });
+  const lines2 = csv2.replace(/^﻿/, "").split("\r\n");
+  assert.ok(!/'-?\d/.test(csv2), `numeric cell was apostrophe-guarded:\n${csv2}`);
+  assert.match(lines2[1], /,-\d+\.\d{2},-\d+\.\d$/, `loss row must stay numeric: ${lines2[1]}`);
+  assert.match(lines2[2], /,Premium,[^,]*,No,/, `2nd result has no free shipping: ${lines2[2]}`);
+  pass("CSV: losses export as plain negative numbers; expanded strip does not flip 'Envío gratis' to Sí");
+
+  await search.focus(".mst-radar__cost");
+  await search.$eval(".mst-radar__cost", (el) => {
+    el.value = "60";
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await sleep(600);
+  // Leave the page as Phase 4 did: "only profitable" ON (Phase 6 turns it off).
+  await search.click(".mst-radar__only");
+  await sleep(150);
+
   // ================= PHASE 5: SPA navigation (stale state impossible) ========
   console.log("\nPHASE 5 — SPA NAVIGATION (stale state from a previous product impossible)");
   await page.bringToFront();
@@ -989,6 +1065,92 @@ try {
   assert.equal(noPriceFatal, false, "unreadable page must not raise a fatal/uncaught error");
   pass("unreadable page: no fatal error, host page intact");
   await noprice.close();
+
+  // ================= PHASE 9: v1.4.3 audit fixes ================================
+  console.log("\nPHASE 9 — v1.4.3 (unified URLs, price follow, currency, strip rebuild, dashboard focus, reload notice)");
+  const logs9 = [];
+  const upPage = tap(await browser.newPage(), "up");
+  upPage.on("console", (m) => logs9.push(m.text()));
+  await upPage.goto(`https://www.mercadolibre.com.mx:${PORT}/celular-test-pro/up/MLMU123456`, { waitUntil: "load" });
+  await upPage.waitForSelector("#mst-card-root", { visible: true, timeout: 20000 });
+  assert.ok(!logs9.some((l) => l.includes("URL not recognized")), "/up/MLMU must be detected by URL, not by the DOM fallback");
+  assert.ok(logs9.some((l) => l.includes("page type: product")), "page type log");
+  pass("/up/MLMU… unified product URL is recognized as a product page");
+
+  // The page re-renders with a new price (variant/promo): the card follows.
+  await upPage.evaluate(() => {
+    document.querySelector('meta[itemprop="price"]').setAttribute("content", "799");
+    const frac = document.querySelectorAll(".ui-pdp-price:not([style]) .andes-money-amount:not(.andes-money-amount--previous) .andes-money-amount__fraction")[0];
+    frac.textContent = "799";
+  });
+  await upPage.waitForFunction(
+    () => document.querySelectorAll(".mst-card input.mst-input")[0]?.value === "799.00",
+    { timeout: 6000, polling: 200 }
+  );
+  assert.equal(await upPage.evaluate(rowValue("Comisión")), "−$79.90");
+  pass("in-page price change 827 → 799: card follows (price field + commission −$79.90)");
+
+  // Explicit non-MXN currency: no card.
+  const usd = tap(await browser.newPage(), "usd");
+  await usd.goto(`${PRODUCT_URL}?e2e=usdcur`, { waitUntil: "load" });
+  await sleep(2500);
+  assert.equal(await usd.$("#mst-card-root"), null, "USD listing must not get an MXN fee card");
+  pass("page currency explicitly USD → no card");
+  await usd.close();
+
+  // A strip wiped by the page's own re-render is rebuilt.
+  await search.bringToFront();
+  const stripsBefore = await search.$$eval(".mst-strip", (els) => els.length);
+  await search.evaluate(() => document.querySelector(".mst-strip").remove());
+  await search.waitForFunction(
+    (n) => document.querySelectorAll(".mst-strip").length === n,
+    { timeout: 5000, polling: 200 },
+    stripsBefore
+  );
+  pass(`strip removed by a page re-render comes back (${stripsBefore} strips again)`);
+
+  // Toolbar/dashboard opener focuses the open dashboard instead of stacking tabs.
+  const dashUrl = `chrome-extension://${extId}/src/dashboard/dashboard.html`;
+  for (const pg of await browser.pages()) if (pg.url().startsWith(dashUrl)) await pg.close();
+  const opener = await browser.newPage();
+  await opener.goto(`chrome-extension://${extId}/src/options/options.html`, { waitUntil: "load" });
+  const r1 = await opener.evaluate(() => chrome.runtime.sendMessage({ type: "openDashboard" }));
+  await sleep(700);
+  const r2 = await opener.evaluate(() => chrome.runtime.sendMessage({ type: "openDashboard" }));
+  await sleep(700);
+  const dashCount = (await browser.pages()).filter((pg) => pg.url().startsWith(dashUrl)).length;
+  assert.equal(dashCount, 1, `dashboard tabs: ${dashCount} (r1=${JSON.stringify(r1)} r2=${JSON.stringify(r2)})`);
+  assert.equal(r1.data.opened, true);
+  assert.equal(r2.data.focused, true);
+  // Junk messages are ignored (no throw, no response needed).
+  await opener.evaluate(() => chrome.runtime.sendMessage("hola").catch(() => null));
+  await opener.evaluate(() => chrome.runtime.sendMessage({ type: "constructor" }).catch(() => null));
+  pass("openDashboard opens once, then focuses the existing tab (no tabs permission)");
+  for (const pg of await browser.pages()) if (pg.url().startsWith(dashUrl)) await pg.close();
+
+  // Extension reloaded under an open tab: the orphaned card says so and the
+  // button brings the page back with the new version.
+  const sw = await browser.waitForTarget((t) => t.type() === "service_worker" && t.url().startsWith("chrome-extension://"));
+  await upPage.bringToFront();
+  await (await sw.worker()).evaluate(() => chrome.runtime.reload());
+  await upPage.waitForFunction(
+    () => document.querySelector("#mst-card-root")?.dataset.stale === "1",
+    { timeout: 15000, polling: 250 }
+  );
+  const staleText = await upPage.$eval("#mst-card-root", (c) => c.textContent);
+  assert.ok(staleText.includes("Netio se actualizó. Recarga la página para seguir.") && staleText.includes("Recargar"), staleText);
+  pass("extension reloaded under the tab: card becomes 'Netio se actualizó. Recarga la página…' + Recargar");
+  await sleep(1500); // let the reloaded extension finish starting
+  await Promise.all([
+    upPage.waitForNavigation({ waitUntil: "load", timeout: 20000 }),
+    upPage.click("#mst-card-root button")
+  ]);
+  // (Headless Chrome does not re-register content scripts for an unpacked
+  // extension after runtime.reload(), so only the reload itself is asserted.)
+  assert.equal(await upPage.$("[data-stale]"), null, "the stale notice is gone after the reload");
+  pass("Recargar reloads the page (stale notice gone)");
+  await upPage.close();
+  await opener.close().catch(() => {});
 
   console.log(`\nE2E: ${passed.length}/${passed.length} checks passed`);
 } finally {

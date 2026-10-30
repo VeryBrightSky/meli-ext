@@ -61,7 +61,33 @@ globalThis.MST_UI = (() => {
     return "green";
   }
 
+  // --- CSV cells ---------------------------------------------------------------
+  // TEXT cells (titles, labels) are seller/page controlled: a leading = + - @
+  // would run as a formula in Excel/Sheets, so they get a leading apostrophe.
+  // NUMERIC cells must never get that guard: "-12.50" is a number, and
+  // prefixing it turns every loss into text that no spreadsheet can sum.
+  function csvText(value) {
+    let s = String(value ?? "");
+    if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
+    return /[",\r\n;]/.test(s) ? `"${s.replaceAll('"', '""')}"` : s;
+  }
+
+  // A number with fixed decimals, marked so csvCell leaves it unguarded.
+  const csvFixed = (n, digits = 2) => ({ csvNum: Number.isFinite(n) ? n.toFixed(digits) : "" });
+
+  function csvCell(value) {
+    if (value && typeof value === "object" && "csvNum" in value) return value.csvNum;
+    if (typeof value === "number") return Number.isFinite(value) ? String(value) : "";
+    return csvText(value);
+  }
+
+  const csvLine = (cells) => cells.map(csvCell).join(",");
+
   return Object.freeze({
+    csvText,
+    csvFixed,
+    csvCell,
+    csvLine,
     fmtMoney,
     fmtRange,
     fmtCharge,

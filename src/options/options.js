@@ -19,7 +19,7 @@ const DEFAULT_SETTINGS = {
 };
 
 // Branding + i18n strings.
-document.title = `${BRAND.name} — ${T("optionsTitle")}`;
+document.title = `${BRAND.name} · ${T("optionsTitle")}`;
 document.getElementById("brand-name").textContent = BRAND.name;
 document.getElementById("brand-logo").src = chrome.runtime.getURL(BRAND.logoPath);
 document.getElementById("lbl-card").textContent = T("optShowCard");
@@ -27,6 +27,8 @@ document.getElementById("lbl-strips").textContent = T("optShowStrips");
 document.getElementById("lbl-shipping").textContent = T("optDefaultShipping");
 document.getElementById("lbl-type").textContent = T("optDefaultType");
 document.getElementById("opt-auto").textContent = T("optTypeAuto");
+document.getElementById("opt-classic").textContent = T("typeClassic");
+document.getElementById("opt-premium").textContent = T("typePremium");
 document.getElementById("reset-btn").textContent = T("optReset");
 document.getElementById("reset-hint").textContent = T("optResetHint");
 document.getElementById("lbl-acquisition").textContent = T("optAcquisition");
@@ -136,8 +138,14 @@ async function removeOwnKeys(area, extraKeys = []) {
   if (mine.length) await area.remove(mine);
 }
 resetBtn.addEventListener("click", async () => {
+  // Irreversible: costs, sales and price history live only in this browser.
+  if (!window.confirm(T("optResetConfirm"))) return;
   await removeOwnKeys(chrome.storage.local);
-  await removeOwnKeys(chrome.storage.sync, [...Object.keys(DEFAULT_SETTINGS), "msiRates", "msiTerm", "reputationId", "freeShipping", "usesFull"]);
+  await removeOwnKeys(chrome.storage.sync, [
+    ...Object.keys(DEFAULT_SETTINGS),
+    "msiRates", "msiTerm", "reputationId", "freeShipping", "usesFull",
+    "showWithholdings", "breakdownOpen"
+  ]);
   await chrome.storage.sync.set(DEFAULT_SETTINGS);
   await load();
   resetStatus.textContent = T("optResetDone");

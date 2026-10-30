@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Netio (dev)",
-  "version": "1.4.2",
+  "version": "1.4.3",
   "description": "Calculadora de comisiones, ganancias y precios para vendedores de Mercado Libre México.",
   "default_locale": "es_419",
   "icons": {
@@ -16,7 +16,7 @@
     "https://extensionpay.com/*"
   ],
   "action": {
-    "default_title": "Netio — Tablero de Ganancias"
+    "default_title": "Netio: Tablero de Ganancias"
   },
   "background": {
     "service_worker": "src/background/service-worker.js"

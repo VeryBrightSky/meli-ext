@@ -33,11 +33,13 @@ retenciones 2026 y tu ganancia neta, sin hojas de cálculo.
 - Probar precios sin tocar tu publicación
 
 **Privacidad:** no necesitas cuenta para usar Netio. Tus costos y productos
-nunca salen de tu navegador. Los pagos de PRO los procesa ExtensionPay con
-Stripe (al pagar solo te pide tu correo).
+nunca salen de tu navegador. La prueba de 7 días es local: sin correo, sin
+tarjeta y sin conexión. Los pagos de PRO los procesa ExtensionPay con Stripe
+y solo te piden tu correo si pagas.
 
-Las cifras son estimaciones basadas en las tarifas publicadas por Mercado
-Libre (fecha citada en cada tarjeta). El porcentaje exacto depende de tu
+Las tablas de tarifas salen de guías públicas para vendedores (no de una API
+de Mercado Libre), así que las cifras son estimaciones (la fecha de las
+tarifas aparece en cada tarjeta). El porcentaje exacto depende de tu
 categoría y cuenta. Esta extensión no está afiliada a Mercado Libre.
 
 ## Long description — English
@@ -61,8 +63,14 @@ yellow, red by your cost, profitable-only filter, CSV export); Profit
 Dashboard ranking all your products with loss-makers on top; what-if pricing.
 
 **Privacy:** no account needed to use Netio. Your costs and products never
-leave your browser. PRO payments are processed by ExtensionPay via Stripe
-(paying only asks for your email).
+leave your browser. The 7-day trial is local: no email, no card, no network
+call. PRO payments are processed by ExtensionPay via Stripe, which only asks
+for your email if you pay.
+
+**Accuracy:** fee tables come from public seller guides (not a Mercado Libre
+API), so every figure is an estimate; the date of the rates is shown on each
+card. Exact rates depend on your category and account. Not affiliated with
+Mercado Libre.
 
 ## Distribution setting (important)
 
@@ -73,6 +81,11 @@ they also drag the install/uninstall and rating signals.
 
 ## What to say in "What's new"
 
+`v1.4.3: arreglos de exportación CSV (las pérdidas ya salen como números),
+la tarjeta sigue los cambios de precio de la página, mejor lectura de montos
+y textos más claros.`
+
+Anterior (v1.4):
 `v1.4: PRO gratis 7 días al instalar. Aviso en rojo cuando pierdes dinero,
 precio objetivo y Radar de Rentabilidad visibles en cada publicación y
 búsqueda, Tablero con vista previa gratis, calculadora de MSI.`
@@ -81,7 +94,11 @@ búsqueda, Tablero con vista previa gratis, calculadora de MSI.`
 
 - Personally identifiable information: **Yes, email**, collected only by the
   payment processor (ExtensionPay) when the user pays. Not sold, not used for
-  anything else.
+  anything else. The 7-day trial is local: no email, no card. A random payment
+  ID is created only if the user opens checkout or logs in; subscription
+  status is then checked when the user uses Mercado Libre pages or starts
+  Chrome.
+- Chrome sync: some preferences sync across the user's own Chrome profiles.
 - Financial/payment information: handled by Stripe via ExtensionPay; Netio
   never sees card data.
 - Website content / browsing: **No** (pages are read locally to compute fees;

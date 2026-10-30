@@ -81,17 +81,43 @@ globalThis.MST_QUICKVIEW = (() => {
     return null;
   }
 
-  function extractItemData(item) {
-    const text = item.innerText;
-    return {
-      priceMXN: extractPrice(item),
+  // Free-shipping / MSI flags come from the result's own text. Our injected
+  // strip lives INSIDE the item, and its expanded panel prints "Envío gratis:
+  // Sí/No" (and the listing type), so reading item.innerText after injection
+  // would feed our own words back in. Flags are therefore cached per item at
+  // first read (before any strip exists), and a later read on an item that
+  // already carries a strip uses a clone with the strip removed.
+  let flagsCache = new WeakMap();
+  function itemFlags(item) {
+    const cached = flagsCache.get(item);
+    if (cached) return cached;
+    let text;
+    if (item.querySelector(`.${STRIP_CLASS}`)) {
+      const clone = item.cloneNode(true);
+      for (const own of clone.querySelectorAll(`.${STRIP_CLASS}`)) own.remove();
+      text = clone.textContent || "";
+    } else {
+      text = item.innerText || "";
+    }
+    const flags = {
       // "Envío gratis" and the newer "Llega gratis hoy/mañana".
       freeShipping: /(?:env[ií]o|llega) gratis/i.test(text),
       // MSI is a Premium-only feature; absence is a weak signal, so this is a
       // labeled guess in the UI.
       listingTypeGuess: /meses sin intereses|mismo precio(?: en)? \d+ (?:meses|cuotas)|\bmsi\b/i.test(text)
         ? "premium"
-        : "classic",
+        : "classic"
+    };
+    flagsCache.set(item, flags);
+    return flags;
+  }
+
+  function extractItemData(item) {
+    const flags = itemFlags(item);
+    return {
+      priceMXN: extractPrice(item),
+      freeShipping: flags.freeShipping,
+      listingTypeGuess: flags.listingTypeGuess,
       seller: item.querySelector('[class*="seller"]')?.textContent.trim() || null
     };
   }
@@ -107,7 +133,9 @@ globalThis.MST_QUICKVIEW = (() => {
 
   function panelRow(label, value) {
     const r = el("div", `${PREFIX}-strip__row`);
-    r.appendChild(el("span", `${PREFIX}-strip__label`, label));
+    const labelEl = el("span", `${PREFIX}-strip__label`, label);
+    labelEl.title = label; // single-line ellipsis: full text on hover
+    r.appendChild(labelEl);
     r.appendChild(el("span", `${PREFIX}-strip__value`, value));
     return r;
   }
@@ -135,7 +163,6 @@ globalThis.MST_QUICKVIEW = (() => {
   const DEFAULT_ASSUMED_COST_PCT = 60;
   const previewPct = () => (acquisitionPct > 0 ? acquisitionPct : DEFAULT_ASSUMED_COST_PCT);
   const radarPreview = () => !GATE.isPro();
-  let freeVerdictsShown = 0;
   let upsellOpen = null; // set when the free export bar is built
 
   // Worst-case verdict for one result: classify by netMin (higher commission
@@ -188,9 +215,11 @@ globalThis.MST_QUICKVIEW = (() => {
         showVerdict = true;
       } else {
         strip.dataset.preview = evaln.bucket;
-        if (freeVerdictsShown < FREE_VERDICTS) {
+        // Count what is on screen (not a running tally) so a strip rebuilt
+        // after a page re-render doesn't use up the free preview twice.
+        const shownNow = document.querySelectorAll(`.${STRIP_CLASS}[data-preview][data-bucket]`).length;
+        if (shownNow < FREE_VERDICTS) {
           strip.dataset.bucket = evaln.bucket;
-          freeVerdictsShown += 1;
           showVerdict = true;
         }
       }
@@ -272,13 +301,8 @@ globalThis.MST_QUICKVIEW = (() => {
 
   // --- CSV export -----------------------------------------------------------
 
-  // Titles are seller-controlled: a leading = + - @ would run as a formula in
-  // Excel/Sheets, so prefix it with an apostrophe (shown as text).
-  function csvEscape(value) {
-    let s = String(value ?? "");
-    if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
-    return /[",\r\n;]/.test(s) ? `"${s.replaceAll('"', '""')}"` : s;
-  }
+  // Cell escaping lives in MST_UI (format.js): text cells get the formula
+  // guard, numeric cells (csvFixed) never do, so a negative profit stays a number.
 
   function buildCsv() {
     const active = radarActive();
@@ -318,20 +342,20 @@ globalThis.MST_QUICKVIEW = (() => {
         item.querySelector("h2, .poly-component__title")?.textContent.trim() ?? "";
       const cells = [
         title,
-        b.priceMXN.toFixed(2),
+        UI.csvFixed(b.priceMXN),
         data.listingTypeGuess === "premium" ? T("typePremium") : T("typeClassic"),
         groupLabel,
         data.freeShipping ? T("yes") : T("no"),
-        b.commissionMinMXN.toFixed(2),
-        b.commissionMaxMXN.toFixed(2),
-        b.netMinMXN.toFixed(2),
-        b.netMaxMXN.toFixed(2)
+        UI.csvFixed(b.commissionMinMXN),
+        UI.csvFixed(b.commissionMaxMXN),
+        UI.csvFixed(b.netMinMXN),
+        UI.csvFixed(b.netMaxMXN)
       ];
       let marginPct = 0;
       if (active) {
         const evaln = evaluateStrip(data, b);
         if (onlyProfitable && evaln.bucket !== "profit") continue; // shortlist
-        cells.push(evaln.profitMXN.toFixed(2), evaln.marginPct.toFixed(1));
+        cells.push(UI.csvFixed(evaln.profitMXN), UI.csvFixed(evaln.marginPct, 1));
         marginPct = evaln.marginPct;
       }
       rows.push({ cells, marginPct });
@@ -340,8 +364,8 @@ globalThis.MST_QUICKVIEW = (() => {
     // shared, tested radar helper).
     const ordered = active && onlyProfitable ? RADAR.rankByMargin(rows) : rows;
 
-    const lines = [header.map(csvEscape).join(",")];
-    for (const r of ordered) lines.push(r.cells.map(csvEscape).join(","));
+    const lines = [UI.csvLine(header)];
+    for (const r of ordered) lines.push(UI.csvLine(r.cells));
     return "﻿" + lines.join("\r\n"); // BOM so Excel opens UTF-8 correctly
   }
 
@@ -458,12 +482,37 @@ globalThis.MST_QUICKVIEW = (() => {
     input.addEventListener("change", async () => {
       const v = Math.max(0, Math.min(99, Math.round(Number(input.value) || 0)));
       input.value = v > 0 ? String(v) : "";
-      await chrome.storage.sync.set({ acquisitionPct: v });
+      // Enter commits without blurring; re-init rebuilds this very input, so
+      // hand focus to the new one instead of dropping the seller's cursor.
+      const hadFocus = document.activeElement === input;
+      try {
+        await chrome.storage.sync.set({ acquisitionPct: v });
+      } catch {
+        // storage write failed (extension reloaded): still apply for this page
+      }
       // Verdicts depend on the cost: rebuild the strips and the bar in place.
-      SAFE.run("quickview-reinit", () => init().catch((err) => warn("re-init failed:", err)));
+      try {
+        await init();
+      } catch (err) {
+        warn("re-init failed:", err);
+      }
+      if (hadFocus) {
+        const fresh = document.querySelector(`.${PREFIX}-radar__cost`);
+        fresh?.focus();
+      }
     });
     field.appendChild(input);
     return field;
+  }
+
+  let targetSyncTimer = null;
+  function saveTarget() {
+    targetSyncTimer = null;
+    try {
+      chrome.storage.sync.set({ radarTargetPct })?.catch?.(() => {});
+    } catch {
+      // extension context gone: nothing to persist to
+    }
   }
 
   function buildRadarRow() {
@@ -482,13 +531,18 @@ globalThis.MST_QUICKVIEW = (() => {
     input.setAttribute("aria-label", T("radarTarget"));
     input.addEventListener("input", () => {
       radarTargetPct = Math.max(0, Math.min(90, Math.round(Number(input.value) || 0)));
-      chrome.storage.sync.set({ radarTargetPct });
       reapplyRadar();
       refreshExportBtn();
+      // Persist after the typing pause: chrome.storage.sync allows ~120
+      // writes/min and every keystroke used to be one.
+      clearTimeout(targetSyncTimer);
+      targetSyncTimer = setTimeout(saveTarget, 300);
     });
     // On commit, show the value actually applied (e.g. 150 → 90).
     input.addEventListener("change", () => {
       input.value = String(radarTargetPct);
+      clearTimeout(targetSyncTimer);
+      saveTarget();
     });
     field.append(input, el("span", null, "%"));
     row.appendChild(field);
@@ -584,11 +638,11 @@ globalThis.MST_QUICKVIEW = (() => {
     let failed = 0;
     let capped = false;
     for (const item of items) {
-      if (processed.has(item)) continue; // no repeat layout reads
-      if (item.querySelector(`.${STRIP_CLASS}`)) {
-        processed.add(item);
-        continue;
-      }
+      // `processed` holds only items to skip for good (no price / poisoned).
+      // Items that got a strip are re-checked each pass (a cheap querySelector,
+      // no layout): when the page's re-render wipes the strip, it is rebuilt.
+      if (processed.has(item)) continue;
+      if (item.querySelector(`.${STRIP_CLASS}`)) continue;
       // Yield after a batch so a big page doesn't build every strip in one
       // long task; the rest is caught on the scheduled follow-up pass below.
       if (injected >= MAX_STRIPS_PER_SCAN) {
@@ -606,7 +660,6 @@ globalThis.MST_QUICKVIEW = (() => {
         }
         const host = item.querySelector(".poly-card__content") ?? item;
         host.appendChild(buildStrip(data));
-        processed.add(item);
         injected++;
       } catch (err) {
         failed++;
@@ -646,7 +699,12 @@ globalThis.MST_QUICKVIEW = (() => {
     observerTimer = null;
     clearTimeout(scanTimer);
     scanTimer = null;
+    if (targetSyncTimer !== null) {
+      clearTimeout(targetSyncTimer);
+      saveTarget(); // don't lose an edit made in the last 300ms
+    }
     processed = new WeakSet();
+    flagsCache = new WeakMap();
     itemSelector = null;
     pageCategoryGroupId = null;
     onlyProfitable = false;
@@ -677,7 +735,6 @@ globalThis.MST_QUICKVIEW = (() => {
   async function init() {
     destroy(); // re-init after SPA navigation starts clean
     const myToken = initToken;
-    freeVerdictsShown = 0;
     upsellOpen = null;
     const settings = await chrome.storage.sync.get({
       acquisitionPct: 0,

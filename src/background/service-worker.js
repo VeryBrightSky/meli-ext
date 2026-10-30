@@ -138,20 +138,41 @@ const handlers = {
 
   // payload.plan: ExtPay v3.1 plan nickname → plan-specific checkout page.
   openPaymentPage: async (payload) => extpay.openPaymentPage(payload?.plan),
-  // Trial starts when the user opts in here — never on install.
-  openTrialPage: async () => extpay.openTrialPage("7 dias"),
   openLoginPage: async () => extpay.openLoginPage(),
 
-  openDashboard: async () => {
-    await chrome.tabs.create({ url: chrome.runtime.getURL(DASHBOARD_URL) });
-    return { opened: true };
-  }
+  openDashboard: async () => openOrFocusDashboard()
 };
 
+// Open the dashboard, or bring an already-open one to the front instead of
+// stacking tabs. runtime.getContexts lists this extension's OWN open tabs
+// without the "tabs" permission (tabs.query by url would need it).
+async function openOrFocusDashboard() {
+  const url = chrome.runtime.getURL(DASHBOARD_URL);
+  try {
+    const contexts = await chrome.runtime.getContexts({ contextTypes: ["TAB"] });
+    const hit = contexts.find(
+      (c) => typeof c.documentUrl === "string" && c.documentUrl.split(/[?#]/)[0] === url && c.tabId >= 0
+    );
+    if (hit) {
+      await chrome.tabs.update(hit.tabId, { active: true });
+      if (hit.windowId >= 0) await chrome.windows.update(hit.windowId, { focused: true });
+      return { opened: false, focused: true };
+    }
+  } catch {
+    // getContexts unavailable (old Chrome): fall through and open a new tab
+  }
+  await chrome.tabs.create({ url });
+  return { opened: true };
+}
+
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  const handler = handlers[message?.type];
+  // Ignore anything that isn't a {type} object (strings, null, arrays from
+  // other extensions or injected scripts); the library's own messages are
+  // handled by its listener, and answering them here would race it.
+  if (!message || typeof message !== "object" || Array.isArray(message)) return false;
+  const handler = Object.hasOwn(handlers, message.type) ? handlers[message.type] : null;
   if (!handler) {
-    sendResponse({ ok: false, error: `Unknown message type: ${message?.type}` });
+    sendResponse({ ok: false, error: `Unknown message type: ${String(message.type)}` });
     return false;
   }
   handler(message.payload ?? {})
@@ -186,5 +207,5 @@ try {
 }
 
 chrome.action.onClicked.addListener(() => {
-  chrome.tabs.create({ url: chrome.runtime.getURL(DASHBOARD_URL) });
+  openOrFocusDashboard().catch(() => {});
 });

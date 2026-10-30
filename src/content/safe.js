@@ -48,6 +48,17 @@ globalThis.MST_SAFE = (() => {
     };
   }
 
+  // After the extension is reloaded/updated, an already-injected content
+  // script is orphaned: chrome.runtime.id goes undefined and every chrome.*
+  // call throws "Extension context invalidated". Callers check this first.
+  function alive() {
+    try {
+      return !!chrome.runtime?.id;
+    } catch {
+      return false;
+    }
+  }
+
   // Last-resort catcher for OUR async/uncaught leftovers. Filter hard: the
   // host page's own errors must not be rebranded with our prefix.
   const extensionUrl = (() => {
@@ -72,5 +83,5 @@ globalThis.MST_SAFE = (() => {
     });
   }
 
-  return Object.freeze({ run, wrap });
+  return Object.freeze({ run, wrap, alive });
 })();

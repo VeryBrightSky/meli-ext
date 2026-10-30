@@ -27,7 +27,7 @@
     "message": "Select a category…"
   },
   "hintDetected": {
-    "message": "We detected this from the listing — fix it if it's wrong."
+    "message": "We detected this from the listing. Fix it if it's wrong."
   },
   "hintNoCategory": {
     "message": "No category detected; the sale commission ranges from $1 to $2."
@@ -188,12 +188,6 @@
   "upsellPricing": {
     "message": "$$89 MXN/mo (under $$3 a day) or $$699 MXN/yr (save 35%). No lock-in."
   },
-  "upsellTrial": {
-    "message": "Try it free for 7 days"
-  },
-  "proSweetSpotName": {
-    "message": "Optimal-price alert"
-  },
   "rowSales": {
     "message": "Sales per month"
   },
@@ -207,7 +201,7 @@
     "message": "Weight (to estimate shipping)"
   },
   "weightNone": {
-    "message": "— choose a weight —"
+    "message": "Choose a weight"
   },
   "linkDashboard": {
     "message": "View my dashboard"
@@ -219,7 +213,7 @@
     "message": "Research: cost $1%"
   },
   "optAcquisition": {
-    "message": "Acquisition cost (% of price) — Research mode"
+    "message": "Acquisition cost (% of price), research mode"
   },
   "optSubscription": {
     "message": "Subscription"
@@ -237,7 +231,7 @@
     "message": "Manage subscription / pay"
   },
   "optLogin": {
-    "message": "Already paid — log in"
+    "message": "Already paid: log in"
   },
   "optDashboard": {
     "message": "Open Profit Dashboard"
@@ -356,9 +350,6 @@
   "radarOnly": {
     "message": "Only profitable"
   },
-  "radarSetCost": {
-    "message": "Enter your cost to switch the Radar on for this search."
-  },
   "btnExportProfitable": {
     "message": "Export profitable ($1)"
   },
@@ -370,9 +361,6 @@
   },
   "btnMsi": {
     "message": "Installments (MSI)"
-  },
-  "proMsiName": {
-    "message": "Installments (MSI) calculator"
   },
   "msiTermLabel": {
     "message": "Number of installments"
@@ -432,7 +420,7 @@
     "message": "Below one exact price, every sale costs you money"
   },
   "upsellBody_breakeven": {
-    "message": "PRO shows the break-even price and the price for the margin you want, on every listing."
+    "message": "PRO also gives you the price for the margin you want, on every listing."
   },
   "upsellLead_sweetspot": {
     "message": "There's a nearby price where you keep $1 more per sale"
@@ -533,9 +521,6 @@
   "dashFreeLimit": {
     "message": "Free plan: showing $1 of $2 products. PRO shows all, ranked by profit."
   },
-  "dashUnlock": {
-    "message": "See all · PRO"
-  },
   "statusTrialDays": {
     "message": "PRO trial: $1 days left"
   },
@@ -582,13 +567,10 @@
     "message": "Open Mercado Libre"
   },
   "welcomeNote": {
-    "message": "Your costs and products are calculated and stored in your browser; we never send them anywhere. Only PRO payment goes through ExtensionPay."
+    "message": "Your costs and products are saved in your browser; we have no servers. Only the PRO payment goes through ExtensionPay."
   },
   "badgeTrialOne": {
     "message": "PRO · last trial day"
-  },
-  "trialActiveBannerOne": {
-    "message": "PRO is on for free: 1 day left. Save your product costs and check your Dashboard."
   },
   "trialEndingOne": {
     "message": "Your PRO trial ends in less than 24 hours. After that you lose target price, Radar and Dashboard."
@@ -643,5 +625,17 @@
   },
   "reviewAsk": {
     "message": "Is Netio useful? A review helps us reach more sellers ★"
+  },
+  "optResetConfirm": {
+    "message": "Delete all saved costs, sales and price history? This can't be undone."
+  },
+  "staleNotice": {
+    "message": "Netio was updated. Reload the page to continue."
+  },
+  "staleReload": {
+    "message": "Reload"
+  },
+  "feeUnavailable": {
+    "message": "Not available for this weight"
   }
 }

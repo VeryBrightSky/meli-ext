@@ -42,7 +42,7 @@
     "message": "Tu costo de envío"
   },
   "rowShippingFree": {
-    "message": "Tu costo de envío (gratis para el comprador desde $$299)"
+    "message": "Tu costo de envío (gratis desde $$299)"
   },
   "rowNet": {
     "message": "Recibes aprox."
@@ -99,7 +99,7 @@
     "message": "No se pudo copiar"
   },
   "rowTargetMargin": {
-    "message": "Margen deseado (%)"
+    "message": "Margen objetivo (%)"
   },
   "rowTargetPrice": {
     "message": "Precio objetivo"
@@ -188,12 +188,6 @@
   "upsellPricing": {
     "message": "$$89 MXN/mes (menos de $$3 al día) o $$699 MXN/año (ahorra 35%). Sin permanencia."
   },
-  "upsellTrial": {
-    "message": "Pruébalo gratis 7 días"
-  },
-  "proSweetSpotName": {
-    "message": "Aviso de precio óptimo"
-  },
   "rowSales": {
     "message": "Ventas al mes"
   },
@@ -207,7 +201,7 @@
     "message": "Peso (para estimar el envío)"
   },
   "weightNone": {
-    "message": "— elige el peso —"
+    "message": "Elige el peso"
   },
   "linkDashboard": {
     "message": "Ver mi tablero"
@@ -219,7 +213,7 @@
     "message": "Modo investigación: costo $1% del precio"
   },
   "optAcquisition": {
-    "message": "Modo investigación: costo del producto (% del precio)"
+    "message": "Costo de adquisición (% del precio), modo investigación"
   },
   "optSubscription": {
     "message": "Suscripción"
@@ -237,7 +231,7 @@
     "message": "Administrar suscripción / pagar"
   },
   "optLogin": {
-    "message": "Ya pagué, iniciar sesión"
+    "message": "Ya pagué: iniciar sesión"
   },
   "optDashboard": {
     "message": "Abrir Tablero de Ganancias"
@@ -273,7 +267,7 @@
     "message": "Costo del producto en pesos"
   },
   "inputMarginAria": {
-    "message": "Margen deseado en porcentaje"
+    "message": "Margen objetivo en porcentaje"
   },
   "rowFull": {
     "message": "¿Usas Mercado Envíos Full?"
@@ -282,7 +276,7 @@
     "message": "Costo del servicio Full"
   },
   "rowWithholdings": {
-    "message": "Mostrar retenciones 2026 (IVA 8% / ISR 2.5%)"
+    "message": "Ver retenciones 2026 (IVA 8% / ISR 2.5%)"
   },
   "rowIvaWithheld": {
     "message": "IVA retenido (8%)"
@@ -315,13 +309,13 @@
     "message": "Ofrezco envío gratis"
   },
   "rowShippingSubsidy": {
-    "message": "Descuento en envío por reputación (estimado)"
+    "message": "Descuento por reputación (est.)"
   },
   "upsellMonthly": {
     "message": "Activar PRO · $$89 al mes"
   },
   "upsellYearly": {
-    "message": "$$699 al año (equivale a $$58 al mes)"
+    "message": "$$699 al año (≈ $$58 al mes)"
   },
   "dashTotalsLabel": {
     "message": "Totales · productos: $1"
@@ -356,9 +350,6 @@
   "radarOnly": {
     "message": "Solo rentables"
   },
-  "radarSetCost": {
-    "message": "Escribe tu costo para activar el Radar en esta búsqueda."
-  },
   "btnExportProfitable": {
     "message": "Exportar rentables ($1)"
   },
@@ -370,9 +361,6 @@
   },
   "btnMsi": {
     "message": "Meses sin intereses"
-  },
-  "proMsiName": {
-    "message": "Calculadora de meses sin intereses"
   },
   "msiTermLabel": {
     "message": "Número de meses"
@@ -429,10 +417,10 @@
     "message": "Con PRO ves ese precio en cada publicación, ya con comisión, costo fijo y tu envío. Cambia el margen y el precio se ajusta al instante."
   },
   "upsellLead_breakeven": {
-    "message": "Debajo de cierto precio, cada venta te cuesta dinero"
+    "message": "Por debajo de cierto precio, cada venta te cuesta dinero"
   },
   "upsellBody_breakeven": {
-    "message": "PRO te muestra el precio mínimo para no perder y el precio para ganar el margen que quieras, en cada publicación."
+    "message": "PRO te da además el precio para ganar el margen que quieras, en cada publicación."
   },
   "upsellLead_sweetspot": {
     "message": "Hay un precio cercano donde recibes $1 más por venta"
@@ -533,9 +521,6 @@
   "dashFreeLimit": {
     "message": "Plan gratuito: ves $1 de $2 productos. Con PRO ves todos, ordenados por ganancia."
   },
-  "dashUnlock": {
-    "message": "Ver todos · PRO"
-  },
   "statusTrialDays": {
     "message": "Prueba PRO: te quedan $1 días"
   },
@@ -543,7 +528,7 @@
     "message": "Plan gratuito (tu prueba PRO terminó)"
   },
   "optMetrics": {
-    "message": "Métricas de uso (solo en tu navegador)"
+    "message": "Diagnóstico local de conversión"
   },
   "upsellOpened": {
     "message": "Abrimos el pago en una pestaña nueva. Al terminar, esta tarjeta se actualiza sola."
@@ -582,13 +567,10 @@
     "message": "Abrir Mercado Libre"
   },
   "welcomeNote": {
-    "message": "Tus costos y productos se calculan y se guardan en tu navegador; no los enviamos a ningún lado. Solo el pago de PRO pasa por ExtensionPay."
+    "message": "Tus costos y productos se guardan en tu navegador; no tenemos servidores. Solo el pago de PRO pasa por ExtensionPay."
   },
   "badgeTrialOne": {
     "message": "PRO · último día de prueba"
-  },
-  "trialActiveBannerOne": {
-    "message": "Tienes PRO gratis: te queda 1 día. Guarda el costo de tus productos y revisa tu Tablero."
   },
   "trialEndingOne": {
     "message": "Tu prueba PRO termina en menos de 24 horas. Después pierdes el precio objetivo, el Radar y el Tablero."
@@ -600,10 +582,10 @@
     "message": "Tienes 1 día de Netio PRO gratis. Sin correo, sin tarjeta. Así le sacas provecho desde hoy:"
   },
   "btnShare": {
-    "message": "Mándale este cálculo a otro vendedor"
+    "message": "Mándaselo a otro vendedor"
   },
   "btnShareApp": {
-    "message": "Recomiéndale Netio a otro vendedor"
+    "message": "Recomienda Netio"
   },
   "shareText": {
     "message": "Uso Netio para ver mi ganancia real en cada publicación de Mercado Libre: comisión, costo fijo, envío y retenciones, sin salir de la página. Es gratis para Chrome y los primeros 7 días traen PRO: $1"
@@ -643,5 +625,17 @@
   },
   "reviewAsk": {
     "message": "¿Te sirve Netio? Una reseña nos ayuda a llegar a más vendedores ★"
+  },
+  "optResetConfirm": {
+    "message": "¿Borrar todos tus costos, ventas e historial de precios? No se puede deshacer."
+  },
+  "staleNotice": {
+    "message": "Netio se actualizó. Recarga la página para seguir."
+  },
+  "staleReload": {
+    "message": "Recargar"
+  },
+  "feeUnavailable": {
+    "message": "No disponible para este peso"
   }
 }

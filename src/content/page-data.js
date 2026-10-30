@@ -52,7 +52,17 @@ globalThis.MST_PAGE = (() => {
   // When BOTH exist but disagree, the DOM wins: the meta can be stale after
   // client-side navigation or variant changes, while the rendered price is
   // what the buyer actually sees. (Sub-peso drift is meta rounding — keep meta.)
+  // The page's declared currency, or null when it does not say. Fees here are
+  // MXN tables: a USD (or any non-MXN) listing must not be fed through them.
+  function explicitCurrency() {
+    const raw = document.querySelector('meta[itemprop="priceCurrency"]')?.content;
+    const code = typeof raw === "string" ? raw.trim().toUpperCase() : "";
+    return code || null;
+  }
+
   function extractPrice(anchorEl) {
+    const currency = explicitCurrency();
+    if (currency !== null && currency !== "MXN") return null;
     let metaValue = null;
     const meta = document.querySelector('meta[itemprop="price"]');
     if (meta?.content) {
@@ -155,7 +165,7 @@ globalThis.MST_PAGE = (() => {
     return "classic";
   }
 
-  function collect(anchorEl) {
+  function collect(anchorEl, { quiet = false } = {}) {
     const data = {
       itemId: extractItemId(),
       price: extractPrice(anchorEl),
@@ -163,6 +173,7 @@ globalThis.MST_PAGE = (() => {
       structuredCategory: extractStructuredCategory(),
       listingTypeGuess: guessListingType(anchorEl)
     };
+    if (quiet) return data;
     console.log(TAG, "page data:", {
       itemId: data.itemId,
       price: data.price,

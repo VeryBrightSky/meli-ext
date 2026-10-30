@@ -4,26 +4,44 @@
 "use strict";
 
 globalThis.MST_CALC = (() => {
-  const round2 = (n) => Math.round(n * 100) / 100;
+  // EPSILON nudge so 1.005 -> 1.01 instead of 1.00 (binary float artefact).
+  const round2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
+  // Hard ceiling for any typed money/number field (also keeps downstream math finite).
+  const MAX_INPUT = 1e9;
 
   // Parse user-typed money. Mexican users mix separators: "1,234.56",
   // "1234.56", "4,99", "$ 450". Rule: with both separators the rightmost one
   // is decimal; a lone comma is decimal only when followed by 1–2 digits.
   function parseMoney(raw) {
-    if (typeof raw === "number") return Number.isFinite(raw) && raw >= 0 ? round2(raw) : 0;
+    if (typeof raw === "number") {
+      return Number.isFinite(raw) && raw >= 0 ? Math.min(round2(raw), MAX_INPUT) : 0;
+    }
     if (typeof raw !== "string") return 0;
     let s = raw.trim();
-    // A price copied from MELI arrives as "$ 870 33" / "$870\n33": the cents
-    // live in a separate <sup>. Re-join them as decimals before stripping.
-    s = s.replace(/^(?:MX)?\$?\s*(\d[\d.,]*)\s+(\d{2})$/, "$1.$2");
+    // Scientific notation ("1e3") is never a price a seller types: reject
+    // instead of silently reading it as 13.
+    if (/\d\s*[eE]\s*[+-]?\d/.test(s)) return 0;
+    // A price copied from MELI arrives as "$ 870 33" / "$870\n33" / "$1 299 00":
+    // the cents live in a separate <sup>. Re-join them as decimals before
+    // stripping. Space-separated thousands ("1 299") may precede the cents.
+    s = s.replace(/^(?:MX)?\$?\s*(\d[\d.,]*(?:[\s\u00a0]\d{3})*)[\s\u00a0]+(\d{2})$/, "$1.$2");
     // Negative input is never a valid amount here.
     if (/^[-−]/.test(s)) return 0;
+    // Any remaining digit-space-digit must be well-formed space thousands
+    // ("1 299", "12 345.50"); otherwise ("$ 870 3") it is ambiguous: return 0
+    // rather than guess ("8703").
+    if (/\d[\s\u00a0]+\d/.test(s) &&
+        !/^(?:MX)?\$?\s*\d{1,3}(?:[\s\u00a0]\d{3})+(?:[.,]\d{1,2})?$/.test(s)) return 0;
     // Drop currency symbols/prefixes ("MX$", "$") and whitespace.
     s = s.replace(/[^\d.,]/g, "");
     if (!s) return 0;
     const lastComma = s.lastIndexOf(",");
     const lastDot = s.lastIndexOf(".");
-    if (lastComma > -1 && lastDot > -1) {
+    const dotCount = (s.match(/\./g) || []).length;
+    if (lastComma === -1 && dotCount >= 2) {
+      // "1.299.000": several dots and no comma can only be thousands separators.
+      s = s.replace(/\./g, "");
+    } else if (lastComma > -1 && lastDot > -1) {
       if (lastComma > lastDot) {
         s = s.replace(/\./g, "").replace(/,/g, ".");
       } else {
@@ -37,7 +55,7 @@ globalThis.MST_CALC = (() => {
         : s.replace(/,/g, "");
     }
     const n = Number.parseFloat(s);
-    return Number.isFinite(n) && n >= 0 ? round2(n) : 0;
+    return Number.isFinite(n) && n >= 0 ? Math.min(round2(n), MAX_INPUT) : 0;
   }
 
   // quote: { pctMin, pctMax, fixedCostMXN } (from fee source)
@@ -45,8 +63,25 @@ globalThis.MST_CALC = (() => {
   // Returns min/max bounds; min === max when the rate is exact.
   function computeBreakdown(quote, inputs) {
     const price = inputs.priceMXN;
-    const shipping = inputs.shippingCostMXN > 0 ? inputs.shippingCostMXN : 0;
-    const fixedCost = quote.fixedCostMXN || 0;
+    if (!Number.isFinite(price) || price < 0) {
+      // Garbage in, zeros out: never leak NaN/Infinity into the UI.
+      return {
+        priceMXN: 0,
+        pctMin: Number.isFinite(quote.pctMin) ? quote.pctMin : 0,
+        pctMax: Number.isFinite(quote.pctMax) ? quote.pctMax : 0,
+        isExactRate: quote.pctMin === quote.pctMax,
+        commissionMinMXN: 0,
+        commissionMaxMXN: 0,
+        fixedCostMXN: 0,
+        shippingCostMXN: 0,
+        netMinMXN: 0,
+        netMaxMXN: 0,
+        effectiveRateMinPct: 0,
+        effectiveRateMaxPct: 0
+      };
+    }
+    const shipping = Number.isFinite(inputs.shippingCostMXN) && inputs.shippingCostMXN > 0 ? inputs.shippingCostMXN : 0;
+    const fixedCost = Number.isFinite(quote.fixedCostMXN) ? quote.fixedCostMXN || 0 : 0;
 
     const commissionMin = round2((price * quote.pctMin) / 100);
     const commissionMax = round2((price * quote.pctMax) / 100);
@@ -73,7 +108,7 @@ globalThis.MST_CALC = (() => {
         price > 0 ? round2(((commissionMax + fixedCost) / price) * 100) : 0
     };
 
-    if (inputs.productCostMXN > 0) {
+    if (Number.isFinite(inputs.productCostMXN) && inputs.productCostMXN > 0) {
       breakdown.productCostMXN = inputs.productCostMXN;
       breakdown.profitMinMXN = round2(netMin - inputs.productCostMXN);
       breakdown.profitMaxMXN = round2(netMax - inputs.productCostMXN);
@@ -103,7 +138,14 @@ globalThis.MST_CALC = (() => {
   // `minPriceMXN` (MELI's listing minimum) when given.
   const ceil2 = (n) => Math.ceil(n * 100 - 1e-6) / 100;
 
+  // Cap on the answer: a price above 20x the landed cost (cost + shipping + fixed charge) means the margin is
+  // effectively unreachable (denominator near zero), not a real suggestion.
+  const MAX_PRICE_MULTIPLE = 20;
+
   function solveTargetPrice({ costMXN, shippingMXN, marginPct, ratePct, fixedCostFn, thresholds = [], minPriceMXN = 0 }) {
+    const shipIn = shippingMXN === undefined || shippingMXN === null ? 0 : shippingMXN;
+    if (![costMXN, shipIn, marginPct, ratePct, minPriceMXN].every(Number.isFinite)) return null;
+    if (typeof fixedCostFn !== "function" || !Array.isArray(thresholds) || !thresholds.every(Number.isFinite)) return null;
     const denom = 1 - ratePct / 100 - marginPct / 100;
     if (denom <= 0.001) return null;
     const base = costMXN + (shippingMXN > 0 ? shippingMXN : 0);
@@ -138,7 +180,9 @@ globalThis.MST_CALC = (() => {
       if (p >= t) candidates.push(p);
     }
     const ok = candidates.filter((p) => p > 0 && feasible(p)).sort((a, b) => a - b);
-    return ok.length ? finish(ok[0]) : finish(price);
+    const out = ok.length ? finish(ok[0]) : finish(price);
+    if (!Number.isFinite(out) || out > Math.max((base + fixedCostFn(out)) * MAX_PRICE_MULTIPLE, minPriceMXN)) return null;
+    return out;
   }
 
   // Sweet-spot detector: fees are discontinuous (fixed-charge tiers at
@@ -155,16 +199,17 @@ globalThis.MST_CALC = (() => {
   // Crossing $299 makes free shipping mandatory, so a step that drops the
   // fixed charge can still lose money once the seller starts paying shipping.
   function findSweetSpot({ priceMXN, ratePct, fixedCostFn, thresholds, maxIncreaseRatio = 0.2, shippingFn = () => 0 }) {
-    if (!(priceMXN > 0)) return null;
+    if (!(priceMXN > 0) || !Number.isFinite(priceMXN) || !Number.isFinite(ratePct) ||
+        !Number.isFinite(maxIncreaseRatio) || !Array.isArray(thresholds)) return null;
     const net = (p) => p * (1 - ratePct / 100) - fixedCostFn(p) - shippingFn(p);
     const limit = priceMXN * (1 + maxIncreaseRatio);
     const fixedNow = fixedCostFn(priceMXN);
     let best = null;
     for (const t of thresholds) {
-      if (t <= priceMXN || t > limit) continue;
+      if (!Number.isFinite(t) || t <= priceMXN || t > limit) continue;
       if (!(fixedCostFn(t) < fixedNow)) continue;
       const gain = round2(net(t) - net(priceMXN));
-      if (gain > 0 && (best === null || gain > best.netGainMXN)) {
+      if (Number.isFinite(gain) && gain > 0 && (best === null || gain > best.netGainMXN)) {
         best = { targetPriceMXN: t, netGainMXN: gain };
       }
     }

@@ -424,6 +424,7 @@ test("gate: never-paid user is not pro", () => {
   assert.deepEqual(GATE.computeProStatus({ paid: false }, now), {
     pro: false,
     paid: false,
+    lapsed: false,
     trialActive: false,
     trialExpired: false,
     trialDaysLeft: 0
@@ -437,12 +438,12 @@ test("gate: active trial is pro, expired trial is not", () => {
     { paid: false, trialStartedAt: new Date(now - 3 * 24 * 3600 * 1000).toISOString() },
     now
   );
-  assert.deepEqual(active, { pro: true, paid: false, trialActive: true, trialExpired: false, trialDaysLeft: 4 });
+  assert.deepEqual(active, { pro: true, paid: false, lapsed: false, trialActive: true, trialExpired: false, trialDaysLeft: 4 });
   const expired = GATE.computeProStatus(
     { paid: false, trialStartedAt: new Date(now - 8 * 24 * 3600 * 1000).toISOString() },
     now
   );
-  assert.deepEqual(expired, { pro: false, paid: false, trialActive: false, trialExpired: true, trialDaysLeft: 0 });
+  assert.deepEqual(expired, { pro: false, paid: false, lapsed: false, trialActive: false, trialExpired: true, trialDaysLeft: 0 });
   // boundary: exactly 7 days → expired
   const edge = GATE.computeProStatus(
     { paid: false, trialStartedAt: new Date(now - GATE.TRIAL_MS).toISOString() },
@@ -850,4 +851,179 @@ test("solveTargetPrice: lands on $299 when the fixed charge drop makes it cover 
     fixedCostFn: (x) => fixed(x) + 60, thresholds, minPriceMXN: 35
   });
   assert.equal(p, 299);
+});
+
+// --- v1.4.3 audit fixes --------------------------------------------------------
+test("v1.4.3 parseMoney: multi-dot thousands, split cents with spaces, ambiguous input", () => {
+  const p = CALC.parseMoney;
+  assert.equal(p("1.299.000"), 1299000);
+  assert.equal(p("1.234.567"), 1234567);
+  assert.equal(p("1.234.567,89"), 1234567.89);
+  assert.equal(p("$1 299 00"), 1299);
+  assert.equal(p("$ 1 299 50"), 1299.5);
+  assert.equal(p("$ 870 33"), 870.33);
+  assert.equal(p("1.299,00"), 1299);
+  assert.equal(p("MX$ 450"), 450);
+  assert.equal(p("1 299"), 1299);
+  // Documented choice: ambiguous or exponent input returns 0, never a guess.
+  assert.equal(p("$ 870 3"), 0);
+  assert.equal(p("1e3"), 0);
+  assert.equal(p("-5"), 0);
+  // Clamp keeps downstream math finite.
+  assert.equal(p("99999999999"), 1e9);
+  assert.equal(p(Infinity), 0);
+  assert.equal(p(NaN), 0);
+});
+
+test("v1.4.3 round2 handles binary float edge cases", () => {
+  assert.equal(CALC.round2(1.005), 1.01);
+  assert.equal(CALC.round2(2.345), 2.35);
+  assert.equal(CALC.round2(2), 2);
+});
+
+test("v1.4.3 computeBreakdown: bad price yields a finite zeroed breakdown", () => {
+  const q = SOURCE.getQuote({ priceMXN: 500, listingTypeId: "classic", categoryGroupId: "tech" });
+  for (const bad of [NaN, Infinity, -10, undefined]) {
+    const b = CALC.computeBreakdown(q, { priceMXN: bad, shippingCostMXN: 5, productCostMXN: 10 });
+    for (const [k, v] of Object.entries(b)) {
+      if (typeof v === "number") assert.ok(Number.isFinite(v), `${k} finite for ${bad}`);
+    }
+    assert.equal(b.netMinMXN, 0);
+    assert.equal(b.netMaxMXN, 0);
+  }
+  const ok = CALC.computeBreakdown(q, { priceMXN: 500, shippingCostMXN: NaN, productCostMXN: NaN });
+  assert.equal(ok.shippingCostMXN, 0);
+  assert.equal(ok.profitMinMXN, undefined);
+});
+
+test("v1.4.3 solveTargetPrice and findSweetSpot reject non-finite and absurd input", () => {
+  const fixed = SOURCE.fixedCostFnFor({ listingTypeId: "classic" });
+  const th = SOURCE.getFixedCostThresholds();
+  const base = { costMXN: 100, shippingMXN: 0, marginPct: 20, ratePct: 10, fixedCostFn: fixed, thresholds: th };
+  assert.ok(CALC.solveTargetPrice(base) > 100);
+  for (const k of ["costMXN", "marginPct", "ratePct"]) {
+    assert.equal(CALC.solveTargetPrice({ ...base, [k]: NaN }), null, k);
+    assert.equal(CALC.solveTargetPrice({ ...base, [k]: Infinity }), null, k);
+  }
+  assert.equal(CALC.solveTargetPrice({ ...base, shippingMXN: NaN }), null);
+  // 89% margin + 10% rate leaves 1% of price: price would be ~100x cost.
+  assert.equal(CALC.solveTargetPrice({ ...base, marginPct: 89 }), null);
+  assert.equal(CALC.findSweetSpot({ priceMXN: NaN, ratePct: 10, fixedCostFn: fixed, thresholds: th }), null);
+  assert.equal(CALC.findSweetSpot({ priceMXN: 90, ratePct: NaN, fixedCostFn: fixed, thresholds: th }), null);
+  assert.equal(CALC.findSweetSpot({ priceMXN: 90, ratePct: 10, fixedCostFn: fixed, thresholds: [NaN, "x"] }), null);
+});
+
+test("v1.4.3 CSV: numeric cells are never apostrophe-guarded, text cells are", () => {
+  // The blocker: a loss like -12.50 used to become the text "'-12.50".
+  assert.equal(UI.csvCell(UI.csvFixed(-12.5)), "-12.50");
+  assert.equal(UI.csvCell(UI.csvFixed(-3.14159, 1)), "-3.1");
+  assert.equal(UI.csvCell(-7), "-7");
+  assert.equal(UI.csvCell(UI.csvFixed(NaN)), "");
+  assert.equal(UI.csvCell(Infinity), "");
+  // Seller-controlled text still gets the formula guard.
+  assert.equal(UI.csvCell("=HYPERLINK(\"x\")"), "\"'=HYPERLINK(\"\"x\"\")\"");
+  assert.equal(UI.csvCell("+52 55 1234"), "'+52 55 1234");
+  assert.equal(UI.csvCell("-50% off"), "'-50% off");
+  assert.equal(UI.csvCell("@SUM(A1)"), "'@SUM(A1)");
+  assert.equal(UI.csvCell("hola, mundo"), "\"hola, mundo\"");
+  assert.equal(UI.csvCell(null), "");
+  // A whole row: title guarded, negative profit/margin untouched.
+  assert.equal(
+    UI.csvLine(["=cmd", UI.csvFixed(299), "Premium", UI.csvFixed(-20.456), UI.csvFixed(-6.8, 1)]),
+    "'=cmd,299.00,Premium,-20.46,-6.8"
+  );
+});
+
+test("v1.4.3 Full mode: unknown service cost is null, never a silent $0", () => {
+  // 61 kg is above the Full table; price < $299 so a service cost applies.
+  const q = SOURCE.getQuote({ priceMXN: 150, listingTypeId: "classic", categoryGroupId: "tech", fullWeightKg: 61 });
+  assert.equal(q.fixedCostMXN, null);
+  assert.equal(q.fixedCostUnavailable, true);
+  assert.equal(SOURCE.fixedCostFnFor({ listingTypeId: "classic", fullWeightKg: 61 })(150), null);
+  // At/above $299 there is no service cost: that 0 is real, not unavailable.
+  const hi = SOURCE.getQuote({ priceMXN: 299, listingTypeId: "classic", categoryGroupId: "tech", fullWeightKg: 61 });
+  assert.equal(hi.fixedCostMXN, 0);
+  assert.equal(hi.fixedCostUnavailable, false);
+  // In range it still works.
+  const ok = SOURCE.getQuote({ priceMXN: 150, listingTypeId: "classic", categoryGroupId: "tech", fullWeightKg: 0.3 });
+  assert.equal(ok.fixedCostMXN, 32);
+  assert.equal(ok.fixedCostUnavailable, false);
+  // The dashboard skips such a listing instead of counting the fee as $0.
+  const rows = DASH.computeRows(
+    {
+      "mst:cost:MLM1": 50, "mst:weight:MLM1": 61,
+      "mst:meta:MLM1": { priceMXN: 150, listingTypeId: "classic", categoryGroupId: "tech", title: "x", url: "https://articulo.mercadolibre.com.mx/MLM-1" },
+      "mst:cost:MLM2": 50, "mst:weight:MLM2": 1,
+      "mst:meta:MLM2": { priceMXN: 150, listingTypeId: "classic", categoryGroupId: "tech", title: "y", url: "https://articulo.mercadolibre.com.mx/MLM-2" }
+    },
+    "mst", 0, { usesFull: true }
+  );
+  assert.deepEqual(rows.map((r) => r.itemId), ["MLM2"]);
+});
+
+test("v1.4.3 gate: future-dated cache is rejected, 60s skew tolerated", () => {
+  const now = Date.UTC(2026, 9, 29);
+  assert.equal(GATE.isCacheUsable({ paid: true, pro: true, fetchedAt: now + 61_000 }, now), false);
+  assert.equal(GATE.isCacheUsable({ paid: true, pro: true, fetchedAt: now + 30_000 }, now), true);
+  assert.equal(GATE.isCacheUsable({ paid: true, pro: true, fetchedAt: now - 1000 }, now), true);
+  assert.equal(GATE.isCacheUsable({ paid: true, pro: true, fetchedAt: now - 31 * 24 * 3600 * 1000 }, now), false);
+  assert.equal(GATE.isCacheUsable({ paid: true, pro: true, fetchedAt: now + 10 * 24 * 3600 * 1000 }, now), false);
+});
+
+test("v1.4.3 gate: a lapsed subscriber is not told their trial ended", () => {
+  const now = Date.UTC(2026, 9, 29);
+  const lapsed = GATE.computeProStatus(
+    { paid: false, paidAt: new Date(now - 40 * 86400000).toISOString(), trialStartedAt: new Date(now - 90 * 86400000).toISOString() },
+    now
+  );
+  assert.equal(lapsed.lapsed, true);
+  assert.equal(lapsed.pro, false);
+  assert.equal(lapsed.trialExpired, false);
+  // Local reverse trial long over: still not a "trial ended" case.
+  const merged = GATE.mergeStatus(lapsed, GATE.computeLocalTrial(now - 60 * 86400000, now));
+  assert.equal(merged.pro, false);
+  assert.equal(merged.trialExpired, false);
+  // A never-paid user whose trial ended still gets the win-back.
+  const never = GATE.mergeStatus(
+    GATE.computeProStatus({ paid: false }, now),
+    GATE.computeLocalTrial(now - 60 * 86400000, now)
+  );
+  assert.equal(never.trialExpired, true);
+});
+
+test("v1.4.3 gate.refresh: an answer after the timeout is applied, cached and announced", async () => {
+  const prevChrome = globalThis.chrome;
+  const localStore = {};
+  const syncStore = {};
+  const area = (store) => ({
+    get: async (keys) => {
+      const out = {};
+      for (const k of [].concat(keys)) if (k in store) out[k] = store[k];
+      return out;
+    },
+    set: async (obj) => Object.assign(store, obj)
+  });
+  const paidAnswer = { ok: true, data: { pro: true, paid: true, lapsed: false, trialActive: false, trialExpired: false, trialDaysLeft: 0 } };
+  globalThis.chrome = {
+    runtime: { sendMessage: () => new Promise((r) => setTimeout(() => r(paidAnswer), 80)) },
+    storage: { local: area(localStore), sync: area(syncStore) }
+  };
+  localStore["mst:installedAt"] = Date.now() - 30 * 86400000; // local trial long over
+  try {
+    const events = [];
+    GATE.onChange((st) => events.push(st.pro));
+    const first = await GATE.refresh({ timeoutMs: 10 });
+    assert.equal(first.pro, false, "slow answer: free for now");
+    await new Promise((r) => setTimeout(r, 200));
+    assert.equal(GATE.isPro(), true, "late paid answer applied");
+    assert.deepEqual(events, [true], "listeners notified once");
+    assert.equal(localStore["mst:proStatus"].paid, true, "late answer cached");
+    assert.equal(typeof localStore["mst:proStatus"].fetchedAt, "number");
+    // Same answer again, late: nothing changed, nobody is re-notified.
+    await GATE.refresh({ timeoutMs: 10 });
+    await new Promise((r) => setTimeout(r, 200));
+    assert.deepEqual(events, [true]);
+  } finally {
+    globalThis.chrome = prevChrome;
+  }
 });

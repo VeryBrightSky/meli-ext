@@ -13,14 +13,17 @@ globalThis.MST_GATE = (() => {
   const TRIAL_MS = 7 * 24 * 60 * 60 * 1000;
 
   // user: ExtPay user object ({ paid, trialStartedAt, ... }) or null.
-  // Returns { pro, paid, trialActive, trialExpired, trialDaysLeft }:
+  // Returns { pro, paid, lapsed, trialActive, trialExpired, trialDaysLeft }:
+  //   lapsed        - paid before (paidAt present) but not paid now: a former
+  //                   subscriber, who must never be told their trial ended
   //   trialActive   — inside the 7-day window and not paid
   //   trialExpired  — a trial was started, the window passed, and never paid
   //                   (the one moment a win-back prompt is justified)
   //   trialDaysLeft — ceil(days) remaining while active, else 0
   function computeProStatus(user, nowMs) {
-    if (!user) return { pro: false, paid: false, trialActive: false, trialExpired: false, trialDaysLeft: 0 };
+    if (!user) return { pro: false, paid: false, lapsed: false, trialActive: false, trialExpired: false, trialDaysLeft: 0 };
     const paid = Boolean(user.paid);
+    const lapsed = !paid && Boolean(user.paidAt);
     let trialActive = false;
     let trialExpired = false;
     let trialDaysLeft = 0;
@@ -34,13 +37,13 @@ globalThis.MST_GATE = (() => {
         if (trialActive) trialDaysLeft = Math.max(1, Math.ceil((TRIAL_MS - elapsed) / 86400000));
       }
     }
-    return { pro: paid || trialActive, paid, trialActive, trialExpired, trialDaysLeft };
+    return { pro: paid || trialActive, paid, lapsed, trialActive, trialExpired: trialExpired && !lapsed, trialDaysLeft };
   }
 
   function resolveStatus(fresh, cached) {
     if (fresh) return { ...fresh, source: "fresh" };
     if (cached && cached.pro) return { ...cached, source: "cache" };
-    return { pro: false, paid: false, trialActive: false, trialExpired: false, trialDaysLeft: 0, source: "default" };
+    return { pro: false, paid: false, lapsed: false, trialActive: false, trialExpired: false, trialDaysLeft: 0, source: "default" };
   }
 
   // An offline Pro cache is honored only within this window; past it a fresh
@@ -49,12 +52,16 @@ globalThis.MST_GATE = (() => {
   // that first stamps fetchedAt must never revoke an entitlement mid-session.
   const CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
   const STATUS_TIMEOUT_MS = 1500;
+  const CLOCK_SKEW_MS = 60 * 1000;
   function isCacheUsable(cached, nowMs) {
     if (!cached) return false;
     // A legacy (pre-1.4) cache without a timestamp is honored only if it was a
     // PAID entitlement; an unstamped trial cache can't be re-verified, so it
     // is dropped rather than kept forever.
     if (typeof cached.fetchedAt !== "number") return cached.paid === true;
+    // A stamp from the future (clock moved back, or tampering) would make the
+    // cache look fresh forever; allow only a minute of clock skew.
+    if (cached.fetchedAt > nowMs + CLOCK_SKEW_MS) return false;
     return nowMs - cached.fetchedAt <= CACHE_TTL_MS;
   }
 
@@ -72,8 +79,8 @@ globalThis.MST_GATE = (() => {
         const m = { ...(stored?.[METRICS_KEY] ?? {}) };
         m[event] = (m[event] ?? 0) + 1;
         m.updatedAt = Date.now();
-        chrome.storage.local.set({ [METRICS_KEY]: m });
-      });
+        return chrome.storage.local.set({ [METRICS_KEY]: m });
+      }).catch(() => {});
     } catch {
       // metrics are best-effort
     }
@@ -118,31 +125,31 @@ globalThis.MST_GATE = (() => {
       ...base,
       pro: false,
       trialActive: false,
-      trialExpired: Boolean(base.trialExpired || local.expired),
+      // A lapsed subscriber is not a "trial ended" case (wrong message).
+      trialExpired: Boolean((base.trialExpired || local.expired) && !base.lapsed),
       trialDaysLeft: 0,
       trialDaysSinceEnd: local.daysSinceEnd,
       localTrial: false
     };
   }
 
-  async function refresh() {
+  // Subscribers notified when a status that arrived AFTER the timeout changes
+  // what the seller is entitled to (see refresh()).
+  const listeners = new Set();
+  const onChange = (fn) => {
+    listeners.add(fn);
+    return () => listeners.delete(fn);
+  };
+  const quiet = (p) => p?.catch?.(() => {});
+  const entitlementKey = (st) => `${st.pro}|${st.paid}|${st.trialActive}|${st.trialExpired}`;
+
+  // Read storage, merge the (possibly null) fresh ExtPay answer with the cache
+  // and the local reverse trial, cache a fresh answer, and set `current`.
+  async function resolveCurrent(fresh) {
     const PREFIX = globalThis.EXT_BRAND?.cssPrefix ?? "mst";
     const CACHE_KEY = `${PREFIX}:proStatus`;
     const OVERRIDE_KEY = `${PREFIX}:proOverride`;
     const INSTALLED_KEY = `${PREFIX}:installedAt`;
-
-    // ExtPay must never block the card: a slow or unreachable server falls
-    // back to the cache after STATUS_TIMEOUT_MS and free features render now.
-    let fresh = null;
-    try {
-      const res = await Promise.race([
-        chrome.runtime.sendMessage({ type: "getProStatus" }),
-        new Promise((r) => setTimeout(() => r(null), STATUS_TIMEOUT_MS))
-      ]);
-      if (res?.ok) fresh = res.data;
-    } catch {
-      // service worker / ExtPay unreachable
-    }
     let cached = null;
     let override = false;
     let installedAt = null;
@@ -164,20 +171,20 @@ globalThis.MST_GATE = (() => {
         const okMirror = Number.isFinite(mirror) && mirror > 0 && mirror <= Date.now();
         if (okMirror) installedAt = installedAt === null ? mirror : Math.min(installedAt, mirror);
         if (installedAt !== null && (!okMirror || mirror !== installedAt)) {
-          chrome.storage.sync.set({ [INSTALLED_KEY]: installedAt });
-          chrome.storage.local.set({ [INSTALLED_KEY]: installedAt });
+          quiet(chrome.storage.sync.set({ [INSTALLED_KEY]: installedAt }));
+          quiet(chrome.storage.local.set({ [INSTALLED_KEY]: installedAt }));
         }
       } catch {
-        // sync storage unavailable — local stamp only
+        // sync storage unavailable: local stamp only
       }
       if (installedAt === null) {
         // First run before the service worker stamped it (or a pre-1.4 install
         // updating): the reverse trial starts now.
         installedAt = Date.now();
-        chrome.storage.local.set({ [INSTALLED_KEY]: installedAt });
+        quiet(chrome.storage.local.set({ [INSTALLED_KEY]: installedAt }));
       }
     } catch {
-      // storage unavailable — resolveStatus handles nulls
+      // storage unavailable: resolveStatus handles nulls
     }
     // Bound offline staleness: drop a cache older than the TTL so it can't
     // grant Pro indefinitely without ExtPay ever confirming again.
@@ -193,9 +200,51 @@ globalThis.MST_GATE = (() => {
       ? { pro: true, paid: true, trialActive: false, trialExpired: false, trialDaysLeft: 0, localTrial: false, source: "override" }
       : mergeStatus(resolveStatus(fresh, cached), computeLocalTrial(installedAt, now));
     if (fresh) {
-      chrome.storage.local.set({ [CACHE_KEY]: { ...fresh, fetchedAt: now } });
+      quiet(chrome.storage.local.set({ [CACHE_KEY]: { ...fresh, fetchedAt: now } }));
     }
     return current;
+  }
+
+  // ExtPay must never block the card: a slow or unreachable server falls
+  // back to the cache after STATUS_TIMEOUT_MS and free features render now.
+  // If the real answer lands later and says something different (a paying
+  // user on a slow connection), it is applied, cached, and announced through
+  // onChange so the UI rebuilds instead of showing free until the next visit.
+  async function refresh({ timeoutMs = STATUS_TIMEOUT_MS } = {}) {
+    let fresh = null;
+    let timedOut = false;
+    let pending = null;
+    try {
+      pending = Promise.resolve(chrome.runtime.sendMessage({ type: "getProStatus" }));
+      const res = await Promise.race([
+        pending,
+        new Promise((r) => setTimeout(() => {
+          timedOut = true;
+          r(null);
+        }, timeoutMs))
+      ]);
+      if (res?.ok) fresh = res.data;
+    } catch {
+      // service worker / ExtPay unreachable
+    }
+    const result = await resolveCurrent(fresh);
+    if (timedOut && pending) {
+      pending.then(async (late) => {
+        if (!late?.ok) return;
+        const before = entitlementKey(current);
+        await resolveCurrent(late.data);
+        if (entitlementKey(current) !== before) {
+          for (const fn of [...listeners]) {
+            try {
+              fn(current);
+            } catch {
+              // a listener must not break the others
+            }
+          }
+        }
+      }).catch(() => {});
+    }
+    return result;
   }
 
   const isPro = () => current.pro;
@@ -207,10 +256,6 @@ globalThis.MST_GATE = (() => {
   const openUpgrade = (plan) => {
     track(plan ? `click:${plan}` : "click:plans");
     return send("openPaymentPage", plan ? { plan } : undefined);
-  };
-  const startTrial = () => {
-    track("click:trial");
-    return send("openTrialPage");
   };
   const openLogin = () => send("openLoginPage");
   const openDashboard = () => send("openDashboard");
@@ -228,7 +273,7 @@ globalThis.MST_GATE = (() => {
     status,
     track,
     openUpgrade,
-    startTrial,
+    onChange,
     openLogin,
     openDashboard
   });

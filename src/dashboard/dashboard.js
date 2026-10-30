@@ -11,7 +11,7 @@
   const CALC = globalThis.MST_CALC;
   const UI = globalThis.MST_UI;
 
-  document.title = `${BRAND.name} — ${T("dashTitle")}`;
+  document.title = `${BRAND.name} · ${T("dashTitle")}`;
   document.getElementById("brand-logo").src = chrome.runtime.getURL(BRAND.logoPath);
   document.getElementById("dash-title").textContent = T("dashTitle");
   const shareBtn = document.getElementById("share-btn");
@@ -49,7 +49,33 @@
     const yearly = document.getElementById("yearly-btn");
     yearly.textContent = T("upsellYearly");
     yearly.addEventListener("click", () => upgrade(BRAND.plans.yearly));
+    // Already paid (other browser/device): log in instead of paying twice.
+    const loginLink = document.getElementById("login-link");
+    loginLink.textContent = T("optLogin");
+    loginLink.addEventListener("click", async (e) => {
+      e.preventDefault();
+      const res = await globalThis.MST_GATE.openLogin();
+      if (!res?.ok) document.getElementById("upsell-pricing").textContent = T("upsellOpenFailed");
+    });
     globalThis.MST_GATE.track("open:dashboard-page");
+  }
+  // A PRO answer that arrives after the 1.5s status timeout: reload once so
+  // a paying user sees the full table instead of the free preview.
+  globalThis.MST_GATE.onChange((st) => {
+    if (st.pro !== pro) location.reload();
+  });
+
+  // Stored listing URLs came from a page we ran on, but storage is plain data:
+  // only ever link to https Mercado Libre Mexico (never javascript:/data:).
+  function safeListingUrl(raw) {
+    try {
+      const u = new URL(String(raw));
+      const host = u.hostname.toLowerCase();
+      const ok = u.protocol === "https:" && (host === "mercadolibre.com.mx" || host.endsWith(".mercadolibre.com.mx"));
+      return ok ? u.href : null;
+    } catch {
+      return null;
+    }
   }
 
   // --- Data (recomputed live; see dashboard-model.js) ---------------------------
@@ -86,7 +112,7 @@
   // num: right-align; tone(r): "pos"/"neg"/null for green/red coloring.
   const toneBy = (n) => (n > 0 ? "pos" : n < 0 ? "neg" : null);
   const COLS = [
-    { key: "title", label: T("csvHeaderTitle"), value: (r) => r.meta.title, sort: (r) => r.meta.title.toLowerCase() },
+    { key: "title", label: T("csvHeaderTitle"), value: (r) => r.meta.title || "", sort: (r) => (r.meta.title || "").toLowerCase() },
     { key: "price", label: T("rowPrice"), num: true, value: (r) => UI.fmtMoney(r.meta.priceMXN), sort: (r) => r.meta.priceMXN },
     { key: "type", csvOnly: true, label: T("rowListingType"), value: (r) => (r.meta.listingTypeId === "premium" ? T("typePremium") : T("typeClassic")), sort: (r) => r.meta.listingTypeId },
     { key: "commission", csvOnly: true, label: T("dashCommission"), num: true, value: (r) => UI.fmtCharge(r.b.commissionMinMXN, r.b.commissionMaxMXN), sort: (r) => r.b.commissionMaxMXN },
@@ -218,12 +244,18 @@
         const tone = colDef.tone ? colDef.tone(row) : null;
         if (tone) td.classList.add(tone);
         if (colDef.key === "title" && !locked) {
-          const a = document.createElement("a");
-          a.href = row.meta.url;
-          a.target = "_blank";
-          a.rel = "noopener";
-          a.textContent = row.meta.title || row.itemId;
-          td.appendChild(a);
+          const href = safeListingUrl(row.meta.url);
+          const label = row.meta.title || row.itemId;
+          if (href) {
+            const a = document.createElement("a");
+            a.href = href;
+            a.target = "_blank";
+            a.rel = "noopener";
+            a.textContent = label;
+            td.appendChild(a);
+          } else {
+            td.textContent = label;
+          }
         } else if (colDef.key === "title") {
           td.textContent = row.meta.title || row.itemId;
         } else if (colDef.editable && pro) {
@@ -235,10 +267,14 @@
           input.addEventListener("change", async () => {
             row.sales = Math.round(CALC.parseMoney(input.value));
             input.value = row.sales > 0 ? String(row.sales) : "";
-            await chrome.storage.local.set({
-              [`${PREFIX}:sales:${row.itemId}`]: row.sales
-            });
             render();
+            try {
+              await chrome.storage.local.set({
+                [`${PREFIX}:sales:${row.itemId}`]: row.sales
+              });
+            } catch {
+              // storage write failed; the table already shows the new value
+            }
           });
           td.appendChild(input);
         } else if (colDef.editable) {
@@ -283,11 +319,7 @@
     // a formula in Excel, so it gets a leading apostrophe. Money/percent
     // columns are exported as raw numbers (worst case), which spreadsheets
     // can sum; formatted ranges like "-$12.00 – $3.00" broke into #NAME?.
-    const esc = (v) => {
-      let t = String(v ?? "");
-      if (/^[=+\-@\t\r]/.test(t)) t = `'${t}`;
-      return /[",\r\n;]/.test(t) ? `"${t.replaceAll('"', '""')}"` : t;
-    };
+    const esc = UI.csvText;
     const RAW = {
       price: (r) => r.meta.priceMXN,
       commission: (r) => r.b.commissionMaxMXN,

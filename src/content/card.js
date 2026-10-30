@@ -12,6 +12,9 @@ globalThis.MST_CARD = (() => {
   const CALC = globalThis.MST_CALC;
   const UI = globalThis.MST_UI;
   const T = globalThis.MST_I18N.t;
+  const SAFE = globalThis.MST_SAFE;
+  // Hard ceiling for any typed money/percent value (mirrors CALC's clamp).
+  const MAX_INPUT = 1e9;
 
   // Mutable card state — survives re-injection because the module outlives
   // the DOM node (persistence watcher rebuilds from this).
@@ -73,6 +76,48 @@ globalThis.MST_CARD = (() => {
 
   const { fmtMoney, fmtRange, fmtCharge, fmtPctRange } = UI;
 
+  // --- Extension-context safety -------------------------------------------------
+  // After an extension update the old content script keeps running but every
+  // chrome.* call throws. Writes go through save()/unsave(), which never throw
+  // and swap the card for a "reload the page" notice once the context is gone.
+  function save(area, items) {
+    try {
+      if (!SAFE.alive()) {
+        showStale();
+        return;
+      }
+      chrome.storage[area].set(items)?.catch?.(() => {});
+    } catch {
+      if (!SAFE.alive()) showStale();
+    }
+  }
+
+  function unsave(area, key) {
+    try {
+      if (!SAFE.alive()) {
+        showStale();
+        return;
+      }
+      chrome.storage[area].remove(key)?.catch?.(() => {});
+    } catch {
+      if (!SAFE.alive()) showStale();
+    }
+  }
+
+  // Replace the whole card with a short notice + reload button. Idempotent.
+  function showStale() {
+    const card = document.getElementById(CARD_ID);
+    if (!card || card.dataset.stale === "1") return;
+    card.dataset.stale = "1";
+    const box = el("div", `${PREFIX}-card__body`);
+    box.appendChild(el("p", `${PREFIX}-stale`, T("staleNotice")));
+    const btn = el("button", `${PREFIX}-copy`, T("staleReload"));
+    btn.type = "button";
+    btn.addEventListener("click", () => window.location.reload());
+    box.appendChild(btn);
+    card.replaceChildren(box);
+  }
+
   function el(tag, className, text) {
     const node = document.createElement(tag);
     if (className) node.className = className;
@@ -131,7 +176,7 @@ globalThis.MST_CARD = (() => {
     input.placeholder = "0.00";
     input.className = `${PREFIX}-input`;
 
-    const apply = () => onValue(CALC.parseMoney(input.value));
+    const apply = () => onValue(Math.min(CALC.parseMoney(input.value), MAX_INPUT));
     const debouncedApply = debounced(apply);
 
     input.addEventListener("input", debouncedApply);
@@ -155,21 +200,54 @@ globalThis.MST_CARD = (() => {
     return input;
   }
 
+  // Keys already present in storage for the current item. A 0 is only written
+  // over a key that exists (a deliberate clear); a fresh item never gets
+  // cost/sales/weight keys full of zeros just because a toggle was clicked.
+  const persistedKeys = new Set();
+
   function persistInputs() {
-    const record = {
-      shippingCostMXN: state.shippingCostMXN,
-      targetMarginPct: state.targetMarginPct
-    };
-    chrome.storage.local.set({ [`${PREFIX}:defaults`]: record });
+    if (!SAFE.alive()) {
+      showStale();
+      return;
+    }
+    const defaultsKey = `${PREFIX}:defaults`;
+    try {
+      if (state.shippingAutofilled) {
+        // The shipping figure was filled from the weight select, not typed by
+        // the seller: it must not become their default. Merge so the stored
+        // default shipping survives.
+        chrome.storage.local.get(defaultsKey).then((cur) => {
+          const prev = cur?.[defaultsKey] && typeof cur[defaultsKey] === "object" ? cur[defaultsKey] : {};
+          save("local", { [defaultsKey]: { ...prev, targetMarginPct: state.targetMarginPct } });
+        }).catch(() => {});
+      } else {
+        save("local", {
+          [defaultsKey]: {
+            shippingCostMXN: state.shippingCostMXN,
+            targetMarginPct: state.targetMarginPct
+          }
+        });
+      }
+    } catch {
+      return;
+    }
     if (state.itemId) {
-      chrome.storage.local.set({
-        [`${PREFIX}:cost:${state.itemId}`]: state.productCostMXN,
-        [`${PREFIX}:sales:${state.itemId}`]: state.salesPerMonth,
-        [`${PREFIX}:weight:${state.itemId}`]: state.weightKg
-      });
+      const entries = {};
+      for (const [name, value] of [
+        ["cost", state.productCostMXN],
+        ["sales", state.salesPerMonth],
+        ["weight", state.weightKg]
+      ]) {
+        const key = `${PREFIX}:${name}:${state.itemId}`;
+        if (value > 0 || persistedKeys.has(key)) {
+          entries[key] = value;
+          persistedKeys.add(key);
+        }
+      }
+      if (Object.keys(entries).length) save("local", entries);
       // Listing snapshot for the dashboard (only meaningful with a cost).
       if (state.productCostMXN > 0) {
-        chrome.storage.local.set({
+        save("local", {
           [`${PREFIX}:meta:${state.itemId}`]: {
             title: document.title.split("|")[0].trim().slice(0, 120),
             priceMXN: state.pagePriceMXN,
@@ -187,7 +265,7 @@ globalThis.MST_CARD = (() => {
   // persist in sync storage alongside the other global preferences — not per
   // item like product cost.
   function persistMsi() {
-    chrome.storage.sync.set({ msiRates: state.msiRates, msiTerm: state.msiTerm });
+    save("sync", { msiRates: state.msiRates, msiTerm: state.msiTerm });
   }
 
   async function restoreInputs() {
@@ -214,6 +292,7 @@ globalThis.MST_CARD = (() => {
         msiTerm: 3
       })
     ]);
+    for (const k of Object.keys(stored)) persistedKeys.add(k);
     // MSI: restore the seller's own per-term rates and last-picked term.
     state.msiRates =
       settings.msiRates && typeof settings.msiRates === "object" ? settings.msiRates : {};
@@ -309,10 +388,50 @@ globalThis.MST_CARD = (() => {
     }
   }
 
+  function renderUnavailable(quote, b) {
+    const na = T("feeUnavailable");
+    refs.fixed.root.style.display = "";
+    patchRow(refs.fixed, T("rowServiceCost"), na, false);
+    patchRow(refs.commission, T("rowCommission", [fmtPctRange(b.pctMin, b.pctMax)]), fmtCharge(b.commissionMinMXN, b.commissionMaxMXN), false);
+    patchRow(refs.net, null, na, false);
+    refs.summaryNet.textContent = `${T("rowNet")} ${na}`;
+    refs.summaryProfit.hidden = true;
+    for (const node of [
+      refs.profit?.root, refs.breakeven?.root, refs.target?.root, refs.targetTeaser?.root,
+      refs.msiTeaser?.root, refs.monthly?.root, refs.sweetspot, refs.compareBox, refs.msiBox
+    ]) {
+      if (node) node.style.display = "none";
+    }
+    refs.alert?.hide();
+  }
+
+  // Labels are single-line with an ellipsis; the title carries the full text
+  // for the narrow card (and for localized strings that run long).
+  function syncLabelTitles() {
+    for (const label of refs.card.querySelectorAll(`.${PREFIX}-row__label`)) {
+      const text = label.textContent;
+      if (label.title !== text) label.title = text;
+    }
+  }
+
   function updateUnsafe(flash) {
+    try {
+      updateBody(flash);
+    } finally {
+      syncLabelTitles();
+    }
+  }
+
+  function updateBody(flash) {
     const { quote, b, effectiveShipping } = computeCurrent();
 
     const pro = state.pro;
+    // Full mode and no service-cost row for this weight/price: say so instead
+    // of showing a net that silently counts the missing fee as $0.
+    if (quote.fixedCostUnavailable) {
+      renderUnavailable(quote, b);
+      return;
+    }
     // One discontinuity model for this render: quotes, sweet spot and the
     // solver all see the same fixed-charge/Full-service-cost function.
     const fixedCostFn = SOURCE.fixedCostFnFor({
@@ -738,7 +857,7 @@ globalThis.MST_CARD = (() => {
     // ranking and no MX competitor has more than a handful.
     const REVIEW_KEY = `${PREFIX}:reviewAsk`;
     chrome.storage.local.get(null).then((all) => {
-      if (all[REVIEW_KEY]) return;
+      if (!all || all[REVIEW_KEY]) return;
       const used = Object.keys(all).filter((k) => k.startsWith(`${PREFIX}:cost:`) && Number(all[k]) > 0).length;
       if (used < 3) return;
       const ask = el("div", `${PREFIX}-review`);
@@ -751,7 +870,7 @@ globalThis.MST_CARD = (() => {
       close.setAttribute("aria-label", T("upsellClose"));
       const done = (how) => {
         ask.remove();
-        chrome.storage.local.set({ [REVIEW_KEY]: how });
+        save("local", { [REVIEW_KEY]: how });
         globalThis.MST_GATE.track(`review:${how}`);
       };
       link.addEventListener("click", () => done("clicked"));
@@ -801,11 +920,9 @@ globalThis.MST_CARD = (() => {
       btn.type = "button";
       btn.addEventListener("click", () => {
         state.listingTypeId = id;
-        if (state.itemId) {
-          chrome.storage.local.set({ [`${PREFIX}:type:${state.itemId}`]: id });
-        }
+        update(); // render first: a dead extension context must not freeze the UI
+        if (state.itemId) save("local", { [`${PREFIX}:type:${state.itemId}`]: id });
         persistInputs(); // keep the dashboard snapshot in step
-        update();
       });
       refs.toggleButtons[id] = btn;
       toggle.appendChild(btn);
@@ -875,9 +992,9 @@ globalThis.MST_CARD = (() => {
     msiTermSel.addEventListener("change", () => {
       const m = Number.parseInt(msiTermSel.value, 10);
       state.msiTerm = msiTermMonths.includes(m) ? m : 3;
-      persistMsi();
       refs.msiRateInput.value = String(msiCurrentRate());
       update();
+      persistMsi();
     });
     refs.msiTermSelect = msiTermSel;
     msiTermRow.appendChild(msiTermSel);
@@ -899,8 +1016,8 @@ globalThis.MST_CARD = (() => {
       // again" rather than a saved 0% that would hide the MSI cost forever.
       if (pct > 0) state.msiRates[String(state.msiTerm)] = Math.min(pct, 99);
       else delete state.msiRates[String(state.msiTerm)];
-      persistMsi();
       update();
+      persistMsi();
     };
     const debouncedRate = debounced(applyRate);
     msiRateInput.addEventListener("input", debouncedRate);
@@ -961,17 +1078,14 @@ globalThis.MST_CARD = (() => {
     select.addEventListener("change", () => {
       state.categoryGroupId = select.value || null;
       state.categoryAutoDetected = false;
+      update();
       if (state.itemId) {
         // Remember the manual pick for this listing (like product cost).
         const key = `${PREFIX}:catpick:${state.itemId}`;
-        if (state.categoryGroupId) {
-          chrome.storage.local.set({ [key]: state.categoryGroupId });
-        } else {
-          chrome.storage.local.remove(key);
-        }
+        if (state.categoryGroupId) save("local", { [key]: state.categoryGroupId });
+        else unsave("local", key);
       }
       persistInputs(); // keep the dashboard snapshot in step
-      update();
     });
     refs.categorySelect = select;
     catRow.appendChild(select);
@@ -1018,8 +1132,8 @@ globalThis.MST_CARD = (() => {
           refs.shippingInput.syncFromState();
         }
       }
-      persistInputs();
       update();
+      persistInputs();
     });
     refs.weightSelect = weightSel;
     weightRow.appendChild(weightSel);
@@ -1033,8 +1147,8 @@ globalThis.MST_CARD = (() => {
     fullCheck.className = `${PREFIX}-full-toggle`;
     fullCheck.addEventListener("change", () => {
       state.usesFull = fullCheck.checked;
-      chrome.storage.sync.set({ usesFull: state.usesFull });
       update();
+      save("sync", { usesFull: state.usesFull });
     });
     refs.fullToggle = fullCheck;
     fullRow.append(el("span", `${PREFIX}-row__label`, T("rowFull")), fullCheck);
@@ -1057,8 +1171,8 @@ globalThis.MST_CARD = (() => {
     }
     repSel.addEventListener("change", () => {
       state.reputationId = repSel.value || "none";
-      chrome.storage.sync.set({ reputationId: state.reputationId });
       update();
+      save("sync", { reputationId: state.reputationId });
     });
     refs.reputationSelect = repSel;
     repRow.appendChild(repSel);
@@ -1071,8 +1185,8 @@ globalThis.MST_CARD = (() => {
     freeCheck.className = `${PREFIX}-free-toggle`;
     freeCheck.addEventListener("change", () => {
       state.freeShipping = freeCheck.checked;
-      chrome.storage.sync.set({ freeShipping: state.freeShipping });
       update();
+      save("sync", { freeShipping: state.freeShipping });
     });
     refs.freeShippingToggle = freeCheck;
     freeRow.append(el("span", `${PREFIX}-row__label`, T("rowFreeShipping")), freeCheck);
@@ -1087,8 +1201,8 @@ globalThis.MST_CARD = (() => {
       (v) => {
         state.shippingCostMXN = v;
         state.shippingAutofilled = false; // typed by the seller: never overwritten
-        persistInputs();
         update();
+        persistInputs();
       }
     );
     refs.shippingInput.setAttribute("aria-label", T("inputShippingAria"));
@@ -1109,8 +1223,8 @@ globalThis.MST_CARD = (() => {
     wCheck.className = `${PREFIX}-withholdings-toggle`;
     wCheck.addEventListener("change", () => {
       state.showWithholdings = wCheck.checked;
-      chrome.storage.sync.set({ showWithholdings: state.showWithholdings });
       update();
+      save("sync", { showWithholdings: state.showWithholdings });
     });
     refs.withholdingsToggle = wCheck;
     wRow.append(el("span", `${PREFIX}-row__label`, T("rowWithholdings")), wCheck);
@@ -1149,8 +1263,8 @@ globalThis.MST_CARD = (() => {
       () => state.productCostMXN,
       (v) => {
         state.productCostMXN = v;
-        persistInputs();
         update();
+        persistInputs();
       }
     );
     refs.costInput.setAttribute("aria-label", T("inputProductCostAria"));
@@ -1172,8 +1286,8 @@ globalThis.MST_CARD = (() => {
         () => state.salesPerMonth,
         (v) => {
           state.salesPerMonth = Math.round(v);
-          persistInputs();
           update();
+          persistInputs();
         }
       );
       refs.salesInput.setAttribute("aria-label", T("rowSales"));
@@ -1191,8 +1305,8 @@ globalThis.MST_CARD = (() => {
         () => effectiveMargin(),
         (v) => {
           state.targetMarginPct = Math.min(v, 99);
-          persistInputs();
           update();
+          persistInputs();
         }
       );
       refs.marginInput.setAttribute("aria-label", T("inputMarginAria"));
@@ -1214,7 +1328,7 @@ globalThis.MST_CARD = (() => {
           histRow.appendChild(svg);
           histRow.style.display = "";
         }
-      });
+      }).catch(() => {});
     } else {
       // Free: the red-number alert, then the target price as a blurred REAL
       // number for this listing (what PRO unlocks), then the two remaining
@@ -1308,12 +1422,14 @@ globalThis.MST_CARD = (() => {
     shipRowEl.before(details);
     for (const node of moveIntoDetails) details.appendChild(node);
     refs.breakdown = details;
-    chrome.storage.sync.get({ breakdownOpen: false }).then((v) => {
-      if (v.breakdownOpen) details.open = true;
-    }).catch(() => {});
-    details.addEventListener("toggle", () => {
-      chrome.storage.sync.set({ breakdownOpen: details.open }).catch(() => {});
-    });
+    try {
+      chrome.storage.sync.get({ breakdownOpen: false }).then((v) => {
+        if (v.breakdownOpen) details.open = true;
+      }).catch(() => {});
+    } catch {
+      // context gone: the card is replaced by the reload notice shortly
+    }
+    details.addEventListener("toggle", () => save("sync", { breakdownOpen: details.open }));
 
     // Upsell panel; never opens on load. It is moved next to whatever the
     // seller clicked (see upsell.js) so it never appears 900px away.
@@ -1337,7 +1453,12 @@ globalThis.MST_CARD = (() => {
   function buildSummaryText() {
     const { quote, b } = computeCurrent();
     const lines = [];
-    lines.push(`${T("cardTitle")} — ${window.location.href}`);
+    if (quote.fixedCostUnavailable) {
+      lines.push(`${T("cardTitle")} · ${window.location.href}`);
+      lines.push(`${T("rowNet")}: ${T("feeUnavailable")}`);
+      return lines.join("\n");
+    }
+    lines.push(`${T("cardTitle")} · ${window.location.href}`);
     lines.push(`${T("rowPrice")}: ${fmtMoney(b.priceMXN)}`);
     lines.push(
       `${T("rowListingType")}: ${state.listingTypeId === "premium" ? T("typePremium") : T("typeClassic")}`
@@ -1496,9 +1617,30 @@ globalThis.MST_CARD = (() => {
         }
       }
       update(false);
+    }).catch((err) => {
+      // storage unavailable (extension reloaded): keep the page-price view
+      console.warn(`[${BRAND.name}] could not restore saved inputs:`, err);
     });
     return card;
   }
 
-  return Object.freeze({ build, state });
+  // The page re-rendered: follow an in-page price change (variant picked,
+  // promo started) so the card never keeps calculating on a stale price.
+  // A what-if price the seller typed is kept; only the page price moves.
+  function refreshFromPage(data) {
+    if (!refs.card || !data?.price || data.itemId !== state.itemId) return false;
+    const next = data.price.value;
+    if (!(next > 0) || next === state.pagePriceMXN) return false;
+    const following = state.priceMXN === state.pagePriceMXN;
+    state.pagePriceMXN = next;
+    if (following) {
+      state.priceMXN = next;
+      refs.priceInput?.syncFromState();
+    }
+    update(true);
+    if (state.productCostMXN > 0) persistInputs(); // refresh the dashboard snapshot
+    return true;
+  }
+
+  return Object.freeze({ build, state, showStale, refreshFromPage });
 })();

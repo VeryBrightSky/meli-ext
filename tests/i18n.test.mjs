@@ -248,3 +248,30 @@ test("no hardcoded user-facing strings in render code (use T())", () => {
   }
   assert.deepEqual(violations, [], "hardcoded UI strings found:\n" + violations.join("\n"));
 });
+
+test("v1.4.3 copy: no em dashes in any locale string, new keys exist in both locales", () => {
+  for (const loc of ["es_419", "en"]) {
+    const msgs = JSON.parse(read(`_locales/${loc}/messages.json`));
+    for (const [key, v] of Object.entries(msgs)) {
+      assert.ok(!v.message.includes("—"), `${loc}/${key} contains an em dash`);
+    }
+    for (const key of ["optResetConfirm", "staleNotice", "staleReload", "feeUnavailable", "optLogin"]) {
+      assert.ok(msgs[key]?.message, `${loc}/${key} missing`);
+    }
+    // Removed in 1.4.3 (confirmed unused): must not creep back.
+    for (const key of ["upsellTrial", "proSweetSpotName", "radarSetCost", "proMsiName", "dashUnlock", "trialActiveBannerOne"]) {
+      assert.equal(msgs[key], undefined, `${loc}/${key} should be gone`);
+    }
+  }
+  const es = JSON.parse(read("_locales/es_419/messages.json"));
+  assert.equal(es.optResetConfirm.message, "¿Borrar todos tus costos, ventas e historial de precios? No se puede deshacer.");
+  assert.equal(es.staleNotice.message, "Netio se actualizó. Recarga la página para seguir.");
+  assert.equal(es.staleReload.message, "Recargar");
+  assert.equal(es.optLogin.message, "Ya pagué: iniciar sesión");
+});
+
+test("v1.4.3 options page uses localized Clásica/Premium labels, not hardcoded ones", () => {
+  const html = read("src/options/options.html");
+  assert.ok(!/>Clásica</.test(html) && !/>Premium</.test(html), "hardcoded option labels");
+  assert.match(read("src/options/options.js"), /opt-classic[\s\S]*typeClassic/);
+});

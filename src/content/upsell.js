@@ -54,12 +54,23 @@ globalThis.MST_UPSELL = (() => {
     yearlyBtn.type = "button";
     yearlyBtn.addEventListener("click", () => opened(BRAND.plans.yearly));
     actions.append(monthlyBtn, yearlyBtn);
+    // Already paid (new browser, reinstalled, other device): sign in with the
+    // email used at checkout instead of paying twice.
+    const login = el("button", `${PREFIX}-upsell__close ${PREFIX}-upsell__login`, T("optLogin"));
+    login.type = "button";
+    login.addEventListener("click", async () => {
+      const res = await GATE.openLogin();
+      if (!res?.ok) {
+        note.textContent = T("upsellOpenFailed");
+        note.classList.remove(`${PREFIX}-upsell__note--active`);
+      }
+    });
     const close = el("button", `${PREFIX}-upsell__close`, T("upsellClose"));
     close.type = "button";
     close.addEventListener("click", () => {
       panel.hidden = true;
     });
-    panel.append(title, lead, body, actions, note, close);
+    panel.append(title, lead, body, actions, note, login, close);
     return { panel, lead, body };
   }
 
@@ -242,14 +253,18 @@ globalThis.MST_UPSELL = (() => {
       if (Date.now() < until) return;
       root.hidden = false;
       if (stateKey === "expired") GATE.track("seen:expired");
-    });
+    }).catch(() => {});
     close.addEventListener("click", () => {
       root.hidden = true;
-      chrome.storage.local.get(DISMISS_KEY).then((stored) => {
-        const d = { ...(stored?.[DISMISS_KEY] ?? {}) };
-        d[stateKey] = Date.now() + 24 * 60 * 60 * 1000;
-        chrome.storage.local.set({ [DISMISS_KEY]: d });
-      });
+      try {
+        chrome.storage.local.get(DISMISS_KEY).then((stored) => {
+          const d = { ...(stored?.[DISMISS_KEY] ?? {}) };
+          d[stateKey] = Date.now() + 24 * 60 * 60 * 1000;
+          return chrome.storage.local.set({ [DISMISS_KEY]: d });
+        }).catch(() => {});
+      } catch {
+        // extension context gone: the dismissal just isn't remembered
+      }
     });
     return root;
   }

@@ -942,6 +942,15 @@
   flex-wrap: wrap;
 }
 
+.mst-upsell__login {
+  display: block;
+}
+
+.mst-stale {
+  font-size: 13px;
+  margin: 0 0 8px;
+}
+
 /* Search page: free radar summary + inline cost input */
 .mst-radar__cta {
   font-family: inherit;

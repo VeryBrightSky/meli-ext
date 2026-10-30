@@ -34,10 +34,14 @@ globalThis.MST_FEE_SOURCE = (() => {
   // Returns price → charge so solvers see the same discontinuities as quotes.
   function fixedCostFnFor({ listingTypeId, fullWeightKg = null }) {
     if (fullWeightKg !== null) {
+      // null (not 0) when the Full service cost is not in the table (weight
+      // above 60 kg, bad weight): "unknown" must never be priced as free.
+      // Callers that need a number (solvers) must check getQuote's
+      // fixedCostUnavailable first.
       return (priceMXN) =>
         priceMXN >= table.fixedCost.thresholdMXN
           ? 0
-          : globalThis.MST_SHIPPING.fullServiceCost(fullWeightKg, priceMXN) ?? 0;
+          : globalThis.MST_SHIPPING.fullServiceCost(fullWeightKg, priceMXN);
     }
     const type = listingTypeId === "premium" ? "premium" : "classic";
     return table.fixedCost.appliesTo.includes(type) ? fixedCostFor : () => 0;
@@ -47,10 +51,14 @@ globalThis.MST_FEE_SOURCE = (() => {
     const type = listingTypeId === "premium" ? "premium" : "classic";
     const group = findGroup(categoryGroupId);
     const rate = group ? group[type] : table.defaults[type];
+    const fixedCost = fixedCostFnFor({ listingTypeId, fullWeightKg })(priceMXN);
     return {
       pctMin: rate.pctMin,
       pctMax: rate.pctMax,
-      fixedCostMXN: fixedCostFnFor({ listingTypeId, fullWeightKg })(priceMXN),
+      fixedCostMXN: fixedCost,
+      // Full mode with no service-cost row for this weight/price: the net
+      // cannot be computed honestly. Callers show "no disponible" / skip.
+      fixedCostUnavailable: fixedCost === null,
       isFullServiceCost: fullWeightKg !== null && priceMXN < table.fixedCost.thresholdMXN,
       categoryGroup: group ? { id: group.id, label: group.label } : null,
       confidence: rate.confidence
