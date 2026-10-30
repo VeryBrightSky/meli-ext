@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /gracias.html
+Disallow: /adios.html
+
+Sitemap: https://netiox.netlify.app/sitemap.xml
