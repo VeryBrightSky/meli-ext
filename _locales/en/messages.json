@@ -528,7 +528,7 @@
     "message": "Free plan (your PRO trial ended)"
   },
   "optMetrics": {
-    "message": "Local conversion diagnostics"
+    "message": "Usage counters (only in your browser)"
   },
   "upsellOpened": {
     "message": "Checkout opened in a new tab. When you're done, this card updates by itself."

@@ -58,7 +58,7 @@ globalThis.MST_FEE_SOURCE = (() => {
       fixedCostMXN: fixedCost,
       // Full mode with no service-cost row for this weight/price: the net
       // cannot be computed honestly. Callers show "no disponible" / skip.
-      fixedCostUnavailable: fixedCost === null,
+      fixedCostUnavailable: fixedCost === null && priceMXN > 0,
       isFullServiceCost: fullWeightKg !== null && priceMXN < table.fixedCost.thresholdMXN,
       categoryGroup: group ? { id: group.id, label: group.label } : null,
       confidence: rate.confidence

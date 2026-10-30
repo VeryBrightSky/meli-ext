@@ -528,7 +528,7 @@
     "message": "Plan gratuito (tu prueba PRO terminó)"
   },
   "optMetrics": {
-    "message": "Diagnóstico local de conversión"
+    "message": "Contadores de uso (solo en tu navegador)"
   },
   "upsellOpened": {
     "message": "Abrimos el pago en una pestaña nueva. Al terminar, esta tarjeta se actualiza sola."
