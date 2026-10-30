@@ -232,7 +232,9 @@ globalThis.MST_MESSAGES = Object.freeze({
     "welcomeLeadExpired": "Puedes seguir usando la calculadora gratis o activar PRO. Así le sacas provecho:",
     "welcomeTitleFree": "Netio está listo",
     "welcomeLeadFree": "Puedes usar la calculadora gratis o activar PRO cuando quieras. Así le sacas provecho:",
-    "optOwnerPaste": "Pegar y activar"
+    "optOwnerPaste": "Pegar y activar",
+    "dashShippingNoteEstimate": "Envío: estimado por peso de Mercado Envíos (0.3 kg si no elegiste peso). Cifras estimadas.",
+    "shippingEstimateTag": "est."
   },
   "en": {
     "cardTitle": "Profit calculator",
@@ -465,6 +467,8 @@ globalThis.MST_MESSAGES = Object.freeze({
     "welcomeLeadExpired": "Keep using the free calculator or activate PRO. Here's how to get value from it:",
     "welcomeTitleFree": "Netio is ready",
     "welcomeLeadFree": "Use the free calculator or activate PRO whenever you want. Here's how to get value from it:",
-    "optOwnerPaste": "Paste and activate"
+    "optOwnerPaste": "Paste and activate",
+    "dashShippingNoteEstimate": "Shipping: Mercado Envíos estimate by weight (0.3 kg when no weight is chosen). Figures are estimates.",
+    "shippingEstimateTag": "est."
   }
 });

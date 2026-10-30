@@ -1228,12 +1228,16 @@ globalThis.MST_CARD = (() => {
     shipRow.appendChild(refs.shipLabel);
     // An autofilled estimate is marked so the seller can tell it from a cost
     // they typed (title + class; the value itself stays editable).
+    const estTag = el("span", `${PREFIX}-estimate-tag`, T("shippingEstimateTag"));
+    estTag.title = T("badgeEstimate");
+    estTag.hidden = true;
     const markShippingEstimate = () => {
       const est = state.shippingAutofilled && state.shippingCostMXN > 0;
       refs.shippingInput.classList.toggle(`${PREFIX}-input--estimate`, est);
       refs.shippingInput.dataset.estimate = est ? "1" : "";
       if (est) refs.shippingInput.title = T("badgeEstimate");
       else refs.shippingInput.removeAttribute("title");
+      estTag.hidden = !est;
     };
     refs.shippingInput = moneyInput(
       () => state.shippingCostMXN,
@@ -1251,7 +1255,7 @@ globalThis.MST_CARD = (() => {
       syncShipping();
       markShippingEstimate();
     };
-    shipRow.appendChild(refs.shippingInput);
+    shipRow.append(estTag, refs.shippingInput);
     body.appendChild(shipRow);
 
     // Shipping subsidy (labeled estimate). Shown only when it actually applies.

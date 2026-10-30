@@ -192,6 +192,7 @@ try {
   assert.equal(await welcome.$eval("#title", (e) => e.textContent), "Tu PRO está activado");
   assert.ok((await welcome.$eval("#lead", (e) => e.textContent)).includes("7 días"), "welcome lead should show 7 días");
   assert.equal(await welcome.$eval("#go", (a) => a.href), "https://www.mercadolibre.com.mx/");
+  assert.equal(await welcome.$eval("#upgrade", (b) => b.hidden), true, "no pay button during the trial");
   assert.ok((await welcome.$eval("#share", (a) => a.href)).includes("wa.me/?text="), "welcome share link");
   pass("install opens the welcome tab: 'Tu PRO está activado', 7 días, link to Mercado Libre");
   await welcome.close();
@@ -227,7 +228,9 @@ try {
   assert.equal(await seed.$eval("#lead", (e) => e.textContent), "Puedes seguir usando la calculadora gratis o activar PRO. Así le sacas provecho:");
   assert.equal(await seed.$eval("#pill", (e) => e.textContent), "Plan gratuito");
   assert.ok(!(await seed.$eval("main", (e) => e.textContent)).includes("7 días"), "welcome must not promise 7 días after the trial");
-  pass("welcome after an expired trial: 'Tu prueba PRO ya terminó', free pill, no '7 días'");
+  const upg = await seed.$eval("#upgrade", (b) => ({ hidden: b.hidden, text: b.textContent, shown: b.offsetWidth > 0 }));
+  assert.deepEqual(upg, { hidden: false, text: "Activar PRO · $89 al mes", shown: true });
+  pass("welcome after an expired trial: 'Tu prueba PRO ya terminó', free pill, no '7 días', 'Activar PRO' button");
   await seed.close();
 
   // ====================== PHASE 1: never-paid (locked) ======================
@@ -261,7 +264,9 @@ try {
     disabled: inputs[1].disabled
   }));
   assert.deepEqual(shipEst, { value: "52.40", estimate: "1", title: "Estimado", disabled: false });
-  pass("shipping row shows the autofilled 52.40 estimate (marked 'Estimado', editable)");
+  const estTag = await page.$eval(".mst-estimate-tag", (e) => ({ hidden: e.hidden, text: e.textContent, shown: e.offsetWidth > 0 }));
+  assert.deepEqual(estTag, { hidden: false, text: "est.", shown: true });
+  pass("shipping row shows the autofilled 52.40 estimate (marked 'Estimado' + visible 'est.' tag, editable)");
 
   // Spanish UI must render Spanish (regression: chrome.i18n served English).
   assert.equal(await page.$eval(".mst-title", (e) => e.textContent), "Calculadora de ganancias");
@@ -286,8 +291,29 @@ try {
   assert.equal(await page.evaluate(rowValue("Neto después")), "$617.05"); // 691.90 − 74.85
   pass("retenciones (free): IVA −$57.03, ISR −$17.82, neto después $617.05");
 
+  // v1.5.2 critic: with nothing configured, the dashboard applies the same
+  // 0.3 kg estimate as the card, so both show the same ganancia for this
+  // listing (827 − 82.70 − 52.40 − 400 = 291.90).
+  await typeInto(page, 2, "400"); // product cost (persists cost + meta, not the estimate)
+  await openBreakdown(page);
+  const cardProfit = await page.evaluate(rowValue("Ganancia"));
+  assert.ok(cardProfit.startsWith("$291.90"), `card profit: ${cardProfit}`);
+  {
+    const d0 = await browser.newPage();
+    await d0.goto(`chrome-extension://${extId}/src/dashboard/dashboard.html`, { waitUntil: "load" });
+    await d0.waitForFunction(() => !document.getElementById("content")?.hidden, { timeout: 10000 });
+    const rowText = await d0.$eval("#rows tr", (tr) => tr.textContent);
+    assert.ok(rowText.includes("$291.90"), `dashboard row: ${rowText}`);
+    const note = await d0.$eval("#shipping-note", (e) => e.textContent);
+    assert.equal(note, "Envío: estimado por peso de Mercado Envíos (0.3 kg si no elegiste peso). Cifras estimadas.");
+    assert.ok(!note.includes("$0.00"));
+    await d0.close();
+  }
+  pass("card and dashboard agree on the shipping estimate: ganancia $291.90 in both, dashboard note says 'estimado'");
+
   await typeInto(page, 1, "50"); // shipping: typed, replaces the estimate
   assert.equal(await page.$$eval(".mst-card input.mst-input", (i) => i[1].dataset.estimate), "", "typed shipping is no longer marked as an estimate");
+  assert.equal(await page.$eval(".mst-estimate-tag", (e) => e.hidden), true, "'est.' tag hides once the seller types");
   assert.equal(await page.evaluate(rowValue("Recibes aprox.")), "$694.30");
   await typeInto(page, 2, "400"); // product cost
   assert.equal(await page.evaluate(rowValue("Precio mínimo")), "$500.00");
@@ -1512,6 +1538,7 @@ try {
     await ow.waitForFunction(() => (document.getElementById("title")?.textContent ?? "").length > 0, { timeout: 10000 });
     assert.equal(await ow.$eval("#pill", (e) => e.textContent), "PRO activo");
     assert.equal(await ow.$eval("#title", (e) => e.textContent), "Netio PRO está activo");
+    assert.equal(await ow.$eval("#upgrade", (b) => b.hidden), true, "no pay button for the owner");
     await ow.close();
     pass("dashboard shows no paywall for the owner; welcome says 'PRO activo'");
 

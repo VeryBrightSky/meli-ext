@@ -691,5 +691,11 @@
   },
   "optOwnerPaste": {
     "message": "Paste and activate"
+  },
+  "dashShippingNoteEstimate": {
+    "message": "Shipping: Mercado Envíos estimate by weight (0.3 kg when no weight is chosen). Figures are estimates."
+  },
+  "shippingEstimateTag": {
+    "message": "est."
   }
 }

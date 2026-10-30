@@ -1121,3 +1121,40 @@ test("v1.5.2 listing signals: MSI brand is not Premium, installment wording is, 
   assert.equal(UI.resultFlags({ body: "$ 827 Envío gratis" }).freeShipping, true);
   assert.equal(UI.isFreeShippingText("ENVÍO GRATIS incluido"), true); // text-level only; callers exclude titles
 });
+
+// v1.5.2 critic: card and dashboard must agree on shipping when nothing is
+// configured. The card autofills the Mercado Envíos estimate for the chosen
+// weight (else 0.3 kg) on $299+ listings; computeRows does the same when
+// resolveShipping says the default is unset. An explicit options 0 stays 0.
+test("v1.5.2 dashboard shipping parity: unset default takes the card's per-weight estimate", () => {
+  const meta = { title: "X", priceMXN: 827, listingTypeId: "classic", categoryGroupId: "tech", url: "u" };
+  const all = { "mst:cost:MLM1": 400, "mst:meta:MLM1": meta };
+  const unset = DASH.resolveShipping({ defaultShippingMXN: null }, undefined);
+  assert.deepEqual(unset, { value: 0, unset: true });
+  assert.deepEqual(DASH.resolveShipping({ defaultShippingMXN: null }, { shippingCostMXN: 0 }), { value: 0, unset: true });
+  assert.deepEqual(DASH.resolveShipping({ defaultShippingMXN: 0 }, undefined), { value: 0, unset: false });
+  assert.deepEqual(DASH.resolveShipping({ defaultShippingMXN: null }, { shippingCostMXN: 50 }), { value: 50, unset: false });
+  assert.equal(DASH.resolveDefaultShipping({ defaultShippingMXN: null }, undefined), 0);
+
+  // Card math for the same listing with the autofilled 0.3 kg estimate.
+  const est = SHIPPING.costForWeight(0.3);
+  assert.equal(est, 52.4);
+  const cardB = CALC.computeBreakdown(
+    SOURCE.getQuote({ priceMXN: 827, listingTypeId: "classic", categoryGroupId: "tech", fullWeightKg: null }),
+    { priceMXN: 827, shippingCostMXN: CALC.subsidizedShipping({ fullShippingMXN: est, priceMXN: 827, freeShipping: true, subsidyPct: 0, thresholdMXN: 299 }), productCostMXN: 400 }
+  );
+  const row = DASH.computeRows(all, "mst", unset.value, { shippingUnset: unset.unset })[0];
+  assert.equal(row.shippingEstimated, true);
+  assert.equal(row.b.shippingCostMXN, 52.4);
+  assert.equal(row.b.profitMinMXN, cardB.profitMinMXN);
+  assert.equal(row.b.profitMinMXN, 291.9); // 827 − 82.70 − 52.40 − 400
+  // Saved weight 1 kg → the 1 kg bracket, like the weight select.
+  const w = DASH.computeRows({ ...all, "mst:weight:MLM1": 1 }, "mst", 0, { shippingUnset: true })[0];
+  assert.equal(w.b.shippingCostMXN, SHIPPING.costForWeight(1));
+  // Explicit 0 (unset:false) and listings under $299 are untouched.
+  assert.equal(DASH.computeRows(all, "mst", 0, { shippingUnset: false })[0].b.shippingCostMXN, 0);
+  const low = { ...all, "mst:meta:MLM1": { ...meta, priceMXN: 250 } };
+  const lowRow = DASH.computeRows(low, "mst", 0, { shippingUnset: true })[0];
+  assert.equal(lowRow.b.shippingCostMXN, 0);
+  assert.equal(lowRow.shippingEstimated, false);
+});

@@ -95,9 +95,10 @@
     reputationId: "none",
     freeShipping: false
   });
-  const defaultShipping = DASH.resolveDefaultShipping(sync, all[`${PREFIX}:defaults`]);
+  const shippingInfo = DASH.resolveShipping(sync, all[`${PREFIX}:defaults`]);
+  const defaultShipping = shippingInfo.value;
 
-  let rows = DASH.computeRows(all, PREFIX, defaultShipping, sync);
+  let rows = DASH.computeRows(all, PREFIX, defaultShipping, { ...sync, shippingUnset: shippingInfo.unset });
   // Free preview shows the same FREE_ROWS products no matter how the table is
   // sorted afterwards (worst margin first at load), so re-sorting can't be
   // used to read every row three at a time.
@@ -110,9 +111,11 @@
 
   // --- Render --------------------------------------------------------------------
   document.getElementById("content").hidden = false;
-  document.getElementById("shipping-note").textContent = T("dashShippingNote", [
-    UI.fmtMoney(defaultShipping)
-  ]);
+  // Nothing configured anywhere: $299+ rows carry the per-weight Mercado
+  // Envíos estimate (the card's rule), so the note says so instead of "$0.00".
+  document.getElementById("shipping-note").textContent = rows.some((r) => r.shippingEstimated)
+    ? T("dashShippingNoteEstimate")
+    : T("dashShippingNote", [UI.fmtMoney(defaultShipping)]);
 
   // num: right-align; tone(r): "pos"/"neg"/null for green/red coloring.
   const toneBy = (n) => (n > 0 ? "pos" : n < 0 ? "neg" : null);

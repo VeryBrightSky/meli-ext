@@ -691,5 +691,11 @@
   },
   "optOwnerPaste": {
     "message": "Pegar y activar"
+  },
+  "dashShippingNoteEstimate": {
+    "message": "Envío: estimado por peso de Mercado Envíos (0.3 kg si no elegiste peso). Cifras estimadas."
+  },
+  "shippingEstimateTag": {
+    "message": "est."
   }
 }

@@ -22,11 +22,11 @@ in one page only you can open. Until step 5 the extension sends nothing.
    Without this step the promise is false.
 6. **Build the telemetry release.** In the repo run
    `node scripts/enable-telemetry.mjs <url> <anon-key>`. It builds the zip and
-   a `release/` folder (the zip is `release/netio-1.5.1-telemetry.zip`; the zip in
+   a `release/` folder (the zip is `release/netio-1.5.2-telemetry.zip`; the zip in
    the repo root never contains the key), and prints the Chrome Web Store checklist.
 7. **Publish.** Upload `release/landing/` to your landing site first (the
    privacy page and the uninstall page must be live), then upload
-   `release/netio-1.5.1-telemetry.zip` to the Chrome Web Store and fill the Privacy
+   `release/netio-1.5.2-telemetry.zip` to the Chrome Web Store and fill the Privacy
    practices tab as the script printed.
 8. **Open the dashboard.** Open `tools/analytics/index.html` in your browser
    (double click). Enter URL, anon key and admin secret, press Load. Tick

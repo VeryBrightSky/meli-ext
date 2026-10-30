@@ -46,6 +46,18 @@ globalThis.MST_WELCOME_COPY = function welcomeCopy(s, T) {
   document.getElementById("s3t").textContent = T("welcomeStep3");
   document.getElementById("s3b").textContent = T("welcomeStep3Body");
   document.getElementById("go").textContent = T("welcomeGo");
+  // Expired/free states: the lead says "activar PRO", so the pay CTA is right
+  // here (monthly plan, the same checkout the card's banners open). Owner,
+  // paid and trial states never show it.
+  const upgrade = document.getElementById("upgrade");
+  if (copy.state === "expired" || copy.state === "free") {
+    upgrade.textContent = T("upsellMonthly");
+    upgrade.hidden = false;
+    upgrade.addEventListener("click", async () => {
+      const res = await globalThis.MST_GATE.openUpgrade(BRAND.plans.monthly, "welcome");
+      if (!res?.ok) upgrade.textContent = T("upsellOpenFailed");
+    });
+  }
   const dash = document.getElementById("dash");
   dash.textContent = T("optDashboard");
   dash.addEventListener("click", () => globalThis.MST_GATE.openDashboard());

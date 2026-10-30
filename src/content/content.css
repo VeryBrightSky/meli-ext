@@ -659,6 +659,16 @@
   font-style: italic;
 }
 
+.mst-estimate-tag {
+  font-size: 11px;
+  color: rgba(0, 0, 0, 0.55);
+  margin-right: 6px;
+}
+
+.mst-estimate-tag[hidden] {
+  display: none;
+}
+
 .mst-input--estimate:focus {
   color: rgba(0, 0, 0, 0.9);
   font-style: normal;

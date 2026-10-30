@@ -274,6 +274,27 @@ tr.locked td:first-child {
 .table-scroll {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+  /* Scroll shadows (CSS only): the right-edge fade is painted only while
+     there is content past the edge, because the white cover scrolls with the
+     table (background-attachment: local) and the shadow does not. */
+  background:
+    linear-gradient(to left, #fff 30%, rgba(255, 255, 255, 0)) right / 40px 100% no-repeat local,
+    linear-gradient(to left, rgba(0, 0, 0, 0.12), rgba(0, 0, 0, 0)) right / 18px 100% no-repeat scroll;
+}
+
+/* Phone width: say it scrolls. Sticky to the left edge so it stays readable
+   while the table is dragged. */
+@media (max-width: 760px) {
+  .table-scroll::after {
+    content: "desliza \2192";
+    display: block;
+    position: sticky;
+    left: 0;
+    width: max-content;
+    font-size: 11px;
+    color: rgba(0, 0, 0, 0.45);
+    padding: 4px 0 0;
+  }
 }
 
 #table[hidden] {

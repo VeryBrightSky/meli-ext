@@ -11,11 +11,27 @@ globalThis.MST_DASH = (() => {
   // explicit value, including a deliberate 0 (genuinely free shipping), wins.
   // "Unset" is null or an ABSENT key (NOT 0); only then do we fall back to the
   // card's last-used local value.
-  function resolveDefaultShipping(syncSettings, localDefaults) {
+  // resolveShipping returns { value, unset }: `unset` is true only when
+  // neither source holds a value (options null/absent AND no last-used
+  // local value > 0), which is exactly when the card autofills the Mercado
+  // Envíos estimate for a $299+ listing (card.js applyShippingEstimate).
+  function resolveShipping(syncSettings, localDefaults) {
     const CALC = globalThis.MST_CALC;
     const s = syncSettings ? syncSettings.defaultShippingMXN : undefined;
-    if (s !== undefined && s !== null) return CALC.parseMoney(s);
-    return CALC.parseMoney((localDefaults && localDefaults.shippingCostMXN) || 0);
+    if (s !== undefined && s !== null) return { value: CALC.parseMoney(s), unset: false };
+    const local = CALC.parseMoney((localDefaults && localDefaults.shippingCostMXN) || 0);
+    return { value: local, unset: !(local > 0) };
+  }
+  const resolveDefaultShipping = (syncSettings, localDefaults) =>
+    resolveShipping(syncSettings, localDefaults).value;
+
+  // The same estimate the card autofills: Mercado Envíos cost for the saved
+  // weight, or the smallest bracket (0.3 kg).
+  function estimatedShipping(weightKg) {
+    const SHIP = globalThis.MST_SHIPPING;
+    if (!SHIP) return 0;
+    const cost = SHIP.costForWeight(weightKg > 0 ? weightKg : 0.3);
+    return cost > 0 ? cost : 0;
   }
 
   // all: a chrome.storage.local snapshot ({key: value}). Returns one row per
@@ -23,6 +39,8 @@ globalThis.MST_DASH = (() => {
   // opts: the account-wide card settings from storage.sync
   // ({ usesFull, reputationId, freeShipping }), so a row's profit matches the
   // card for the same listing (Full fees, reputation shipping discount).
+  // opts.shippingUnset: no shipping configured anywhere; $299+ listings then
+  // take the per-weight estimate, like the card (v1.5.2 parity).
   function computeRows(all, prefix, defaultShipping, opts = {}) {
     const SOURCE = globalThis.MST_FEE_SOURCE;
     const CALC = globalThis.MST_CALC;
@@ -49,8 +67,12 @@ globalThis.MST_DASH = (() => {
       const threshold = SOURCE.shippingSubsidy?.thresholdMXN ?? 299;
       const subsidyPct =
         SOURCE.shippingSubsidy?.levels?.find((l) => l.id === opts.reputationId)?.subsidyPct || 0;
+      const fullShipping =
+        opts.shippingUnset === true && meta.priceMXN >= SOURCE.freeShippingThresholdMXN
+          ? estimatedShipping(weight)
+          : defaultShipping;
       const shipping = CALC.subsidizedShipping({
-        fullShippingMXN: defaultShipping,
+        fullShippingMXN: fullShipping,
         priceMXN: meta.priceMXN,
         freeShipping: opts.freeShipping === true || meta.priceMXN >= SOURCE.freeShippingThresholdMXN,
         subsidyPct,
@@ -61,7 +83,7 @@ globalThis.MST_DASH = (() => {
         shippingCostMXN: shipping,
         productCostMXN: cost
       });
-      rows.push({ itemId, meta, cost, sales, b });
+      rows.push({ itemId, meta, cost, sales, b, shippingEstimated: fullShipping !== defaultShipping });
     }
     return rows;
   }
@@ -126,5 +148,5 @@ globalThis.MST_DASH = (() => {
     };
   }
 
-  return Object.freeze({ resolveDefaultShipping, computeRows, totals, portfolioSummary });
+  return Object.freeze({ resolveShipping, resolveDefaultShipping, estimatedShipping, computeRows, totals, portfolioSummary });
 })();
