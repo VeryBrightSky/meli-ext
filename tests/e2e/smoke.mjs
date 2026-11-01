@@ -1370,7 +1370,7 @@ try {
   for (const r of all) {
     assert.deepEqual(Object.keys(r).sort(), COLS);
     assert.match(r.install_id, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
-    assert.equal(r.ext_version, "1.5.2");
+    assert.equal(r.ext_version, "1.5.3");
     for (const v of Object.values(r.props)) assert.match(String(v), /^[a-z0-9._:+-]{1,24}$/);
   }
   assert.equal(new Set(all.map((r) => r.install_id)).size, 1, "one random install id");
