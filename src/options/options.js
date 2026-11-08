@@ -41,6 +41,7 @@ document.getElementById("owner-activate").textContent = T("optOwnerActivate");
 document.getElementById("owner-paste").textContent = T("optOwnerPaste");
 document.getElementById("owner-remove").textContent = T("optOwnerRemove");
 document.getElementById("version-label").textContent = `${BRAND.name} v${chrome.runtime.getManifest().version}`;
+document.getElementById("support-label").textContent = T("optSupport", [BRAND.supportEmail]);
 
 const cardEnabled = document.getElementById("card-enabled");
 const stripsEnabled = document.getElementById("strips-enabled");
@@ -115,7 +116,9 @@ async function loadSubscriptionStatus() {
           : T("statusTrial"))
       : s.trialExpired
         ? T("statusTrialExpired")
-        : T("statusFree");
+        : s.trialPending
+          ? T("statusTrialPending")
+          : T("statusFree");
 
   // Local-only funnel counters for the developer (no network, nothing sent).
   const metricsEl = document.getElementById("metrics");
@@ -248,6 +251,7 @@ loadTelemetry().catch(() => {});
 // "first time" event.
 const KEEP_LOCAL = new Set([
   `${BRAND.cssPrefix}:installedAt`,
+  `${BRAND.cssPrefix}:trialStartedAt`,
   `${BRAND.cssPrefix}:metrics`,
   globalThis.MST_OWNER.STORAGE_KEY,
   globalThis.MST_OWNER.HASH_OVERRIDE_KEY,

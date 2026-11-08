@@ -23,6 +23,10 @@ globalThis.MST_WELCOME_COPY = function welcomeCopy(s, T) {
   if (s.trialExpired) {
     return { pill: T("statusFree"), title: T("welcomeTitleExpired"), lead: T("welcomeLeadExpired"), state: "expired" };
   }
+  // Fresh install (1.5.5+): the 7 days start with the first saved cost.
+  if (s.trialPending) {
+    return { pill: T("badgeTrialPending"), title: T("welcomeTitlePending"), lead: T("welcomeLeadPending"), state: "pending" };
+  }
   return { pill: T("statusFree"), title: T("welcomeTitleFree"), lead: T("welcomeLeadFree"), state: "free" };
 };
 
@@ -40,7 +44,11 @@ globalThis.MST_WELCOME_COPY = function welcomeCopy(s, T) {
   document.getElementById("title").textContent = copy.title;
   document.getElementById("lead").textContent = copy.lead;
   document.getElementById("s1t").textContent = T("welcomeStep1");
-  document.getElementById("s1b").textContent = T("welcomeStep1Body");
+  document.getElementById("s1t").href = BRAND.listingsUrl;
+  document.getElementById("go").href = BRAND.listingsUrl;
+  // Only a trial that has not started is told what starts it.
+  document.getElementById("s1b").textContent =
+    copy.state === "pending" ? `${T("welcomeStep1Body")} ${T("welcomeStep1Trial")}` : T("welcomeStep1Body");
   document.getElementById("s2t").textContent = T("welcomeStep2");
   document.getElementById("s2b").textContent = T("welcomeStep2Body");
   document.getElementById("s3t").textContent = T("welcomeStep3");

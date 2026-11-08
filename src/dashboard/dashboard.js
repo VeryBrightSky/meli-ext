@@ -130,7 +130,7 @@
     { key: "profit", label: T("rowProfit"), num: true, value: (r) => UI.fmtRange(r.b.profitMinMXN, r.b.profitMaxMXN), tone: (r) => toneBy(r.b.profitMinMXN), sort: (r) => r.b.profitMinMXN },
     { key: "margin", label: T("dashMargin"), num: true, value: (r) => UI.fmtPctRange(r.b.marginMinPct, r.b.marginMaxPct), tone: (r) => toneBy(r.b.marginMinPct), sort: (r) => r.b.marginMinPct },
     { key: "sales", label: T("rowSales"), num: true, editable: true, sort: (r) => r.sales },
-    { key: "monthly", label: T("rowMonthlyProfit"), num: true, value: (r) => (r.sales > 0 ? UI.fmtRange(CALC.round2(r.b.profitMinMXN * r.sales), CALC.round2(r.b.profitMaxMXN * r.sales)) : "—"), tone: (r) => (r.sales > 0 ? toneBy(r.b.profitMinMXN) : null), sort: (r) => r.b.profitMinMXN * r.sales }
+    { key: "monthly", label: T("rowMonthlyProfit"), num: true, value: (r) => (r.sales > 0 ? UI.fmtRange(CALC.round2(r.b.profitMinMXN * r.sales), CALC.round2(r.b.profitMaxMXN * r.sales)) : T("noValue")), tone: (r) => (r.sales > 0 ? toneBy(r.b.profitMinMXN) : null), sort: (r) => r.b.profitMinMXN * r.sales }
   ];
 
   // Commission, shipping and type stay in the CSV; the on-screen table keeps
@@ -207,23 +207,45 @@
     box.appendChild(stats);
   }
 
+  // Empty state: one clearly labeled sample row (real fee math on a made-up
+  // listing) so the seller sees what the table will hold, plus the one thing
+  // to do next. No PRO pitch on an empty table.
+  const EXAMPLE_ID = "EJEMPLO";
+  function exampleRows() {
+    const group = SOURCE.listCategoryGroups()[0];
+    const fake = {
+      [`${PREFIX}:cost:${EXAMPLE_ID}`]: 180,
+      [`${PREFIX}:meta:${EXAMPLE_ID}`]: {
+        title: T("dashExampleTitle"),
+        priceMXN: 499,
+        listingTypeId: "classic",
+        categoryGroupId: group?.id ?? null,
+        url: null
+      }
+    };
+    return DASH.computeRows(fake, PREFIX, 0, { shippingUnset: true, reputationId: "none" });
+  }
+
   function render() {
-    // Empty state: hide the table, show a friendly message.
     const empty = rows.length === 0;
-    document.getElementById("table").hidden = empty;
+    const view = empty ? exampleRows() : rows;
     document.getElementById("shipping-note").hidden = empty;
     document.getElementById("portfolio").hidden = empty;
     const note = document.getElementById("empty-note");
     note.hidden = !empty;
     note.textContent = T("dashEmpty");
+    const open = document.getElementById("empty-open");
+    open.hidden = !empty;
+    open.textContent = T("dashOpenMeli");
     document.getElementById("export-btn").hidden = empty;
-    if (empty) return;
+    document.getElementById("upsell").hidden = empty || pro;
+    document.getElementById("totals-row").hidden = empty;
 
-    renderPortfolio();
+    if (!empty) renderPortfolio();
 
     renderHead();
     const col = COLS.find((c) => c.key === sortKey);
-    rows.sort((a, b2) => {
+    view.sort((a, b2) => {
       const va = col.sort(a);
       const vb = col.sort(b2);
       return (va < vb ? -1 : va > vb ? 1 : 0) * sortDir;
@@ -240,18 +262,27 @@
       limitNote.hidden = true;
     }
 
-    rows.forEach((row) => {
+    view.forEach((row) => {
       const tr = document.createElement("tr");
+      const example = row.itemId === EXAMPLE_ID && empty;
       // Flag loss-makers (worst-case profit below zero) for visual call-out.
-      if (row.b.profitMinMXN < 0) tr.classList.add(`${PREFIX}-row--loss`);
-      const locked = !pro && !freeIds.has(row.itemId);
+      if (row.b.profitMinMXN < 0 && !example) tr.classList.add(`${PREFIX}-row--loss`);
+      const locked = !example && !pro && !freeIds.has(row.itemId);
       if (locked) tr.classList.add("locked");
+      if (example) tr.classList.add("example");
       for (const colDef of TABLE_COLS) {
         const td = document.createElement("td");
         if (colDef.num) td.className = "num";
-        const tone = colDef.tone ? colDef.tone(row) : null;
+        const tone = colDef.tone && !example ? colDef.tone(row) : null;
         if (tone) td.classList.add(tone);
-        if (colDef.key === "title" && !locked) {
+        if (example && colDef.key === "title") {
+          const tag = document.createElement("span");
+          tag.className = "example-tag";
+          tag.textContent = T("dashExample");
+          td.append(tag, document.createTextNode(row.meta.title));
+        } else if (example && colDef.editable) {
+          td.textContent = T("noValue");
+        } else if (colDef.key === "title" && !locked) {
           const href = safeListingUrl(row.meta.url);
           const label = row.meta.title || row.itemId;
           if (href) {
@@ -286,7 +317,7 @@
           });
           td.appendChild(input);
         } else if (colDef.editable) {
-          td.textContent = row.sales > 0 ? String(row.sales) : "—";
+          td.textContent = row.sales > 0 ? String(row.sales) : T("noValue");
         } else {
           td.textContent = colDef.value(row);
         }
@@ -296,9 +327,10 @@
     });
 
     // Grand totals: monthly projected profit across all rows + product count.
-    const tot = DASH.totals(pro ? rows : rows.filter((r) => freeIds.has(r.itemId)));
     const tfoot = document.getElementById("totals-row");
     tfoot.replaceChildren();
+    if (empty) return;
+    const tot = DASH.totals(pro ? rows : rows.filter((r) => freeIds.has(r.itemId)));
     const labelTd = document.createElement("td");
     labelTd.colSpan = TABLE_COLS.length - 1;
     labelTd.textContent = T("dashTotalsLabel", [String(tot.count)]);
@@ -308,7 +340,7 @@
       valueTd.textContent = UI.fmtRange(tot.monthlyMinMXN, tot.monthlyMaxMXN);
       valueTd.classList.add(toneBy(tot.monthlyMinMXN) || "pos");
     } else {
-      valueTd.textContent = "—";
+      valueTd.textContent = T("noValue");
     }
     tfoot.append(labelTd, valueTd);
   }

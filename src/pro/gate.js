@@ -67,7 +67,7 @@ globalThis.MST_GATE = (() => {
 
   // --- runtime (requires chrome.*) -------------------------------------------
 
-  let current = { pro: false, paid: false, trialActive: false, trialExpired: false, trialDaysLeft: 0, source: "init" };
+  let current = { pro: false, paid: false, trialActive: false, trialExpired: false, trialPending: false, trialDaysLeft: 0, source: "init" };
 
   // Local-only funnel counters (no network, no PII): how often the upsell is
   // seen vs. the trial/plan buttons clicked. Shown on the options page so the
@@ -88,36 +88,63 @@ globalThis.MST_GATE = (() => {
   }
 
   // --- Reverse trial ----------------------------------------------------------
-  // Every install gets PRO for TRIAL_MS from first run, no email, no card
-  // (stamped by the service worker on install/update; the content script
-  // stamps it too as a fallback). When it ends the seller visibly loses the
-  // target price, radar colors and dashboard they were using — loss aversion
-  // is the whole mechanism, so nothing here is hidden or quiet.
-  // Pure helper: installedAtMs → { active, expired, daysLeft }.
-  function computeLocalTrial(installedAtMs, nowMs) {
-    if (!Number.isFinite(installedAtMs) || installedAtMs <= 0) {
-      return { active: false, expired: false, daysLeft: 0, daysSinceEnd: 0 };
+  // Every install gets PRO for TRIAL_MS, no email, no card. Since 1.5.5 the
+  // clock starts at the FIRST SAVED COST (<prefix>:trialStartedAt), not at
+  // install: a seller who installs and only reads the free card for a week
+  // no longer burns 7 invisible PRO days. Safety nets:
+  //   - no cost ever saved: the trial starts by itself TRIAL_AUTO_START_MS
+  //     after install, so nobody is stuck in "not started" forever
+  //   - pre-1.5.5 installs with a saved cost keep their old window
+  //     (trialStartedAt is migrated to installedAt)
+  // When it ends the seller visibly loses the target price, radar colors and
+  // dashboard they were using, so nothing here is hidden or quiet.
+  const TRIAL_AUTO_START_MS = 30 * 24 * 60 * 60 * 1000;
+
+  // Pure: where the 7-day window starts, from the stamps in storage.
+  //   stamp     a trialStartedAt stamp exists
+  //   migrated  pre-1.5.5 install with a saved cost: the window ran from install
+  //   auto      nothing saved for TRIAL_AUTO_START_MS: starts by itself
+  //   pending   installed, no cost yet: not started
+  //   none      no stamps at all (first run before the service worker ran)
+  function deriveTrialStart({ installedAt, trialStartedAt, hasCost }, nowMs) {
+    const ok = (v) => Number.isFinite(v) && v > 0 && v <= nowMs + CLOCK_SKEW_MS;
+    if (ok(trialStartedAt)) return { startedAt: trialStartedAt, reason: "stamp" };
+    if (!ok(installedAt)) return { startedAt: null, reason: "none" };
+    if (hasCost) return { startedAt: installedAt, reason: "migrated" };
+    if (nowMs - installedAt >= TRIAL_AUTO_START_MS) {
+      return { startedAt: installedAt + TRIAL_AUTO_START_MS, reason: "auto" };
     }
-    const elapsed = nowMs - installedAtMs;
+    return { startedAt: null, reason: "pending" };
+  }
+
+  // Pure helper: trialStartedAtMs → { active, expired, pending, daysLeft }.
+  // No start yet is "pending" (PRO not started, nothing lost, nothing expired).
+  function computeLocalTrial(startedAtMs, nowMs) {
+    if (!Number.isFinite(startedAtMs) || startedAtMs <= 0) {
+      return { active: false, expired: false, pending: true, daysLeft: 0, daysSinceEnd: 0 };
+    }
+    const elapsed = nowMs - startedAtMs;
     const active = elapsed >= 0 && elapsed < TRIAL_MS;
     const daysLeft = active ? Math.max(1, Math.ceil((TRIAL_MS - elapsed) / 86400000)) : 0;
     const daysSinceEnd = active ? 0 : Math.floor((elapsed - TRIAL_MS) / 86400000);
-    return { active, expired: !active && elapsed >= TRIAL_MS, daysLeft, daysSinceEnd };
+    return { active, expired: !active && elapsed >= TRIAL_MS, pending: false, daysLeft, daysSinceEnd };
   }
 
   // Merge ExtPay-derived status with the local reverse trial. Paid always
   // wins; an ExtPay trial (legacy opt-in) counts while active; otherwise the
   // local window decides. `trialExpired` is true only when a trial of either
-  // kind has ended without a purchase.
+  // kind has ended without a purchase; `trialPending` when the local trial
+  // has not started yet (no cost saved).
   function mergeStatus(base, local) {
-    if (base.paid) return { ...base, trialExpired: false, localTrial: false };
-    if (base.trialActive) return { ...base, localTrial: false };
+    if (base.paid) return { ...base, trialExpired: false, trialPending: false, localTrial: false };
+    if (base.trialActive) return { ...base, trialPending: false, localTrial: false };
     if (local.active) {
       return {
         ...base,
         pro: true,
         trialActive: true,
         trialExpired: false,
+        trialPending: false,
         trialDaysLeft: local.daysLeft,
         localTrial: true
       };
@@ -128,10 +155,66 @@ globalThis.MST_GATE = (() => {
       trialActive: false,
       // A lapsed subscriber is not a "trial ended" case (wrong message).
       trialExpired: Boolean((base.trialExpired || local.expired) && !base.lapsed),
+      trialPending: Boolean(local.pending && !base.trialExpired && !base.lapsed),
       trialDaysLeft: 0,
       trialDaysSinceEnd: local.daysSinceEnd,
       localTrial: false
     };
+  }
+
+  // Read both stamps (local + sync mirror, earliest wins), derive the start,
+  // and persist a derived start (migrated/auto) so it is stable from now on.
+  // Returns { installedAt, trialStartedAt, local } for the current moment.
+  // Any context with chrome.storage can call it (content, options, worker).
+  async function readLocalTrial(nowMs = Date.now()) {
+    const PREFIX = globalThis.EXT_BRAND?.cssPrefix ?? "mst";
+    const INSTALLED_KEY = `${PREFIX}:installedAt`;
+    const TRIAL_KEY = `${PREFIX}:trialStartedAt`;
+    const valid = (v) => Number.isFinite(v) && v > 0 && v <= nowMs;
+    const earliest = (a, b) => (valid(a) && valid(b) ? Math.min(a, b) : valid(a) ? a : valid(b) ? b : null);
+    let installedAt = null;
+    let trialStartedAt = null;
+    try {
+      const stored = await chrome.storage.local.get([INSTALLED_KEY, TRIAL_KEY]);
+      let sync = {};
+      try {
+        sync = (await chrome.storage.sync.get([INSTALLED_KEY, TRIAL_KEY])) ?? {};
+      } catch {
+        // sync storage unavailable: local stamps only
+      }
+      // The stamps are mirrored in storage.sync; the earlier of the two wins,
+      // so clearing local storage can't restart the trial. (ExtPay's own
+      // install time is NOT used: for pre-1.4 users it is months old.)
+      installedAt = earliest(stored[INSTALLED_KEY], sync[INSTALLED_KEY]);
+      trialStartedAt = earliest(stored[TRIAL_KEY], sync[TRIAL_KEY]);
+      if (installedAt === null) {
+        // First run before the service worker stamped it: install is now.
+        installedAt = nowMs;
+      }
+      let hasCost = false;
+      if (trialStartedAt === null) {
+        // Only scanned until the stamp exists (one storage read per page
+        // view at most, and only for installs that never saved a cost).
+        const all = await chrome.storage.local.get(null);
+        hasCost = Object.keys(all ?? {}).some((k) => k.startsWith(`${PREFIX}:cost:`) && Number(all[k]) > 0);
+      }
+      const derived = deriveTrialStart({ installedAt, trialStartedAt, hasCost }, nowMs);
+      trialStartedAt = derived.startedAt;
+      const writes = {};
+      if (stored[INSTALLED_KEY] !== installedAt) writes[INSTALLED_KEY] = installedAt;
+      if (trialStartedAt !== null && stored[TRIAL_KEY] !== trialStartedAt) writes[TRIAL_KEY] = trialStartedAt;
+      if (Object.keys(writes).length) {
+        quiet(chrome.storage.local.set(writes));
+        quiet(chrome.storage.sync.set(writes));
+      } else if (sync[INSTALLED_KEY] !== installedAt || (trialStartedAt !== null && sync[TRIAL_KEY] !== trialStartedAt)) {
+        const mirror = { [INSTALLED_KEY]: installedAt };
+        if (trialStartedAt !== null) mirror[TRIAL_KEY] = trialStartedAt;
+        quiet(chrome.storage.sync.set(mirror));
+      }
+    } catch {
+      // storage unavailable: pending (free) until it answers
+    }
+    return { installedAt, trialStartedAt, local: computeLocalTrial(trialStartedAt, nowMs) };
   }
 
   // Subscribers notified when a status that arrived AFTER the timeout changes
@@ -158,52 +241,25 @@ globalThis.MST_GATE = (() => {
     // Re-verified against the key hash on every computation: a flag or hash
     // pasted into storage proves nothing.
     if (await ownerActive()) {
-      current = { pro: true, paid: true, lapsed: false, trialActive: false, trialExpired: false, trialDaysLeft: 0, localTrial: false, owner: true, source: "owner" };
+      current = { pro: true, paid: true, lapsed: false, trialActive: false, trialExpired: false, trialPending: false, trialDaysLeft: 0, localTrial: false, owner: true, source: "owner" };
       return current;
     }
     const PREFIX = globalThis.EXT_BRAND?.cssPrefix ?? "mst";
     const CACHE_KEY = `${PREFIX}:proStatus`;
     const OVERRIDE_KEY = `${PREFIX}:proOverride`;
-    const INSTALLED_KEY = `${PREFIX}:installedAt`;
     let cached = null;
     let override = false;
-    let installedAt = null;
     try {
-      const stored = await chrome.storage.local.get([CACHE_KEY, OVERRIDE_KEY, INSTALLED_KEY]);
+      const stored = await chrome.storage.local.get([CACHE_KEY, OVERRIDE_KEY]);
       cached = stored[CACHE_KEY] ?? null;
       override = stored[OVERRIDE_KEY] === true;
-      const raw = stored[INSTALLED_KEY];
-      // A corrupt (NaN/0) or future-dated stamp is treated as missing and
-      // re-stamped, so no install is ever stuck without its trial.
-      installedAt = Number.isFinite(raw) && raw > 0 && raw <= Date.now() ? raw : null;
-      // The trial start is mirrored in storage.sync; the earlier of the two
-      // wins, so clearing local storage can't restart the trial. (ExtPay's own
-      // install time is NOT used: for pre-1.4 users it is months old and
-      // would cancel the 7 days they are promised on update.)
-      try {
-        const sync = await chrome.storage.sync.get(INSTALLED_KEY);
-        const mirror = sync?.[INSTALLED_KEY];
-        const okMirror = Number.isFinite(mirror) && mirror > 0 && mirror <= Date.now();
-        if (okMirror) installedAt = installedAt === null ? mirror : Math.min(installedAt, mirror);
-        if (installedAt !== null && (!okMirror || mirror !== installedAt)) {
-          quiet(chrome.storage.sync.set({ [INSTALLED_KEY]: installedAt }));
-          quiet(chrome.storage.local.set({ [INSTALLED_KEY]: installedAt }));
-        }
-      } catch {
-        // sync storage unavailable: local stamp only
-      }
-      if (installedAt === null) {
-        // First run before the service worker stamped it (or a pre-1.4 install
-        // updating): the reverse trial starts now.
-        installedAt = Date.now();
-        quiet(chrome.storage.local.set({ [INSTALLED_KEY]: installedAt }));
-      }
     } catch {
       // storage unavailable: resolveStatus handles nulls
     }
+    const now = Date.now();
+    const { local } = await readLocalTrial(now);
     // Bound offline staleness: drop a cache older than the TTL so it can't
     // grant Pro indefinitely without ExtPay ever confirming again.
-    const now = Date.now();
     if (!isCacheUsable(cached, now)) cached = null;
     // An offline cache that carries the ExtPay trial start is re-evaluated,
     // so a lapsed ExtPay trial can't stay PRO until the cache TTL runs out.
@@ -212,12 +268,47 @@ globalThis.MST_GATE = (() => {
     }
 
     current = override
-      ? { pro: true, paid: true, trialActive: false, trialExpired: false, trialDaysLeft: 0, localTrial: false, source: "override" }
-      : mergeStatus(resolveStatus(fresh, cached), computeLocalTrial(installedAt, now));
+      ? { pro: true, paid: true, trialActive: false, trialExpired: false, trialPending: false, trialDaysLeft: 0, localTrial: false, source: "override" }
+      : mergeStatus(resolveStatus(fresh, cached), local);
     if (fresh) {
+      lastFresh = fresh;
       quiet(chrome.storage.local.set({ [CACHE_KEY]: { ...fresh, fetchedAt: now } }));
     }
     return current;
+  }
+
+  // The first saved cost starts the 7 PRO days. Stamps trialStartedAt (local
+  // + sync mirror), recomputes the status and announces the change through
+  // onChange so the card rebuilds as PRO on the spot. Resolves true when a
+  // trial was started by this call.
+  let lastFresh = null;
+  async function startTrial() {
+    if (!current.trialPending || current.paid || current.owner) return false;
+    const PREFIX = globalThis.EXT_BRAND?.cssPrefix ?? "mst";
+    const TRIAL_KEY = `${PREFIX}:trialStartedAt`;
+    const now = Date.now();
+    try {
+      await chrome.storage.local.set({ [TRIAL_KEY]: now });
+      quiet(chrome.storage.sync.set({ [TRIAL_KEY]: now }));
+    } catch {
+      return false;
+    }
+    const before = entitlementKey(current);
+    await resolveCurrent(lastFresh);
+    if (!current.trialActive) return false;
+    track("trial:started"); // local funnel counter only
+    if (entitlementKey(current) !== before) notify();
+    return true;
+  }
+
+  function notify() {
+    for (const fn of [...listeners]) {
+      try {
+        fn(current);
+      } catch {
+        // a listener must not break the others
+      }
+    }
   }
 
   // ExtPay must never block the card: a slow or unreachable server falls
@@ -250,15 +341,7 @@ globalThis.MST_GATE = (() => {
         if (!late?.ok) return;
         const before = entitlementKey(current);
         await resolveCurrent(late.data);
-        if (entitlementKey(current) !== before) {
-          for (const fn of [...listeners]) {
-            try {
-              fn(current);
-            } catch {
-              // a listener must not break the others
-            }
-          }
-        }
+        if (entitlementKey(current) !== before) notify();
       }).catch(() => {});
     }
     return result;
@@ -296,9 +379,13 @@ globalThis.MST_GATE = (() => {
 
   return Object.freeze({
     TRIAL_MS,
+    TRIAL_AUTO_START_MS,
     METRICS_KEY,
     computeProStatus,
     computeLocalTrial,
+    deriveTrialStart,
+    readLocalTrial,
+    startTrial,
     mergeStatus,
     resolveStatus,
     isCacheUsable,

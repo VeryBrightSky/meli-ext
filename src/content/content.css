@@ -796,6 +796,7 @@
 /* Flex containers must still honor the hidden attribute. */
 .mst-alert[hidden],
 .mst-trialbar[hidden],
+.mst-trialbar__btn[hidden],
 .mst-upsell[hidden],
 .mst-radar[hidden] {
   display: none;
@@ -1040,6 +1041,52 @@
   background: #d8f1e3;
 }
 
+.mst-share[hidden] {
+  display: none;
+}
+
+/* v1.5.5: retentions and the PRO line under the headline, the "saved"
+   confirmation under the cost input, and the above-the-fold category slot. */
+.mst-summary__retentions {
+  margin-top: 3px;
+  font-size: 12.5px;
+  color: rgba(0, 0, 0, 0.65);
+  font-variant-numeric: tabular-nums;
+}
+
+.mst-summary__retentions[hidden],
+.mst-summary__pro[hidden],
+.mst-saved[hidden] {
+  display: none;
+}
+
+.mst-summary__pro {
+  margin-top: 4px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #0a5c34;
+  font-variant-numeric: tabular-nums;
+}
+
+.mst-saved {
+  font-size: 12px;
+  color: #00a650;
+  margin: -4px 0 2px;
+}
+
+.mst-catslot:empty {
+  display: none;
+}
+
+.mst-catslot > .mst-row {
+  margin-top: 6px;
+}
+
+.mst-catslot > .mst-hint {
+  margin-top: 2px;
+  color: #a3600c;
+}
+
 /* --- v1.4.1: narrow-column layout (MELI's buy-box column is ~326px) ------- */
 
 /* Rows wrap instead of truncating: a long label gets two lines, a long value
@@ -1101,6 +1148,12 @@
 .mst-trialbar[data-tone="expired"] {
   background: #e3edfb;
   border-color: rgba(52, 131, 250, 0.35);
+}
+
+/* Not started yet (1.5.5): quiet grey, no button. */
+.mst-trialbar[data-tone="pending"] {
+  background: #f5f7fb;
+  border-color: rgba(0, 0, 0, 0.1);
 }
 
 /* MSI columns stack in the narrow column so the payout is never cut off. */

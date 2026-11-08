@@ -760,10 +760,10 @@ test("fee table meta carries source citations and retrieval date", () => {
   }
 });
 
-test("gate: local reverse trial — active for 7 days from install, then expired", () => {
+test("gate: local reverse trial — active for 7 days from its start, then expired (no start → pending)", () => {
   const now = Date.UTC(2026, 5, 12);
   const day = 24 * 3600 * 1000;
-  assert.deepEqual(GATE.computeLocalTrial(null, now), { active: false, expired: false, daysLeft: 0, daysSinceEnd: 0 });
+  assert.deepEqual(GATE.computeLocalTrial(null, now), { active: false, expired: false, pending: true, daysLeft: 0, daysSinceEnd: 0 });
   const fresh = GATE.computeLocalTrial(now - 1000, now);
   assert.equal(fresh.active, true);
   assert.equal(fresh.daysLeft, 7);
@@ -771,7 +771,7 @@ test("gate: local reverse trial — active for 7 days from install, then expired
   assert.equal(day5.active, true);
   assert.equal(day5.daysLeft, 2);
   const over = GATE.computeLocalTrial(now - 9 * day, now);
-  assert.deepEqual(over, { active: false, expired: true, daysLeft: 0, daysSinceEnd: 2 });
+  assert.deepEqual(over, { active: false, expired: true, pending: false, daysLeft: 0, daysSinceEnd: 2 });
   // boundary: exactly 7 days → expired
   assert.equal(GATE.computeLocalTrial(now - GATE.TRIAL_MS, now).active, false);
 });
@@ -1042,6 +1042,141 @@ test("v1.4.3 gate: a lapsed subscriber is not told their trial ended", () => {
   assert.equal(never.trialExpired, true);
 });
 
+// v1.5.5: the 7 PRO days start at the first saved cost, not at install.
+test("v1.5.5 trial: no cost → not started (pending), first cost → 7 days, 30-day fallback, migration", () => {
+  const DAY = 86400000;
+  const now = Date.UTC(2026, 10, 7);
+  const base = GATE.computeProStatus({ paid: false }, now);
+  // Fresh install, nothing saved: pending, not PRO, not expired.
+  let d = GATE.deriveTrialStart({ installedAt: now - 2 * DAY, trialStartedAt: null, hasCost: false }, now);
+  assert.deepEqual(d, { startedAt: null, reason: "pending" });
+  let m = GATE.mergeStatus(base, GATE.computeLocalTrial(d.startedAt, now));
+  assert.equal(m.pro, false);
+  assert.equal(m.trialPending, true);
+  assert.equal(m.trialExpired, false);
+  assert.equal(m.trialActive, false);
+  // Same install 10 days later, still no cost: still pending (the old model
+  // would have burned the 7 days by now).
+  d = GATE.deriveTrialStart({ installedAt: now - 10 * DAY, trialStartedAt: null, hasCost: false }, now);
+  assert.equal(d.reason, "pending");
+  // First cost saved: the stamp wins and the window runs 7 full days from it.
+  d = GATE.deriveTrialStart({ installedAt: now - 10 * DAY, trialStartedAt: now - 1000, hasCost: true }, now);
+  assert.deepEqual(d, { startedAt: now - 1000, reason: "stamp" });
+  m = GATE.mergeStatus(base, GATE.computeLocalTrial(d.startedAt, now));
+  assert.deepEqual([m.pro, m.trialActive, m.trialPending, m.trialDaysLeft, m.localTrial], [true, true, false, 7, true]);
+  m = GATE.mergeStatus(base, GATE.computeLocalTrial(now - 5 * DAY, now));
+  assert.equal(m.trialDaysLeft, 2);
+  m = GATE.mergeStatus(base, GATE.computeLocalTrial(now - 7 * DAY, now));
+  assert.deepEqual([m.pro, m.trialExpired, m.trialPending, m.trialDaysSinceEnd], [false, true, false, 0]);
+  m = GATE.mergeStatus(base, GATE.computeLocalTrial(now - 9 * DAY, now));
+  assert.deepEqual([m.trialExpired, m.trialDaysSinceEnd], [true, 2]);
+  // 30-day fallback: no cost ever saved → starts by itself 30 days after install.
+  d = GATE.deriveTrialStart({ installedAt: now - 29 * DAY, trialStartedAt: null, hasCost: false }, now);
+  assert.equal(d.reason, "pending");
+  d = GATE.deriveTrialStart({ installedAt: now - 30 * DAY, trialStartedAt: null, hasCost: false }, now);
+  assert.deepEqual(d, { startedAt: now, reason: "auto" });
+  assert.equal(GATE.mergeStatus(base, GATE.computeLocalTrial(d.startedAt, now)).trialDaysLeft, 7);
+  d = GATE.deriveTrialStart({ installedAt: now - 35 * DAY, trialStartedAt: null, hasCost: false }, now);
+  assert.equal(d.startedAt, now - 5 * DAY);
+  assert.equal(GATE.mergeStatus(base, GATE.computeLocalTrial(d.startedAt, now)).trialDaysLeft, 2);
+  d = GATE.deriveTrialStart({ installedAt: now - 60 * DAY, trialStartedAt: null, hasCost: false }, now);
+  m = GATE.mergeStatus(base, GATE.computeLocalTrial(d.startedAt, now));
+  assert.deepEqual([m.pro, m.trialExpired, m.trialPending], [false, true, false]);
+  // Migration: a pre-1.5.5 install with a saved cost and no start stamp keeps
+  // its old window (trialStartedAt = installedAt).
+  d = GATE.deriveTrialStart({ installedAt: now - 3 * DAY, trialStartedAt: null, hasCost: true }, now);
+  assert.deepEqual(d, { startedAt: now - 3 * DAY, reason: "migrated" });
+  assert.equal(GATE.mergeStatus(base, GATE.computeLocalTrial(d.startedAt, now)).trialDaysLeft, 4);
+  d = GATE.deriveTrialStart({ installedAt: now - 20 * DAY, trialStartedAt: null, hasCost: true }, now);
+  assert.equal(d.reason, "migrated");
+  assert.equal(GATE.mergeStatus(base, GATE.computeLocalTrial(d.startedAt, now)).trialExpired, true);
+  // An existing stamp always beats migration and the fallback.
+  d = GATE.deriveTrialStart({ installedAt: now - 90 * DAY, trialStartedAt: now - DAY, hasCost: true }, now);
+  assert.deepEqual(d, { startedAt: now - DAY, reason: "stamp" });
+  // Corrupt / future stamps are ignored; no install stamp at all → none.
+  assert.equal(GATE.deriveTrialStart({ installedAt: NaN, trialStartedAt: now + 10 * DAY, hasCost: true }, now).reason, "none");
+  assert.equal(GATE.deriveTrialStart({ installedAt: now - DAY, trialStartedAt: now + 10 * DAY, hasCost: false }, now).reason, "pending");
+  // Paid and lapsed users are never "pending".
+  const paid = GATE.mergeStatus(GATE.computeProStatus({ paid: true }, now), GATE.computeLocalTrial(null, now));
+  assert.deepEqual([paid.pro, paid.trialPending], [true, false]);
+  const lapsed = GATE.mergeStatus(GATE.computeProStatus({ paid: false, paidAt: new Date(now - 40 * DAY).toISOString() }, now), GATE.computeLocalTrial(null, now));
+  assert.deepEqual([lapsed.pro, lapsed.trialPending, lapsed.trialExpired], [false, false, false]);
+});
+
+test("v1.5.5 gate.readLocalTrial + startTrial: stamps, migrates, notifies", async () => {
+  const prevChrome = globalThis.chrome;
+  const prevBrand = globalThis.EXT_BRAND;
+  const DAY = 86400000;
+  const localStore = {};
+  const syncStore = {};
+  const area = (store) => ({
+    get: async (keys) => {
+      if (keys === null) return { ...store };
+      const out = {};
+      for (const k of [].concat(keys)) if (k in store) out[k] = store[k];
+      return out;
+    },
+    set: async (obj) => Object.assign(store, obj)
+  });
+  globalThis.EXT_BRAND = { cssPrefix: "mst" };
+  globalThis.chrome = {
+    runtime: { sendMessage: async () => ({ ok: false }) },
+    storage: { local: area(localStore), sync: area(syncStore) }
+  };
+  try {
+    // Fresh install, no cost: pending; the install stamp is mirrored to sync.
+    localStore["mst:installedAt"] = Date.now() - 2 * DAY;
+    let r = await GATE.readLocalTrial();
+    assert.equal(r.trialStartedAt, null);
+    assert.equal(r.local.pending, true);
+    await new Promise((res) => setTimeout(res, 0));
+    assert.equal(syncStore["mst:installedAt"], localStore["mst:installedAt"]);
+    assert.equal(localStore["mst:trialStartedAt"], undefined, "pending writes no start stamp");
+    let st = await GATE.refresh({ timeoutMs: 10 });
+    assert.deepEqual([st.pro, st.trialPending], [false, true]);
+    // First cost: startTrial stamps now (local + sync) and announces PRO.
+    const events = [];
+    const off = GATE.onChange((s2) => events.push(s2.pro));
+    localStore["mst:cost:MLM1"] = 400;
+    assert.equal(await GATE.startTrial(), true);
+    assert.ok(Math.abs(localStore["mst:trialStartedAt"] - Date.now()) < 5000);
+    await new Promise((res) => setTimeout(res, 0));
+    assert.equal(syncStore["mst:trialStartedAt"], localStore["mst:trialStartedAt"]);
+    assert.deepEqual(events, [true]);
+    assert.deepEqual([GATE.isPro(), GATE.status().trialDaysLeft, GATE.status().localTrial], [true, 7, true]);
+    // Idempotent: a second cost does not restart anything.
+    assert.equal(await GATE.startTrial(), false);
+    off();
+    // Clearing local storage can't restart the trial: the sync mirror wins.
+    for (const k of Object.keys(localStore)) delete localStore[k];
+    r = await GATE.readLocalTrial();
+    assert.equal(r.trialStartedAt, syncStore["mst:trialStartedAt"]);
+    // Migration: pre-1.5.5 install (stamp 3 days old, a cost, no start) keeps
+    // its window and the derived start is persisted.
+    for (const k of Object.keys(localStore)) delete localStore[k];
+    for (const k of Object.keys(syncStore)) delete syncStore[k];
+    localStore["mst:installedAt"] = Date.now() - 3 * DAY;
+    localStore["mst:cost:MLM9"] = 120;
+    r = await GATE.readLocalTrial();
+    assert.equal(r.trialStartedAt, localStore["mst:installedAt"]);
+    assert.equal(r.local.daysLeft, 4);
+    await new Promise((res) => setTimeout(res, 0));
+    assert.equal(localStore["mst:trialStartedAt"], localStore["mst:installedAt"]);
+    assert.equal(syncStore["mst:trialStartedAt"], localStore["mst:installedAt"]);
+    // 30-day fallback persists its derived start too.
+    for (const k of Object.keys(localStore)) delete localStore[k];
+    for (const k of Object.keys(syncStore)) delete syncStore[k];
+    localStore["mst:installedAt"] = Date.now() - 31 * DAY;
+    r = await GATE.readLocalTrial();
+    assert.equal(r.local.daysLeft, 6);
+    await new Promise((res) => setTimeout(res, 0));
+    assert.equal(localStore["mst:trialStartedAt"], localStore["mst:installedAt"] + GATE.TRIAL_AUTO_START_MS);
+  } finally {
+    globalThis.chrome = prevChrome;
+    globalThis.EXT_BRAND = prevBrand;
+  }
+});
+
 test("v1.4.3 gate.refresh: an answer after the timeout is applied, cached and announced", async () => {
   const prevChrome = globalThis.chrome;
   const localStore = {};
@@ -1059,7 +1194,9 @@ test("v1.4.3 gate.refresh: an answer after the timeout is applied, cached and an
     runtime: { sendMessage: () => new Promise((r) => setTimeout(() => r(paidAnswer), 80)) },
     storage: { local: area(localStore), sync: area(syncStore) }
   };
-  localStore["mst:installedAt"] = Date.now() - 30 * 86400000; // local trial long over
+  // Local trial long over: installed 60 days ago, never saved a cost, so the
+  // 30-day fallback started it 30 days ago and it ended 23 days ago.
+  localStore["mst:installedAt"] = Date.now() - 60 * 86400000;
   try {
     const events = [];
     GATE.onChange((st) => events.push(st.pro));

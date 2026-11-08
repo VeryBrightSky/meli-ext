@@ -437,6 +437,8 @@ globalThis.MST_CARD = (() => {
     patchRow(refs.net, null, na, false);
     refs.summaryNet.textContent = `${T("rowNet")} ${na}`;
     refs.summaryProfit.hidden = true;
+    refs.summaryRetentions.hidden = true;
+    refs.proLine.hidden = true;
     for (const node of [
       refs.profit?.root, refs.breakeven?.root, refs.target?.root, refs.targetTeaser?.root,
       refs.msiTeaser?.root, refs.monthly?.root, refs.sweetspot, refs.compareBox, refs.msiBox
@@ -655,19 +657,19 @@ globalThis.MST_CARD = (() => {
     refs.isr.root.style.display = showW ? "" : "none";
     refs.netAfter.root.style.display = showW ? "" : "none";
     refs.withholdingsHint.style.display = showW ? "" : "none";
+    refs.summaryRetentions.hidden = !showW;
     if (showW) {
       const w = CALC.computeWithholdings(state.priceMXN, SOURCE.withholdings);
       patchRow(refs.iva, null, fmtCharge(w.ivaMXN), flash);
       patchRow(refs.isr, null, fmtCharge(w.isrMXN), flash);
-      patchRow(
-        refs.netAfter,
-        null,
-        fmtRange(
-          CALC.round2(b.netMinMXN - w.totalMXN),
-          CALC.round2(b.netMaxMXN - w.totalMXN)
-        ),
-        flash
+      const afterW = fmtRange(
+        CALC.round2(b.netMinMXN - w.totalMXN),
+        CALC.round2(b.netMaxMXN - w.totalMXN)
       );
+      patchRow(refs.netAfter, null, afterW, flash);
+      // One line under the headline: the headline is before IVA/ISR, so an
+      // RFC seller sees what actually lands after the 2026 retentions.
+      refs.summaryRetentions.textContent = T("summaryRetentions", [fmtMoney(w.totalMXN), afterW]);
     }
 
     patchRow(
@@ -690,10 +692,17 @@ globalThis.MST_CARD = (() => {
     }
 
     patchRow(refs.net, null, fmtRange(b.netMinMXN, b.netMaxMXN), flash);
-    if (refs.shareBtn) refs.shareBtn.href = buildShareUrl();
     refs.summaryNet.textContent = T("summaryNet", [fmtRange(b.netMinMXN, b.netMaxMXN)]);
-    // The button says "this calculation" only when the message carries one.
-    if (refs.shareBtn) refs.shareBtn.textContent = state.productCostMXN > 0 ? T("btnShare") : T("btnShareApp");
+    // Share only once there is a real number to share (a saved cost): a
+    // "recommend the app" button on first sight is noise.
+    if (refs.shareBtn) {
+      const canShare = state.productCostMXN > 0;
+      refs.shareBtn.hidden = !canShare;
+      if (canShare) {
+        refs.shareBtn.href = buildShareUrl();
+        refs.shareBtn.textContent = T("btnShare");
+      }
+    }
     if (b.profitMinMXN !== undefined) {
       const losing = b.profitMaxMXN < 0;
       refs.summaryProfit.hidden = false;
@@ -750,7 +759,7 @@ globalThis.MST_CARD = (() => {
     if (hasCost) {
       const lo = solve(quote.pctMin, 0);
       const hi = solve(quote.pctMax, 0);
-      patchRow(refs.breakeven, null, lo !== null && hi !== null ? fmtRange(lo, hi) : "—", flash);
+      patchRow(refs.breakeven, null, lo !== null && hi !== null ? fmtRange(lo, hi) : T("noValue"), flash);
     }
 
     if (!pro) {
@@ -797,6 +806,7 @@ globalThis.MST_CARD = (() => {
       refs.targetMarginRow.style.display = hasCost ? "" : "none";
       const hasTarget = hasCost && margin > 0;
       refs.target.root.style.display = hasTarget ? "" : "none";
+      refs.proLine.hidden = true;
       if (hasTarget) {
         refs.target.label.textContent = T("rowTargetPriceFor", [String(margin)]);
         const lo = solve(quote.pctMin, margin);
@@ -807,6 +817,12 @@ globalThis.MST_CARD = (() => {
           lo !== null && hi !== null ? fmtRange(lo, hi) : T("targetUnreachable"),
           flash
         );
+        // One short line under the summary so the seller sees what PRO just
+        // did for this listing (worst-case price for the margin in effect).
+        if (hi !== null) {
+          refs.proLine.textContent = T("proDidLine", [fmtMoney(hi), String(margin)]);
+          refs.proLine.hidden = false;
+        }
       }
 
       // Monthly profit: profit per unit × user-entered sales/month.
@@ -827,9 +843,12 @@ globalThis.MST_CARD = (() => {
       }
     }
 
-    // Category hint + toggle button states.
+    // Category hint + toggle button states. With no category the selector
+    // and its hint sit above the fold (next to the summary), because the
+    // range the card shows is only exact once the seller picks one; with a
+    // category they live in the collapsed breakdown.
     if (!state.categoryGroupId) {
-      refs.hint.textContent = T("hintNoCategory", [`${quote.pctMin}%`, `${quote.pctMax}%`]);
+      refs.hint.textContent = T("hintNoCategory");
       refs.hint.style.display = "";
     } else if (state.categoryAutoDetected) {
       refs.hint.textContent = T("hintDetected");
@@ -837,6 +856,7 @@ globalThis.MST_CARD = (() => {
     } else {
       refs.hint.style.display = "none";
     }
+    placeCategoryPicker(!state.categoryGroupId);
     for (const [id, btn] of Object.entries(refs.toggleButtons)) {
       const active = state.listingTypeId === id;
       btn.classList.toggle(`${PREFIX}-toggle__btn--active`, active);
@@ -865,6 +885,23 @@ globalThis.MST_CARD = (() => {
   }
 
   // --- Build (once per injection) -----------------------------------------------
+
+  // Category picker + hint: above the fold (right under the cost) while the
+  // category is unknown, inside the collapsed breakdown once it is known.
+  // Idempotent; called from build and from every update.
+  function placeCategoryPicker(above) {
+    const row = refs.categorySelect?.closest(`.${PREFIX}-row`);
+    if (!row || !refs.hint || !refs.catSlot) return;
+    if (above) {
+      if (refs.catSlot.contains(row)) return;
+      refs.catSlot.append(row, refs.hint);
+    } else if (refs.breakdown) {
+      if (refs.breakdown.contains(row)) return;
+      const toggle = refs.breakdown.querySelector(`.${PREFIX}-breakdown__toggle`);
+      if (toggle) toggle.after(row, refs.hint);
+      else refs.breakdown.append(row, refs.hint);
+    }
+  }
 
   function buildSkeletonRows(body) {
     for (const width of ["60%", "85%", "40%"]) {
@@ -897,17 +934,74 @@ globalThis.MST_CARD = (() => {
     // Answer first: what the seller keeps, before any breakdown.
     refs.summary = el("div", `${PREFIX}-summary`);
     refs.summaryNet = el("div", `${PREFIX}-summary__net`, "");
+    refs.summaryRetentions = el("div", `${PREFIX}-summary__retentions`, "");
+    refs.summaryRetentions.hidden = true;
     refs.summaryProfit = el("div", `${PREFIX}-summary__profit`, "");
     refs.summaryProfit.hidden = true;
-    refs.summary.append(refs.summaryNet, refs.summaryProfit);
+    refs.proLine = el("div", `${PREFIX}-summary__pro`, "");
+    refs.proLine.hidden = true;
+    refs.summary.append(refs.summaryNet, refs.summaryRetentions, refs.summaryProfit, refs.proLine);
     body.appendChild(refs.summary);
 
+    // Product cost: the one input that turns fees into profit, so it sits
+    // right under the answer. Saving is confirmed for 2 s; the first saved
+    // cost also starts the 7 PRO days (gate.startTrial).
+    const costRow = el("div", `${PREFIX}-row ${PREFIX}-row--cost`);
+    costRow.appendChild(el("span", `${PREFIX}-row__label`, T("rowProductCost")));
+    refs.savedNote = el("div", `${PREFIX}-saved`, T("costSaved"));
+    refs.savedNote.hidden = true;
+    let savedTimer = null;
+    const showSaved = () => {
+      refs.savedNote.hidden = false;
+      clearTimeout(savedTimer);
+      savedTimer = setTimeout(() => {
+        refs.savedNote.hidden = true;
+      }, 2000);
+    };
+    const startTrialSoon = debounced(() => {
+      if (state.productCostMXN > 0 && globalThis.MST_GATE.status().trialPending) {
+        globalThis.MST_GATE.startTrial().catch(() => {});
+      }
+    }, 1500);
+    refs.costInput = moneyInput(
+      () => state.productCostMXN,
+      (v) => {
+        const changed = v !== state.productCostMXN;
+        state.productCostMXN = v;
+        update();
+        persistInputs();
+        if (v > 0) {
+          TRACK.once("first_cost_entered");
+          TRACK.count("cost_entries");
+          if (changed && state.itemId && SAFE.alive()) showSaved();
+          startTrialSoon();
+        }
+      }
+    );
+    refs.costInput.addEventListener("blur", () => startTrialSoon.flush());
+    refs.costInput.setAttribute("aria-label", T("inputProductCostAria"));
+    costRow.appendChild(refs.costInput);
+    body.appendChild(costRow);
+    body.appendChild(refs.savedNote);
+    // Category picker lands here when the category is unknown (see
+    // placeCategoryPicker); otherwise it lives in the breakdown.
+    refs.catSlot = el("div", `${PREFIX}-catslot`);
+    body.appendChild(refs.catSlot);
+
     // Review ask: only after the seller has used Netio on 3+ listings (saved
-    // a cost), once, dismissible forever. Ratings drive Chrome Web Store
-    // ranking and no MX competitor has more than a handful.
+    // a cost) AND either pays for PRO or has been around 14+ days, never to
+    // someone whose trial just expired (they are not in a rating mood). Once,
+    // dismissible forever. Ratings drive Chrome Web Store ranking.
     const REVIEW_KEY = `${PREFIX}:reviewAsk`;
-    chrome.storage.local.get(null).then((all) => {
+    const reviewEligible = (all) => {
+      if (gateStatus.paid) return true;
+      if (gateStatus.trialExpired) return false;
+      const installedAt = Number(all[`${PREFIX}:installedAt`]);
+      return Number.isFinite(installedAt) && installedAt > 0 && Date.now() - installedAt >= 14 * 86400000;
+    };
+    if (SAFE.alive()) chrome.storage.local.get(null).then((all) => {
       if (!all || all[REVIEW_KEY] || globalThis.MST_GATE.isOwner()) return;
+      if (!reviewEligible(all)) return;
       const used = Object.keys(all).filter((k) => k.startsWith(`${PREFIX}:cost:`) && Number(all[k]) > 0).length;
       if (used < 3) return;
       const ask = el("div", `${PREFIX}-review`);
@@ -1332,25 +1426,6 @@ globalThis.MST_CARD = (() => {
     });
     body.appendChild(refs.sweetspot);
 
-    // Product cost input → profit margin.
-    const costRow = el("div", `${PREFIX}-row`);
-    costRow.appendChild(el("span", `${PREFIX}-row__label`, T("rowProductCost")));
-    refs.costInput = moneyInput(
-      () => state.productCostMXN,
-      (v) => {
-        state.productCostMXN = v;
-        update();
-        persistInputs();
-        if (v > 0) {
-          TRACK.once("first_cost_entered");
-          TRACK.count("cost_entries");
-        }
-      }
-    );
-    refs.costInput.setAttribute("aria-label", T("inputProductCostAria"));
-    costRow.appendChild(refs.costInput);
-    body.appendChild(costRow);
-
     refs.profit = buildRow(T("rowProfit"), "profit");
     body.appendChild(refs.profit.root);
 
@@ -1471,6 +1546,7 @@ globalThis.MST_CARD = (() => {
     refs.shareBtn = el("a", `${PREFIX}-share`, T("btnShare"));
     refs.shareBtn.target = "_blank";
     refs.shareBtn.rel = "noopener";
+    refs.shareBtn.hidden = true; // shown by update() once a cost is saved
     refs.shareBtn.href = buildShareUrl();
     refs.shareBtn.addEventListener("click", () => {
       refs.shareBtn.href = buildShareUrl();
@@ -1484,8 +1560,6 @@ globalThis.MST_CARD = (() => {
     const details = el("details", `${PREFIX}-breakdown`);
     details.appendChild(el("summary", `${PREFIX}-breakdown__toggle`, T("breakdownToggle")));
     const moveIntoDetails = [
-      refs.categorySelect?.closest(`.${PREFIX}-row`),
-      refs.hint,
       refs.commission?.root,
       refs.fixed?.root,
       refs.effective?.root,
@@ -1504,6 +1578,7 @@ globalThis.MST_CARD = (() => {
     shipRowEl.before(details);
     for (const node of moveIntoDetails) details.appendChild(node);
     refs.breakdown = details;
+    placeCategoryPicker(!state.categoryGroupId);
     try {
       chrome.storage.sync.get({ breakdownOpen: false }).then((v) => {
         if (v.breakdownOpen) details.open = true;

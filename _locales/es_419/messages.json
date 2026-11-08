@@ -30,7 +30,7 @@
     "message": "La detectamos de la publicación; corrígela si no coincide."
   },
   "hintNoCategory": {
-    "message": "No detectamos la categoría; la comisión por venta va del $1 al $2."
+    "message": "No detectamos la categoría. Elígela para ver un número exacto."
   },
   "rowCommission": {
     "message": "Comisión por venta ($1)"
@@ -213,7 +213,7 @@
     "message": "Modo investigación: costo $1% del precio"
   },
   "optAcquisition": {
-    "message": "Costo de adquisición (% del precio), modo investigación"
+    "message": "Radar: costo supuesto (% del precio) cuando no hay costo guardado"
   },
   "optSubscription": {
     "message": "Suscripción"
@@ -240,7 +240,7 @@
     "message": "Tablero de Ganancias"
   },
   "dashEmpty": {
-    "message": "Guarda el costo de un producto en su publicación para verlo aquí."
+    "message": "Guarda el costo en cualquier publicación y aparecerá aquí"
   },
   "dashCommission": {
     "message": "Comisión"
@@ -549,7 +549,7 @@
     "message": "Gracias por suscribirte. Así le sacas todo el provecho:"
   },
   "welcomeStep1": {
-    "message": "Abre cualquier publicación de Mercado Libre"
+    "message": "Abre una de tus publicaciones"
   },
   "welcomeStep1Body": {
     "message": "La calculadora aparece debajo del precio con tu comisión, costo fijo, envío y ganancia."
@@ -567,7 +567,7 @@
     "message": "En los resultados de búsqueda, cada producto sale en verde, amarillo o rojo según tu costo."
   },
   "welcomeGo": {
-    "message": "Abrir Mercado Libre"
+    "message": "Abrir mis publicaciones"
   },
   "welcomeNote": {
     "message": "Tus costos y productos se guardan en tu navegador; no tenemos servidores. Solo el pago de PRO pasa por ExtensionPay."
@@ -600,7 +600,7 @@
     "message": "Precio para ganar $1%"
   },
   "summaryNet": {
-    "message": "Mercado Libre te deposita $1 por venta"
+    "message": "Te queda $1 por venta (antes de IVA/ISR)"
   },
   "summaryProfit": {
     "message": "Ganancia $1 · $2"
@@ -700,5 +700,59 @@
   },
   "shippingEstimateTag": {
     "message": "est."
+  },
+  "summaryRetentions": {
+    "message": "Retenciones IVA 8% + ISR 2.5%: $1. Después de retenciones te quedan $2"
+  },
+  "costSaved": {
+    "message": "Guardado para esta publicación"
+  },
+  "proDidLine": {
+    "message": "PRO: a $1 ganas el $2%"
+  },
+  "noValue": {
+    "message": "sin dato"
+  },
+  "statusTrialPending": {
+    "message": "Prueba PRO de 7 días: empieza cuando guardes tu primer costo"
+  },
+  "trialPendingBanner": {
+    "message": "Tu prueba PRO de 7 días empieza cuando guardes tu primer costo"
+  },
+  "trialEndingWorstLoss": {
+    "message": "Te quedan $3 días de PRO. Tu peor producto: $1, pierde $2 por venta."
+  },
+  "trialEndingWorstLossOne": {
+    "message": "Último día de PRO. Tu peor producto: $1, pierde $2 por venta."
+  },
+  "trialEndingWorstThin": {
+    "message": "Te quedan $3 días de PRO. Tu peor producto: $1, deja solo $2 por venta."
+  },
+  "trialEndingWorstThinOne": {
+    "message": "Último día de PRO. Tu peor producto: $1, deja solo $2 por venta."
+  },
+  "welcomeTitlePending": {
+    "message": "Tu prueba PRO está lista"
+  },
+  "welcomeLeadPending": {
+    "message": "Tienes 7 días de Netio PRO gratis: empiezan cuando guardes tu primer costo. Sin correo, sin tarjeta. Así le sacas provecho desde hoy:"
+  },
+  "badgeTrialPending": {
+    "message": "PRO · 7 días al guardar tu primer costo"
+  },
+  "dashExample": {
+    "message": "Ejemplo"
+  },
+  "dashExampleTitle": {
+    "message": "Ejemplo: Audífonos Bluetooth"
+  },
+  "dashOpenMeli": {
+    "message": "Abrir Mercado Libre"
+  },
+  "optSupport": {
+    "message": "Soporte: $1"
+  },
+  "welcomeStep1Trial": {
+    "message": "Tu prueba PRO de 7 días empieza cuando guardes tu primer costo."
   }
 }
