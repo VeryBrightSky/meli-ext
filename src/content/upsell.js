@@ -264,10 +264,12 @@ globalThis.MST_UPSELL = (() => {
     let stateKey = null;
     if (status.trialPending && !status.paid) {
       // 1.5.5: the 7 days have not started; say what starts them. No button:
-      // the cost input right below is the action.
-      stateKey = "pending";
+      // the cost input right below is the action. From day 30 after install
+      // (r3: there is no automatic start any more) the reminder comes back
+      // under its own dismissal key.
+      stateKey = status.trialRemind ? "remind" : "pending";
       root.dataset.tone = "pending";
-      text.textContent = T("trialPendingBanner");
+      text.textContent = status.trialRemind ? T("trialRemindBanner") : T("trialPendingBanner");
       btn.hidden = true;
     } else if (status.trialActive && status.localTrial) {
       stateKey = status.trialDaysLeft <= 3 ? "ending" : "active";

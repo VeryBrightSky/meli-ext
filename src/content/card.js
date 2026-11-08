@@ -172,7 +172,9 @@ globalThis.MST_CARD = (() => {
   // Money input: type=text + inputmode=decimal so commas are typeable.
   // Never reformatted while focused; normalized to "123.45" on blur.
   // Enter confirms (blurs). Recalc is debounced on 'input'.
-  function moneyInput(getValue, onValue) {
+  // onCommit(value) fires on blur/Enter (after the pending edit is applied):
+  // the moment a typed value is final, as opposed to a debounced keystroke.
+  function moneyInput(getValue, onValue, { onCommit } = {}) {
     const input = document.createElement("input");
     input.type = "text";
     input.inputMode = "decimal";
@@ -197,6 +199,7 @@ globalThis.MST_CARD = (() => {
       debouncedApply.flush();
       const v = getValue();
       input.value = v > 0 ? v.toFixed(2) : "";
+      if (onCommit) onCommit(v);
     });
 
     input.syncFromState = () => {
@@ -212,7 +215,11 @@ globalThis.MST_CARD = (() => {
   // cost/sales/weight keys full of zeros just because a toggle was clicked.
   const persistedKeys = new Set();
 
-  function persistInputs() {
+  // extra: entries written in the SAME storage write as the per-item keys
+  // (the trial start stamp rides with the first saved cost, so a navigation
+  // right after a chip tap can never separate the two). Only written when
+  // the item has an id, like the cost itself.
+  function persistInputs(extra = null) {
     if (!SAFE.alive()) {
       showStale();
       return;
@@ -252,6 +259,7 @@ globalThis.MST_CARD = (() => {
           persistedKeys.add(key);
         }
       }
+      if (extra) Object.assign(entries, extra);
       if (Object.keys(entries).length) save("local", entries);
       // Listing snapshot for the dashboard (only meaningful with a cost).
       if (state.productCostMXN > 0) {
@@ -1089,31 +1097,37 @@ globalThis.MST_CARD = (() => {
         refs.savedNote.hidden = true;
       }, 2000);
     };
-    const startTrialSoon = debounced(() => {
-      if (state.productCostMXN > 0 && globalThis.MST_GATE.status().trialPending) {
-        globalThis.MST_GATE.startTrial().catch(() => {});
-      }
-    }, 1500);
-    // One path for a typed cost and a tapped chip: both save, confirm and
-    // start the trial the same way.
-    const applyCost = (v, { how }) => {
-      const changed = v !== state.productCostMXN;
+    // One path for a typed cost and a tapped chip. A keystroke only
+    // recalculates; the cost is saved when it is final (blur/Enter, or a chip
+    // tap), and the FIRST saved cost carries the trial start stamp in the
+    // same storage write (no debounce, no second write a navigation could
+    // cut off). A page without an item id saves nothing and starts nothing.
+    let lastCommittedCost = state.productCostMXN;
+    refs.markCostCommitted = (v) => {
+      lastCommittedCost = v;
+    };
+    const applyCost = (v, { how, commit }) => {
       state.productCostMXN = v;
       update();
-      persistInputs();
+      if (!commit) return;
+      const changed = v !== lastCommittedCost;
+      lastCommittedCost = v;
+      const GATE = globalThis.MST_GATE;
+      const stamp = v > 0 && state.itemId ? GATE.trialStampForFirstCost() : null;
+      persistInputs(stamp);
       if (v > 0) {
         TRACK.once("first_cost_entered");
         TRACK.count("cost_entries");
-        if (how === "chip") globalThis.MST_GATE.track("cost:chip"); // local funnel counter only
+        if (how === "chip") GATE.track("cost:chip"); // local funnel counter only
         if (changed && state.itemId && SAFE.alive()) showSaved();
-        startTrialSoon();
+        if (stamp) GATE.startTrial({ stampedAt: Object.values(stamp)[0] }).catch(() => {});
       }
     };
     refs.costInput = moneyInput(
       () => state.productCostMXN,
-      (v) => applyCost(v, { how: "typed" })
+      (v) => applyCost(v, { how: "typed", commit: false }),
+      { onCommit: (v) => applyCost(v, { how: "typed", commit: true }) }
     );
-    refs.costInput.addEventListener("blur", () => startTrialSoon.flush());
     refs.costInput.setAttribute("aria-label", T("inputProductCostAria"));
     // Cost chips: the first cost is one tap. 40 / 50 / 60 % of the page
     // price, each showing the peso amount it stands for; hidden once a cost
@@ -1127,7 +1141,7 @@ globalThis.MST_CARD = (() => {
       chip.addEventListener("click", () => {
         const v = CALC.round2((state.pagePriceMXN * pct) / 100);
         if (!(v > 0)) return;
-        applyCost(v, { how: "chip" });
+        applyCost(v, { how: "chip", commit: true });
         refs.costInput.syncFromState();
       });
       refs.chipButtons.push(chip);
@@ -1945,6 +1959,7 @@ globalThis.MST_CARD = (() => {
       refs.priceInput.syncFromState();
       refs.shippingInput.syncFromState();
       refs.costInput.syncFromState();
+      refs.markCostCommitted?.(state.productCostMXN);
       refs.marginInput?.syncFromState();
       refs.salesInput?.syncFromState();
       refs.adsInput?.syncFromState();

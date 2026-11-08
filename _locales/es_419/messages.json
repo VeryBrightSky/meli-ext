@@ -719,6 +719,9 @@
   "trialPendingBanner": {
     "message": "Tu prueba PRO de 7 días empieza cuando guardes tu primer costo"
   },
+  "trialRemindBanner": {
+    "message": "Tu prueba PRO empieza cuando guardes tu primer costo"
+  },
   "trialEndingWorstLoss": {
     "message": "Te quedan $3 días de PRO. Tu peor producto: $1, pierde $2 por venta."
   },

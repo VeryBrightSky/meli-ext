@@ -719,6 +719,9 @@
   "trialPendingBanner": {
     "message": "Your 7-day PRO trial starts when you save your first product cost"
   },
+  "trialRemindBanner": {
+    "message": "Your PRO trial starts when you save your first product cost"
+  },
   "trialEndingWorstLoss": {
     "message": "$3 days of PRO left. Your worst product: $1, loses $2 per sale."
   },

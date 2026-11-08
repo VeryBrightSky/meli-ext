@@ -73,22 +73,12 @@ quietly(telemetry.init().then(() => telemetry.flush()));
 chrome.runtime.onInstalled.addListener((details) => quietly(telemetry.onInstalled(details)));
 
 // Reverse trial: stamp first-run time on install, and on update for users
-// who predate it. Since 1.5.5 the 7 PRO days start at the first saved cost
-// (gate.js readLocalTrial derives and migrates the start stamp).
+// who predate it. Since 1.5.5 the 7 PRO days start at the first saved cost;
+// the one-time migration of pre-1.5.5 installs (and the trialSchema stamp)
+// happens here, in gate.js migrateTrialOnUpdate.
 const WELCOME_URL = "src/onboarding/welcome.html";
 const REVERSE_TRIAL_SINCE = "1.4.0";
-
-// "1.3.1" < "1.4.0" → true. Numeric, segment by segment.
-function versionBefore(a, b) {
-  const pa = String(a ?? "0").split(".").map((n) => Number(n) || 0);
-  const pb = String(b).split(".").map((n) => Number(n) || 0);
-  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-    const x = pa[i] ?? 0;
-    const y = pb[i] ?? 0;
-    if (x !== y) return x < y;
-  }
-  return false;
-}
+const versionBefore = globalThis.MST_GATE.versionBefore;
 
 const WELCOMED_KEY = `${PREFIX}:welcomed`;
 const validStamp = (v) => Number.isFinite(v) && v > 0 && v <= Date.now();
@@ -104,8 +94,10 @@ chrome.runtime.onInstalled.addListener(async (details) => {
     const stamp = a !== null && b !== null ? Math.min(a, b) : (a ?? b ?? Date.now());
     await chrome.storage.local.set({ [INSTALLED_KEY]: stamp });
     chrome.storage.sync.set({ [INSTALLED_KEY]: stamp }).catch(() => {});
-    // Migration (pre-1.5.5 install with a saved cost keeps its window) and
-    // the 30-day fallback are stamped here once, so every context agrees.
+    // One-time trial schema stamp + pre-1.5.5 migration (a saved cost with
+    // no start stamp keeps its old window from install), so every context
+    // agrees and no content script ever migrates on its own.
+    await globalThis.MST_GATE.migrateTrialOnUpdate(details, Date.now());
     await globalThis.MST_GATE.readLocalTrial(Date.now());
   } catch (err) {
     console.warn("[Netio] could not stamp installedAt:", err);
