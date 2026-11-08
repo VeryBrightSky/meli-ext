@@ -362,7 +362,10 @@ try {
     assert.equal(await seed.$eval("#lbl-lang", (e) => e.textContent), "Idioma");
     assert.equal(await seed.$eval("#lang", (e) => e.value), "es_419");
     assert.equal(await seed.$eval("#lbl-privacy", (e) => e.textContent), "Tus costos, ventas y el historial de precios de las publicaciones que abres se guardan solo en tu navegador. No tenemos servidores.");
-    await seed.select("#lang", "en");
+    // The options page reloads itself after saving the language: wait for
+    // that navigation (a waitForFunction alone can be lost with the old
+    // document and time out).
+    await Promise.all([seed.waitForNavigation({ waitUntil: "load", timeout: 10000 }), seed.select("#lang", "en")]);
     await seed.waitForFunction(() => (document.getElementById("lbl-lang")?.textContent ?? "") === "Language", { timeout: 10000 });
     assert.equal(await seed.evaluate(async () => (await chrome.storage.sync.get("mst:lang"))["mst:lang"]), "en");
     assert.equal(await seed.$eval("#lbl-card", (e) => e.textContent), "Show the calculator on listings");
@@ -371,7 +374,7 @@ try {
     await first.waitForFunction(() => (document.querySelector(".mst-summary__net")?.textContent ?? "").includes("$665.70"), { timeout: 5000 });
     assert.equal(await first.$eval(".mst-summary__net", (e) => e.textContent), "You keep $665.70 per sale (before VAT/income tax)");
     assert.equal(await first.$eval("#mst-card-root", (c) => c.textContent.includes("MX$")), false, "money stays '$' in English");
-    await seed.select("#lang", "es_419");
+    await Promise.all([seed.waitForNavigation({ waitUntil: "load", timeout: 10000 }), seed.select("#lang", "es_419")]);
     await seed.waitForFunction(() => (document.getElementById("lbl-lang")?.textContent ?? "") === "Idioma", { timeout: 10000 });
     await first.reload({ waitUntil: "load" });
     await first.waitForSelector("#mst-card-root", { visible: true, timeout: 20000 });
