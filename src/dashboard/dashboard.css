@@ -232,7 +232,39 @@ tbody tr.mst-row--loss:hover {
   text-align: center;
   font-size: 14px;
   color: rgba(0, 0, 0, 0.55);
-  padding: 48px 16px;
+  padding: 20px 16px 6px;
+}
+
+.empty-actions {
+  text-align: center;
+  margin: 0 0 16px;
+}
+
+.empty-actions .share {
+  display: inline-block;
+  margin: 0;
+}
+
+#empty-open[hidden] {
+  display: none;
+}
+
+/* v1.5.5: the sample row on an empty table. */
+tr.example td {
+  color: rgba(0, 0, 0, 0.45);
+  font-style: italic;
+}
+
+.example-tag {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.6);
+  background: rgba(0, 0, 0, 0.07);
 }
 
 /* v1.4: free preview of the table */
