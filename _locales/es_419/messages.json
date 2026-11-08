@@ -113,6 +113,9 @@
   "stripNet": {
     "message": "Neto aprox."
   },
+  "stripAssumedCost": {
+    "message": "con costo supuesto $1%"
+  },
   "stripListingType": {
     "message": "Tipo (estimado)"
   },
@@ -133,9 +136,6 @@
   },
   "stripFixedCost": {
     "message": "Costo fijo"
-  },
-  "stripNetBeforeShipping": {
-    "message": "Neto antes del envío"
   },
   "stripFooter": {
     "message": "$1 · estimado, tarifas al $2"
@@ -709,6 +709,9 @@
   },
   "proDidLine": {
     "message": "PRO: a $1 ganas el $2%"
+  },
+  "proDidLineMaxCost": {
+    "message": "PRO: costo máximo para ganar $1%: $2"
   },
   "noValue": {
     "message": "sin dato"

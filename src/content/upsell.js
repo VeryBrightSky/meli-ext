@@ -222,7 +222,8 @@ globalThis.MST_UPSELL = (() => {
       defaultShippingMXN: null, usesFull: false, reputationId: "none", freeShipping: false
     });
     const ship = DASH.resolveShipping(sync, all[`${PREFIX}:defaults`]);
-    const rows = DASH.computeRows(all, PREFIX, ship.value, { ...sync, shippingUnset: ship.unset });
+    // Ads count only while PRO, exactly like the card's own profit line.
+    const rows = DASH.computeRows(all, PREFIX, ship.value, { ...sync, shippingUnset: ship.unset, includeAds: GATE.isPro() });
     if (!rows.length) return null;
     rows.sort((a, b) => a.b.profitMinMXN - b.b.profitMinMXN);
     const w = rows[0];

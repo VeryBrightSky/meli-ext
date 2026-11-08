@@ -113,6 +113,9 @@
   "stripNet": {
     "message": "Net approx."
   },
+  "stripAssumedCost": {
+    "message": "with an assumed cost of $1%"
+  },
   "stripListingType": {
     "message": "Listing (est.)"
   },
@@ -133,9 +136,6 @@
   },
   "stripFixedCost": {
     "message": "Fixed fee"
-  },
-  "stripNetBeforeShipping": {
-    "message": "Net before shipping"
   },
   "stripFooter": {
     "message": "$1 · estimate, rates as of $2"
@@ -709,6 +709,9 @@
   },
   "proDidLine": {
     "message": "PRO: at $1 you earn $2%"
+  },
+  "proDidLineMaxCost": {
+    "message": "PRO: max cost to earn $1%: $2"
   },
   "noValue": {
     "message": "no data"

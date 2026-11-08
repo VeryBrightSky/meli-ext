@@ -98,7 +98,9 @@
   const shippingInfo = DASH.resolveShipping(sync, all[`${PREFIX}:defaults`]);
   const defaultShipping = shippingInfo.value;
 
-  let rows = DASH.computeRows(all, PREFIX, defaultShipping, { ...sync, shippingUnset: shippingInfo.unset });
+  // Ads % per product counts only for PRO, as on the card (the ads input is
+  // a PRO row; a free preview must show the same numbers the free card does).
+  let rows = DASH.computeRows(all, PREFIX, defaultShipping, { ...sync, shippingUnset: shippingInfo.unset, includeAds: pro });
   // Free preview shows the same FREE_ROWS products no matter how the table is
   // sorted afterwards (worst margin first at load), so re-sorting can't be
   // used to read every row three at a time.
@@ -125,6 +127,7 @@
     { key: "type", csvOnly: true, label: T("rowListingType"), value: (r) => (r.meta.listingTypeId === "premium" ? T("typePremium") : T("typeClassic")), sort: (r) => r.meta.listingTypeId },
     { key: "commission", csvOnly: true, label: T("dashCommission"), num: true, value: (r) => UI.fmtCharge(r.b.commissionMinMXN, r.b.commissionMaxMXN), sort: (r) => r.b.commissionMaxMXN },
     { key: "shipping", csvOnly: true, label: T("dashShipping"), num: true, value: (r) => UI.fmtCharge(r.b.shippingCostMXN), sort: (r) => r.b.shippingCostMXN },
+    { key: "ads", csvOnly: true, label: T("rowAds"), num: true, value: (r) => (r.b.adsCostMXN > 0 ? UI.fmtCharge(r.b.adsCostMXN) : T("noValue")), sort: (r) => r.b.adsCostMXN },
     { key: "net", label: T("dashNet"), num: true, value: (r) => UI.fmtRange(r.b.netMinMXN, r.b.netMaxMXN), sort: (r) => r.b.netMinMXN },
     { key: "cost", label: T("dashCost"), num: true, value: (r) => UI.fmtMoney(r.cost), sort: (r) => r.cost },
     { key: "profit", label: T("rowProfit"), num: true, value: (r) => UI.fmtRange(r.b.profitMinMXN, r.b.profitMaxMXN), tone: (r) => toneBy(r.b.profitMinMXN), sort: (r) => r.b.profitMinMXN },

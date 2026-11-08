@@ -888,7 +888,33 @@ globalThis.MST_CARD = (() => {
         );
         // One short line under the summary so the seller sees what PRO just
         // did for this listing (worst-case price for the margin in effect).
-        if (hi !== null) {
+        // r3: never recommend a LOWER price for a margin the seller already
+        // has. When the current worst-case margin already meets the target,
+        // the line points up instead: the price for 10 more points, or, if
+        // no price reaches that, the most this unit may cost at the current
+        // price for the target margin.
+        const currentMargin = b.marginMinPct ?? 0;
+        if (currentMargin >= margin) {
+          const upMargin = Math.min(99, Math.ceil(currentMargin + 10));
+          const up = upMargin > currentMargin ? solve(quote.pctMax, upMargin) : null;
+          if (up !== null && up > state.priceMXN) {
+            refs.proLine.textContent = T("proDidLine", [fmtMoney(up), String(upMargin)]);
+            refs.proLine.hidden = false;
+          } else {
+            const maxCost = CALC.solveMaxCost({
+              priceMXN: state.priceMXN,
+              marginPct: margin,
+              ratePct: quote.pctMax,
+              adsPct: effectiveAdsPct(),
+              fixedCostMXN: b.fixedCostMXN,
+              shippingMXN: effectiveShipping
+            });
+            if (maxCost !== null) {
+              refs.proLine.textContent = T("proDidLineMaxCost", [String(margin), fmtMoney(maxCost)]);
+              refs.proLine.hidden = false;
+            }
+          }
+        } else if (hi !== null) {
           refs.proLine.textContent = T("proDidLine", [fmtMoney(hi), String(margin)]);
           refs.proLine.hidden = false;
         }

@@ -346,6 +346,16 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Free preview: the verdict is computed with an assumed cost; say so inline. */
+.mst-strip__assumed {
+  color: rgba(0, 0, 0, 0.5);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
 .mst-strip__dot {
   width: 8px;
   height: 8px;

@@ -724,6 +724,41 @@ test("portfolioSummary: single row is both best and worst; avg rounds to 2dp", (
   assert.equal(s.avgMarginPct, 33.34);
 });
 
+test("v1.5.5 r3 dashboard rows fold the per-product ads % in like the card (10% ads)", () => {
+  const all = {
+    "mst:cost:MLM1": 413.5,
+    "mst:ads:MLM1": 10,
+    "mst:meta:MLM1": { title: "Celular", priceMXN: 827, listingTypeId: "classic", categoryGroupId: "tech" },
+    "mst:cost:MLM2": 413.5,
+    "mst:meta:MLM2": { title: "Sin ads", priceMXN: 827, listingTypeId: "classic", categoryGroupId: "tech" }
+  };
+  const rows = DASH.computeRows(all, "mst", 0, { shippingUnset: true, reputationId: "none" });
+  const withAds = rows.find((r) => r.itemId === "MLM1");
+  const noAds = rows.find((r) => r.itemId === "MLM2");
+  // The card at $827, tech 10%, 0.3 kg estimate 78.60, ads 10% = 82.70:
+  // net 583.00, profit 169.50, margin 20.5% (the card's own numbers).
+  const expected = CALC.computeBreakdown(
+    SOURCE.getQuote({ priceMXN: 827, listingTypeId: "classic", categoryGroupId: "tech" }),
+    { priceMXN: 827, shippingCostMXN: 78.6, productCostMXN: 413.5, adsPct: 10 }
+  );
+  assert.equal(withAds.adsPct, 10);
+  assert.equal(withAds.b.adsCostMXN, 82.7);
+  assert.deepEqual([withAds.b.netMinMXN, withAds.b.profitMinMXN, withAds.b.marginMinPct], [583, 169.5, 20.5]);
+  assert.deepEqual([withAds.b.netMinMXN, withAds.b.profitMinMXN, withAds.b.marginMinPct], [expected.netMinMXN, expected.profitMinMXN, expected.marginMinPct]);
+  assert.deepEqual([noAds.b.netMinMXN, noAds.b.profitMinMXN, noAds.b.marginMinPct], [665.7, 252.2, 30.5]);
+  // The worst product (what the trial banners quote) is the one paying ads.
+  const summary = DASH.portfolioSummary(rows);
+  assert.equal(summary.worstMargin.itemId, "MLM1");
+  assert.equal(summary.worstMargin.marginPct, 20.5);
+  // Free callers (card without the ads row) get the same numbers as the free card.
+  const free = DASH.computeRows(all, "mst", 0, { shippingUnset: true, reputationId: "none", includeAds: false });
+  assert.equal(free.find((r) => r.itemId === "MLM1").b.adsCostMXN, 0);
+  assert.equal(free.find((r) => r.itemId === "MLM1").b.marginMinPct, 30.5);
+  // Ads are capped at 99 like the card input.
+  const capped = DASH.computeRows({ ...all, "mst:ads:MLM1": 500 }, "mst", 0, { shippingUnset: true, reputationId: "none" });
+  assert.equal(capped.find((r) => r.itemId === "MLM1").adsPct, 99);
+});
+
 test("portfolioSummary: derives from live computeRows (worst-case margin/profit)", () => {
   const all = {
     "mst:cost:A": 400, "mst:meta:A": { title: "A", priceMXN: 827, listingTypeId: "classic", categoryGroupId: "tech", url: "u" },
