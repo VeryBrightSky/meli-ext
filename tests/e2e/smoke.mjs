@@ -813,6 +813,21 @@ try {
   assert.equal(await page.$(".mst-review"), null, "expired trial: never asked for a review");
   pass("review ask never shown to an expired-trial user (3 used listings)");
   await seedPage(() => chrome.storage.local.remove(["mst:cost:MLM1", "mst:cost:MLM2"]));
+  // r4 (minor d): an ads % saved during the trial is not in the free card's
+  // numbers (the input is PRO); the card says so under the summary instead
+  // of dropping it silently. Net stays $694.30 (no ads deducted).
+  await seedPage(() => chrome.storage.local.set({ "mst:ads:MLM12345678": 10 }));
+  await page.reload({ waitUntil: "load" });
+  await page.waitForSelector("#mst-card-root", { visible: true, timeout: 20000 });
+  await page.waitForFunction(() => !document.querySelector(".mst-summary__adshint")?.hidden, { timeout: 5000, polling: 100 });
+  assert.equal(await page.$eval(".mst-summary__adshint", (e) => e.textContent), "Publicidad (10%) solo se aplica con PRO");
+  assert.equal(await page.evaluate(rowValue("Recibes aprox.")), "$694.30", "free net ignores the saved ads %");
+  assert.equal(await page.evaluate(rowValue("Publicidad (10%)")), null, "no ads row on the free card");
+  pass("expired trial with a saved 10% ads: hint 'Publicidad (10%) solo se aplica con PRO', net unchanged ($694.30)");
+  await seedPage(() => chrome.storage.local.remove("mst:ads:MLM12345678"));
+  await page.reload({ waitUntil: "load" });
+  await page.waitForSelector("#mst-card-root", { visible: true, timeout: 20000 });
+  await page.waitForFunction(() => document.querySelector(".mst-summary__adshint")?.hidden === true, { timeout: 5000, polling: 100 });
 
   if (process.env.E2E_SHOTS) {
     await page.$eval(".mst-upsell", (e) => (e.hidden = true));

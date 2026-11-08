@@ -1073,8 +1073,16 @@
 
 .mst-summary__retentions[hidden],
 .mst-summary__pro[hidden],
+.mst-summary__adshint[hidden],
 .mst-saved[hidden] {
   display: none;
+}
+
+/* Free card: a saved ads % is not in the numbers until PRO (r4). */
+.mst-summary__adshint {
+  margin-top: 4px;
+  font-size: 11.5px;
+  color: rgba(0, 0, 0, 0.55);
 }
 
 .mst-summary__pro {

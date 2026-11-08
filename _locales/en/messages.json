@@ -833,6 +833,9 @@
   "rowAds": {
     "message": "Ads (% of price)"
   },
+  "summaryAdsProOnly": {
+    "message": "Ads ($1%) only apply with PRO"
+  },
   "rowAdsCost": {
     "message": "Ads ($1%)"
   },

@@ -465,6 +465,7 @@ globalThis.MST_CARD = (() => {
     refs.summaryRetentions.hidden = true;
     refs.summaryUpto.hidden = true;
     refs.proLine.hidden = true;
+    refs.adsHint.hidden = true;
     refs.stack.hidden = true;
     for (const node of [
       refs.profit?.root, refs.breakeven?.root, refs.target?.root, refs.targetTeaser?.root,
@@ -724,6 +725,11 @@ globalThis.MST_CARD = (() => {
     if (b.adsCostMXN > 0) {
       patchRow(refs.ads, T("rowAdsCost", [String(b.adsPct)]), fmtCharge(b.adsCostMXN), flash);
     }
+    // Free/expired card with a saved ads %: the numbers above ignore it (the
+    // input is PRO), so one line says the percentage is waiting for PRO.
+    const adsDropped = !pro && state.adsPct > 0;
+    refs.adsHint.hidden = !adsDropped;
+    if (adsDropped) refs.adsHint.textContent = T("summaryAdsProOnly", [String(state.adsPct)]);
 
     patchRow(refs.net, null, fmtRange(b.netMinMXN, b.netMaxMXN), flash);
     // Headline: one number. With an exact rate it is the number; with an
@@ -1113,6 +1119,10 @@ globalThis.MST_CARD = (() => {
     refs.summaryProfit.hidden = true;
     refs.proLine = el("div", `${PREFIX}-summary__pro`, "");
     refs.proLine.hidden = true;
+    // r4 (minor d): a saved ads % is ignored on the free card (the input is
+    // PRO); say so instead of silently dropping it from the numbers.
+    refs.adsHint = el("div", `${PREFIX}-summary__adshint`, "");
+    refs.adsHint.hidden = true;
     // Zero-typing value: while no cost is saved, the whole fee stack at the
     // page price (commission, fixed charge, shipping, retentions) sits under
     // the headline as hard numbers. Once a cost exists the profit lines take
@@ -1128,7 +1138,7 @@ globalThis.MST_CARD = (() => {
       refs.stackRows[id] = r;
       refs.stack.appendChild(r.root);
     }
-    refs.summary.append(refs.summaryNet, refs.summaryUpto, refs.summaryRetentions, refs.summaryProfit, refs.proLine, refs.stack);
+    refs.summary.append(refs.summaryNet, refs.summaryUpto, refs.summaryRetentions, refs.summaryProfit, refs.proLine, refs.adsHint, refs.stack);
     body.appendChild(refs.summary);
 
     // Product cost: the one input that turns fees into profit, so it sits
