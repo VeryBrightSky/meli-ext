@@ -1143,14 +1143,21 @@ globalThis.MST_CARD = (() => {
     // same storage write (no debounce, no second write a navigation could
     // cut off). A page without an item id saves nothing and starts nothing.
     let lastCommittedCost = state.productCostMXN;
+    let costDirty = false; // typed since the last commit
     refs.markCostCommitted = (v) => {
       lastCommittedCost = v;
+      costDirty = false;
     };
     const applyCost = (v, { how, commit }) => {
       state.productCostMXN = v;
       update();
-      if (!commit) return;
-      const changed = v !== lastCommittedCost;
+      if (!commit) {
+        costDirty = true;
+        return;
+      }
+      // A blur that typed nothing (focus in, focus out) is not a save.
+      if (!costDirty && how !== "chip" && v === lastCommittedCost) return;
+      costDirty = false;
       lastCommittedCost = v;
       const GATE = globalThis.MST_GATE;
       const stamp = v > 0 && state.itemId ? GATE.trialStampForFirstCost() : null;
@@ -1159,7 +1166,7 @@ globalThis.MST_CARD = (() => {
         TRACK.once("first_cost_entered");
         TRACK.count("cost_entries");
         if (how === "chip") GATE.track("cost:chip"); // local funnel counter only
-        if (changed && state.itemId && SAFE.alive()) {
+        if (state.itemId && SAFE.alive()) {
           savedNoteUntil = Date.now() + SAVED_NOTE_MS;
           savedNoteItemId = state.itemId;
           showSaved();
