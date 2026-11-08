@@ -1097,12 +1097,17 @@ try {
   assert.deepEqual(compareVals, ["$694.30", "$657.08 – $673.62", "$20.68 – $37.22"]);
   pass("compare: Clásica $694.30 / Premium $657.08–$673.62 / MSI $20.68–$37.22");
 
-  // PRO shows the target price by default at 30% as soon as a cost exists.
-  assert.equal(await page.evaluate(rowValue("Precio para ganar 30%")), "$750.00");
-  // r3: at $827 this listing already makes 35.59 % (> 30 %), so the PRO line
-  // never suggests $750 (a lower price); it points up: 46 % at $1,022.73.
+  // PRO shows the target row by default at 30% as soon as a cost exists.
+  // r3/r4: at $827 this listing already makes 35.59 % (> 30 %), so neither
+  // the row nor the PRO line suggests $750 (a lower price): the row states
+  // the margin met at the current price, the PRO line points up (46 % at
+  // $1,022.73), and the max-cost row keeps the 30 % number.
+  assert.equal(await page.evaluate(rowValue("Ya ganas 35.59% a este precio")), "$827.00");
+  assert.equal(await page.evaluate(rowValue("Precio para ganar 30%")), null, "no lower price on the card");
+  assert.equal(await page.$eval("#mst-card-root", (c) => c.textContent.includes("$750.00")), false, "$750.00 nowhere on the card");
   assert.equal(await page.$eval(".mst-summary__pro", (e) => (e.hidden ? "" : e.textContent)), "PRO: a $1,022.73 ganas el 46%");
-  pass("PRO target price visible by default at 30% margin ($750.00); the PRO line points up ('a $1,022.73 ganas el 46%'), never below the current price");
+  assert.equal(await page.evaluate(rowValue("Costo máximo para ganar 30%")), "$446.20"); // 827 × 0.60 − 50
+  pass("PRO target row at 30%: 'Ya ganas 35.59% a este precio: $827.00' (no $750), PRO line points up ('a $1,022.73 ganas el 46%'), max cost $446.20");
   // Review ask (v1.5.5): paid PRO with 3+ used listings → shown once,
   // links to the store reviews, dismiss is permanent.
   {
@@ -1131,7 +1136,10 @@ try {
   }
   // inputs (pro): 0 cost, 1 price, 2 shipping, 3 ventas, 4 margin
   await typeInto(page, IDX.margin, "20");
-  assert.equal(await page.evaluate(rowValue("Precio para ganar 20%")), "$642.86");
+  // r4: 35.59 % already beats 20 %, so the row never shows the lower $642.86
+  // (the solver's number is unit-tested); it states the margin at $827.
+  assert.equal(await page.evaluate(rowValue("Ya ganas 35.59% a este precio")), "$827.00");
+  assert.equal(await page.evaluate(rowValue("Precio para ganar 20%")), null, "no lower price while the margin is met");
   await typeInto(page, IDX.sales, "10");
   assert.equal(await page.evaluate(rowValue("Ganancia mensual")), "$2,943.00");
   pass("Pro solver $642.86 + ventas 10 → ganancia mensual $2,943.00");
@@ -1154,14 +1162,15 @@ try {
   assert.ok(iAds > iShip && iAds < iNet, `ads row not between shipping and net: ${order.join(" | ")}`);
   assert.notEqual(order[iTotal - 1], order[iAds], "ads must not sit right above 'Costo total'");
   assert.ok(iAds > iTotal, `ads row must come after 'Costo total': ${order.join(" | ")}`);
-  assert.equal(await page.evaluate(rowValue("Precio para ganar 20%")), "$692.31");
+  // With 5 % ads the margin is (652.95 − 400) / 827 = 30.59 %: still met.
+  assert.equal(await page.evaluate(rowValue("Ya ganas 30.59% a este precio")), "$827.00");
   assert.equal(await page.evaluate(rowValue("Costo máximo para ganar 20%")), "$487.55");
   assert.equal(await page.evaluate(rowValue("Ganancia mensual")), "$2,529.50");
   // Persisted per product: survives a reload.
   await page.reload({ waitUntil: "load" });
   await page.waitForSelector("#mst-card-root", { visible: true, timeout: 20000 });
   await page.waitForFunction((k) => document.querySelectorAll(".mst-card input.mst-input")[k]?.value === "5.00", { timeout: 10000 }, IDX.ads);
-  assert.equal(await page.evaluate(rowValue("Precio para ganar 20%")), "$692.31");
+  assert.equal(await page.evaluate(rowValue("Ya ganas 30.59% a este precio")), "$827.00");
   // r3 (major 4): the dashboard folds the saved 5 % ads in exactly like the
   // card: monthly (652.95 − 400) × 10 = $2,529.50, not $2,943.00.
   {
@@ -1177,9 +1186,9 @@ try {
     pass("dashboard folds the product's 5% ads in: net $652.95, profit $252.95, monthly $2,529.50 (same as the card)");
   }
   await typeInto(page, IDX.ads, "0");
-  assert.equal(await page.evaluate(rowValue("Precio para ganar 20%")), "$642.86");
+  assert.equal(await page.evaluate(rowValue("Ya ganas 35.59% a este precio")), "$827.00");
   assert.equal(await page.evaluate(rowValue("Costo máximo para ganar 20%")), "$528.90");
-  pass("PRO: costo máximo para ganar 20% $528.90; publicidad 5% → −$41.35, net $652.95, target $692.31, max cost $487.55, monthly $2,529.50; persisted per product; back to 0");
+  pass("PRO: costo máximo para ganar 20% $528.90; publicidad 5% → −$41.35, net $652.95, 'Ya ganas 30.59%', max cost $487.55, monthly $2,529.50; persisted per product; back to 0");
 
   // Margin-health dot: 35.59% margin → green.
   assert.equal(
@@ -1197,7 +1206,11 @@ try {
     await page.$eval(".mst-row--profit", (e) => e.classList.contains("mst-row--loss")),
     true
   );
-  pass('negative profit shows red "Pierdes …" framing');
+  // r4: below the target the row proposes the price for the margin in
+  // effect (20 %): (900 + 50) / (1 − 0.10 − 0.20) = $1,357.15 (cent up).
+  assert.equal(await page.evaluate(rowValue("Precio para ganar 20%")), "$1,357.15");
+  assert.equal(await page.evaluate(rowValue("a este precio")), null, "no 'Ya ganas' row on a loss");
+  pass('negative profit shows red "Pierdes …" framing; target row proposes $1,357.15 for 20%');
   await typeInto(page, IDX.cost, "400"); // restore
 
   // ====================== PHASE 4: search page, Pro =========================
@@ -2054,7 +2067,8 @@ try {
     assert.equal(ui.bar, false, "no trial/win-back bar");
     assert.equal(ui.upsellOpen, false, "no upsell");
     assert.equal(ui.review, 0, "no review ask");
-    assert.ok(await op.evaluate(rowValue("Precio para ganar 30%")), "target price visible");
+    // The PRO target row (r4: "Ya ganas X% a este precio" once the margin is met).
+    assert.ok((await op.evaluate(rowValue("Precio para ganar 30%"))) || (await op.evaluate(rowValue("a este precio"))), "target row visible");
     pass("listing page: PRO unlocked, no teaser/trial bar/upsell/review ask");
     await op.close();
 
