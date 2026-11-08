@@ -1417,3 +1417,63 @@ test("v1.5.3 official calculator cases: the extension matches official_expected"
     assert.equal(CALC.round2(b.netMaxMXN - i.cost - wh.totalMXN), e.netMax ?? e.net, `case ${c.id} net max`);
   }
 });
+
+// --- v1.5.5 r2: ads % folded into the net, max-cost solver ------------------
+
+test("computeBreakdown: adsPct lowers net/profit/margin like a commission (tech classic $827, 5% ads)", () => {
+  const quote = SOURCE.getQuote({ priceMXN: 827, listingTypeId: "classic", categoryGroupId: "tech" });
+  const base = CALC.computeBreakdown(quote, { priceMXN: 827, shippingCostMXN: 50, productCostMXN: 400 });
+  const ads = CALC.computeBreakdown(quote, { priceMXN: 827, shippingCostMXN: 50, productCostMXN: 400, adsPct: 5 });
+  assert.equal(base.adsPct, 0);
+  assert.equal(base.adsCostMXN, 0);
+  assert.equal(ads.adsPct, 5);
+  assert.equal(ads.adsCostMXN, 41.35); // 827 × 5%
+  assert.equal(ads.netMinMXN, CALC.round2(base.netMinMXN - 41.35)); // 694.30 − 41.35 = 652.95
+  assert.equal(ads.netMinMXN, 652.95);
+  assert.equal(ads.profitMinMXN, 252.95);
+  assert.equal(ads.marginMinPct, 30.59);
+  // The effective MELI rate row stays commission + fixed charge only.
+  assert.equal(ads.effectiveRateMinPct, base.effectiveRateMinPct);
+  // Garbage/negative/absurd ads never leak: 0, −5 and 500 clamp.
+  assert.equal(CALC.computeBreakdown(quote, { priceMXN: 827, shippingCostMXN: 0, productCostMXN: 0, adsPct: -5 }).adsCostMXN, 0);
+  assert.equal(CALC.computeBreakdown(quote, { priceMXN: 827, shippingCostMXN: 0, productCostMXN: 0, adsPct: NaN }).adsCostMXN, 0);
+  assert.equal(CALC.computeBreakdown(quote, { priceMXN: 100, shippingCostMXN: 0, productCostMXN: 0, adsPct: 500 }).adsPct, 99);
+});
+
+test("solveMaxCost: inverse of the target price at a fixed price (tech classic 10%, $642.86, 20%, ship 50)", () => {
+  // solveTargetPrice(cost 400, ship 50, 20%) = 642.86, so at $642.86 the
+  // most the unit may cost for 20% is 400 (floored to the cent).
+  const max = CALC.solveMaxCost({ priceMXN: 642.86, marginPct: 20, ratePct: 10, fixedCostMXN: 0, shippingMXN: 50 });
+  assert.ok(Math.abs(max - 400) < 0.01, String(max));
+  // Round trip: a unit at that cost sold at that price reaches the margin.
+  const quote = SOURCE.getQuote({ priceMXN: 642.86, listingTypeId: "classic", categoryGroupId: "tech" });
+  const b = CALC.computeBreakdown(quote, { priceMXN: 642.86, shippingCostMXN: 50, productCostMXN: max });
+  assert.ok(b.marginMinPct >= 20, `margin ${b.marginMinPct}`);
+});
+
+test("solveMaxCost: exact display numbers at $827 (10%, 30%, ship 78.60) and with 5% ads", () => {
+  // 827 × (1 − 0.10 − 0.30) = 496.20; − 78.60 = 417.60
+  assert.equal(CALC.solveMaxCost({ priceMXN: 827, marginPct: 30, ratePct: 10, shippingMXN: 78.6 }), 417.6);
+  // 5% ads: 827 × 0.55 = 454.85 − 78.60 = 376.25
+  assert.equal(CALC.solveMaxCost({ priceMXN: 827, marginPct: 30, ratePct: 10, adsPct: 5, shippingMXN: 78.6 }), 376.25);
+  // The fixed charge below $299 is subtracted: $250 at 10%, 30%: 150 − 37 = 113
+  assert.equal(CALC.solveMaxCost({ priceMXN: 250, marginPct: 30, ratePct: 10, fixedCostMXN: 37 }), 113);
+  assert.equal(UI.fmtMoney(417.6), "$417.60");
+});
+
+test("solveMaxCost: nothing left → null; bad input → null; floors to the cent", () => {
+  assert.equal(CALC.solveMaxCost({ priceMXN: 100, marginPct: 85, ratePct: 16 }), null); // 1 − 1.01 < 0
+  assert.equal(CALC.solveMaxCost({ priceMXN: 100, marginPct: 30, ratePct: 10, shippingMXN: 60 }), null); // 60 − 60 = 0
+  assert.equal(CALC.solveMaxCost({ priceMXN: 0, marginPct: 30, ratePct: 10 }), null);
+  assert.equal(CALC.solveMaxCost({ priceMXN: NaN, marginPct: 30, ratePct: 10 }), null);
+  assert.equal(CALC.solveMaxCost({ priceMXN: 100, marginPct: "30", ratePct: 10 }), null);
+  // 333.33 × 0.6 = 199.998 → 199.99, never 200.00 (which would miss the margin by a hair)
+  assert.equal(CALC.solveMaxCost({ priceMXN: 333.33, marginPct: 30, ratePct: 10 }), 199.99);
+});
+
+test("solveTargetPrice with ads: rate + ads is the same as a higher commission", () => {
+  const a = CALC.solveTargetPrice({ costMXN: 400, shippingMXN: 50, marginPct: 20, ratePct: 15, fixedCostFn: SOURCE.getFixedCost });
+  const b = CALC.solveTargetPrice({ costMXN: 400, shippingMXN: 50, marginPct: 20, ratePct: 10 + 5, fixedCostFn: SOURCE.getFixedCost });
+  assert.equal(a, b);
+  assert.equal(a, 692.31); // 450 / 0.65
+});
