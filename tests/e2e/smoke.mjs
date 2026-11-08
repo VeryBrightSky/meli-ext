@@ -75,6 +75,18 @@ fixtures.productUsd = fixtures.product.replace(
   /<meta itemprop="price"[^>]*>/i,
   '<meta itemprop="price" content="827" /><meta itemprop="priceCurrency" content="USD" />'
 );
+// r4: search results WITH links, as MELI renders them. The first result is
+// the product fixture's own listing (catalog /p/MLM12345678), the second an
+// item link (/MLM-…), the third has no link at all (id cannot be extracted).
+fixtures.searchLinked = fixtures.search
+  .replace(
+    "<h2>Celular Test Pro 128 GB</h2>",
+    '<h2><a class="poly-component__title" href="https://www.mercadolibre.com.mx/celular-test-pro/p/MLM12345678?pdp_filters=x#polycard_client=search">Celular Test Pro 128 GB</a></h2>'
+  )
+  .replace(
+    "<h2>Celular Económico 32 GB</h2>",
+    '<h2><a class="poly-component__title" href="https://articulo.mercadolibre.com.mx/MLM-2222222222-celular-economico-_JM">Celular Económico 32 GB</a></h2>'
+  );
 fixtures.productNoAnchor = fixtures.productNoPrice.replace(
   /ui-pdp-price/g,
   "ui-pdp-x"
@@ -85,7 +97,7 @@ const server = createServer(
     const host = req.headers.host ?? "";
     const url = req.url ?? "";
     const body = host.startsWith("listado.")
-      ? (url.includes("grid") ? fixtures.searchGrid : fixtures.search)
+      ? (url.includes("grid") ? fixtures.searchGrid : url.includes("linked") ? fixtures.searchLinked : fixtures.search)
       : url.includes("noprice")
         ? fixtures.productNoPrice
         : url.includes("nometa")
@@ -368,6 +380,43 @@ try {
     // 827 × (1 − 0.10 − 0.30) − 78.60 = 417.60
     assert.equal(await first.evaluate(rowValue("Costo máximo para ganar 30%")), "$417.60");
     pass("chip tap = first saved cost: 'Guardado', $413.50 in the input, trial starts (7 días), card rebuilds as PRO, Ganancia $252.20 · 30.5%, PRO line points up (41%), costo máximo $417.60");
+    // r4 (major a): the Radar strip for THIS listing uses the saved cost, so
+    // the search page shows the card's own profit and margin ($252.20 · 30.5%,
+    // "tu costo"), not the assumed 60 %. A result whose link carries no id
+    // falls back to the assumption with the existing label.
+    {
+      const linked = await browser.newPage();
+      await linked.goto(`${SEARCH_URL}?linked`, { waitUntil: "load" });
+      await linked.waitForFunction(() => document.querySelectorAll(".mst-strip").length === 3, { timeout: 20000, polling: 100 });
+      const strips = await linked.$$eval(".mst-strip", (els) =>
+        els.map((e) => ({
+          id: e.dataset.itemId ?? null,
+          saved: e.dataset.savedCost ?? null,
+          bucket: e.dataset.bucket,
+          profit: e.querySelector(".mst-strip__verdict b")?.textContent ?? null,
+          margin: e.querySelector(".mst-strip__margin")?.textContent ?? null,
+          basis: e.querySelector(".mst-strip__assumed")?.textContent ?? null
+        }))
+      );
+      assert.deepEqual(strips[0], { id: "MLM12345678", saved: "413.5", bucket: "profit", profit: "$252.20", margin: "30.5%", basis: "tu costo" }, JSON.stringify(strips[0]));
+      assert.equal(strips[1].id, "MLM2222222222", "item link id");
+      assert.equal(strips[1].saved, null, "no saved cost for the 2nd result");
+      assert.equal(strips[1].basis, null, "PRO strip without a saved cost carries no basis label");
+      assert.equal(strips[2].id, null, "no link → no id");
+      assert.equal(strips[2].saved, null);
+      await linked.click(".mst-strip__bar");
+      await linked.waitForFunction(() => !document.querySelector(".mst-strip__panel").hidden, { timeout: 2000 });
+      const rows = await linked.$eval(".mst-strip__panel", (p) =>
+        Object.fromEntries([...p.querySelectorAll(".mst-strip__row")].map((r) => [r.querySelector(".mst-strip__label").textContent, r.querySelector(".mst-strip__value").textContent]))
+      );
+      assert.equal(rows["Recibes aprox."], "$665.70", JSON.stringify(rows));
+      assert.equal(rows["Ganancia (tu costo: $413.50)"], "$252.20", JSON.stringify(rows));
+      assert.equal(rows["Envío estimado (hasta 0.3 kg)"], "−$78.60", JSON.stringify(rows));
+      const summary = await linked.$eval(".mst-radar__summary", (e) => e.textContent);
+      assert.ok(summary.startsWith("Analizados: 3 · rentables: 1"), summary);
+      await linked.close();
+      pass("search strips use the saved cost: $827 result shows $252.20 · 30.5% 'tu costo' like the card; no-id result keeps the assumption");
+    }
     // r3 (major 7): the banner button opens the plan panel (yearly first,
     // "ahorras $369"; monthly "$89 al mes (menos de $3 al día)"), never a
     // bare "$89/mes" checkout.

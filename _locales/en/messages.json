@@ -116,6 +116,12 @@
   "stripAssumedCost": {
     "message": "with an assumed cost of $1%"
   },
+  "stripOwnCost": {
+    "message": "your cost"
+  },
+  "stripProfitOwnCost": {
+    "message": "Profit (your cost: $1)"
+  },
   "stripListingType": {
     "message": "Listing (est.)"
   },

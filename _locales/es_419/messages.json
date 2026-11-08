@@ -116,6 +116,12 @@
   "stripAssumedCost": {
     "message": "con costo supuesto $1%"
   },
+  "stripOwnCost": {
+    "message": "tu costo"
+  },
+  "stripProfitOwnCost": {
+    "message": "Ganancia (tu costo: $1)"
+  },
   "stripListingType": {
     "message": "Tipo (estimado)"
   },

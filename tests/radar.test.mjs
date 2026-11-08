@@ -89,3 +89,20 @@ test("rankByMargin: winners first, stable on ties, non-mutating", () => {
 test("DEFAULT_TARGET_PCT is a sane sourcing default", () => {
   assert.equal(RADAR.DEFAULT_TARGET_PCT, 30);
 });
+
+test("v1.5.5 r4 evaluate: a saved per-listing cost replaces the assumed %", () => {
+  // $827, net 665.70 (10 % + $78.60 shipping), saved cost 413.50 → the
+  // card's own numbers: profit 252.20, margin 30.5 %, a winner at 30 %.
+  const e = RADAR.evaluate({ priceMXN: 827, netMXN: 665.7, acquisitionPct: 60, acquisitionCostMXN: 413.5, targetMarginPct: 30 });
+  assert.equal(e.acquisitionCostMXN, 413.5);
+  assert.equal(e.profitMXN, 252.2);
+  assert.equal(e.marginPct, 30.5);
+  assert.equal(e.bucket, "profit");
+  // Without a saved cost (0 / undefined / NaN) the assumption still rules.
+  for (const none of [0, undefined, null, NaN, -5]) {
+    const a = RADAR.evaluate({ priceMXN: 827, netMXN: 665.7, acquisitionPct: 60, acquisitionCostMXN: none, targetMarginPct: 30 });
+    assert.equal(a.acquisitionCostMXN, 496.2, `cost ${none}`);
+    assert.equal(a.profitMXN, 169.5);
+    assert.equal(a.bucket, "thin");
+  }
+});

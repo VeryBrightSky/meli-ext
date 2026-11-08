@@ -356,6 +356,12 @@
   min-width: 0;
 }
 
+/* The verdict uses the seller's own saved cost for this listing (r4). */
+.mst-strip__assumed--own {
+  color: rgba(0, 0, 0, 0.72);
+  font-weight: 600;
+}
+
 .mst-strip__dot {
   width: 8px;
   height: 8px;
