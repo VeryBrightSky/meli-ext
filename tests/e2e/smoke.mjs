@@ -699,7 +699,7 @@ try {
     exportHidden: document.getElementById("export-btn").hidden
   }));
   assert.equal(emptyState.note, "Guarda el costo en cualquier publicación y aparecerá aquí");
-  assert.deepEqual(emptyState.open, { hidden: false, href: "https://www.mercadolibre.com.mx/", text: "Abrir Mercado Libre" });
+  assert.deepEqual(emptyState.open, { hidden: false, href: "https://www.mercadolibre.com.mx/publicaciones/listado", text: "Abrir Mercado Libre" });
   assert.equal(emptyState.rows, 1, "one sample row");
   assert.ok(emptyState.example.startsWith("Ejemplo"), `sample row: ${emptyState.example}`);
   assert.equal(emptyState.upsellHidden, true, "no PRO pitch on an empty table");

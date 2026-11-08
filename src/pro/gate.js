@@ -108,7 +108,12 @@ globalThis.MST_GATE = (() => {
   //   none      no stamps at all (first run before the service worker ran)
   function deriveTrialStart({ installedAt, trialStartedAt, hasCost }, nowMs) {
     const ok = (v) => Number.isFinite(v) && v > 0 && v <= nowMs + CLOCK_SKEW_MS;
-    if (ok(trialStartedAt)) return { startedAt: trialStartedAt, reason: "stamp" };
+    // An existing stamp always wins, even one from a clock that was ahead:
+    // clamp it to now instead of dropping it (dropping it would fall through
+    // to "migrated" and backdate the trial to install, locking the seller out).
+    if (Number.isFinite(trialStartedAt) && trialStartedAt > 0) {
+      return { startedAt: Math.min(trialStartedAt, nowMs), reason: "stamp" };
+    }
     if (!ok(installedAt)) return { startedAt: null, reason: "none" };
     if (hasCost) return { startedAt: installedAt, reason: "migrated" };
     if (nowMs - installedAt >= TRIAL_AUTO_START_MS) {
@@ -170,7 +175,9 @@ globalThis.MST_GATE = (() => {
     const PREFIX = globalThis.EXT_BRAND?.cssPrefix ?? "mst";
     const INSTALLED_KEY = `${PREFIX}:installedAt`;
     const TRIAL_KEY = `${PREFIX}:trialStartedAt`;
-    const valid = (v) => Number.isFinite(v) && v > 0 && v <= nowMs;
+    // No upper bound: a future-dated stamp is clamped by deriveTrialStart,
+    // never discarded.
+    const valid = (v) => Number.isFinite(v) && v > 0;
     const earliest = (a, b) => (valid(a) && valid(b) ? Math.min(a, b) : valid(a) ? a : valid(b) ? b : null);
     let installedAt = null;
     let trialStartedAt = null;

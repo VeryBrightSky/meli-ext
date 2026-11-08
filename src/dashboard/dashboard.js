@@ -237,6 +237,7 @@
     const open = document.getElementById("empty-open");
     open.hidden = !empty;
     open.textContent = T("dashOpenMeli");
+    if (globalThis.EXT_BRAND?.listingsUrl) open.href = globalThis.EXT_BRAND.listingsUrl;
     document.getElementById("export-btn").hidden = empty;
     document.getElementById("upsell").hidden = empty || pro;
     document.getElementById("totals-row").hidden = empty;

@@ -1082,6 +1082,14 @@ test("v1.5.5 trial: no cost → not started (pending), first cost → 7 days, 30
   d = GATE.deriveTrialStart({ installedAt: now - 60 * DAY, trialStartedAt: null, hasCost: false }, now);
   m = GATE.mergeStatus(base, GATE.computeLocalTrial(d.startedAt, now));
   assert.deepEqual([m.pro, m.trialExpired, m.trialPending], [false, true, false]);
+  // A future-dated stamp (clock ahead on another device, NTP step back) is
+  // clamped to now, never dropped into "migrated" (which would backdate the
+  // trial to install and lock an old install out forever).
+  d = GATE.deriveTrialStart({ installedAt: now - 10 * DAY, trialStartedAt: now + 2000, hasCost: true }, now);
+  assert.deepEqual(d, { startedAt: now, reason: "stamp" });
+  assert.equal(GATE.mergeStatus(base, GATE.computeLocalTrial(d.startedAt, now)).trialDaysLeft, 7);
+  d = GATE.deriveTrialStart({ installedAt: now - 10 * DAY, trialStartedAt: now + 2 * DAY, hasCost: false }, now);
+  assert.deepEqual(d, { startedAt: now, reason: "stamp" });
   // Migration: a pre-1.5.5 install with a saved cost and no start stamp keeps
   // its old window (trialStartedAt = installedAt).
   d = GATE.deriveTrialStart({ installedAt: now - 3 * DAY, trialStartedAt: null, hasCost: true }, now);
@@ -1093,9 +1101,10 @@ test("v1.5.5 trial: no cost → not started (pending), first cost → 7 days, 30
   // An existing stamp always beats migration and the fallback.
   d = GATE.deriveTrialStart({ installedAt: now - 90 * DAY, trialStartedAt: now - DAY, hasCost: true }, now);
   assert.deepEqual(d, { startedAt: now - DAY, reason: "stamp" });
-  // Corrupt / future stamps are ignored; no install stamp at all → none.
-  assert.equal(GATE.deriveTrialStart({ installedAt: NaN, trialStartedAt: now + 10 * DAY, hasCost: true }, now).reason, "none");
-  assert.equal(GATE.deriveTrialStart({ installedAt: now - DAY, trialStartedAt: now + 10 * DAY, hasCost: false }, now).reason, "pending");
+  // Corrupt stamps are ignored; a future stamp is clamped to now (see above).
+  assert.equal(GATE.deriveTrialStart({ installedAt: NaN, trialStartedAt: NaN, hasCost: true }, now).reason, "none");
+  assert.equal(GATE.deriveTrialStart({ installedAt: NaN, trialStartedAt: -5, hasCost: true }, now).reason, "none");
+  assert.deepEqual(GATE.deriveTrialStart({ installedAt: now - DAY, trialStartedAt: now + 10 * DAY, hasCost: false }, now), { startedAt: now, reason: "stamp" });
   // Paid and lapsed users are never "pending".
   const paid = GATE.mergeStatus(GATE.computeProStatus({ paid: true }, now), GATE.computeLocalTrial(null, now));
   assert.deepEqual([paid.pro, paid.trialPending], [true, false]);
