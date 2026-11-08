@@ -555,10 +555,10 @@
     "message": "La calculadora aparece debajo del precio con tu comisión, costo fijo, envío y ganancia."
   },
   "welcomeStep2": {
-    "message": "Escribe el costo de tu producto"
+    "message": "Toca o escribe el costo de tu producto"
   },
   "welcomeStep2Body": {
-    "message": "Con eso Netio te da el precio mínimo para no perder y el precio para ganar el margen que quieras."
+    "message": "Un toque en 40, 50 o 60% del precio basta. Con eso Netio te da el precio mínimo para no perder y el precio para ganar el margen que quieras."
   },
   "welcomeStep3": {
     "message": "Busca productos y mira el Radar"
@@ -841,5 +841,14 @@
   },
   "trialExpiredProductsOne": {
     "message": "Tu prueba PRO terminó. Tu producto guardado sigue aquí, ya sin precio objetivo."
+  },
+  "welcomeDemoTitle": {
+    "message": "Así se ve en una publicación"
+  },
+  "welcomeDemoCaption": {
+    "message": "Ejemplo real: publicación Clásica de $1 en $2, 0.3 kg, sin reputación, costo de $$250. Tarifas y tabla de envío oficiales."
+  },
+  "welcomeDemoPro": {
+    "message": "Con PRO, en la misma tarjeta"
   }
 }

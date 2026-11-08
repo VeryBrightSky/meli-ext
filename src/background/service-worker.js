@@ -93,6 +93,39 @@ function versionBefore(a, b) {
 const WELCOMED_KEY = `${PREFIX}:welcomed`;
 const validStamp = (v) => Number.isFinite(v) && v > 0 && v <= Date.now();
 
+// Content scripts are not injected into tabs that were already open when the
+// extension was installed. Reload the Mercado Libre tabs that are open at
+// install so the card appears there at once instead of after the seller's
+// next navigation. Needs no extra permission: tabs.query without a filter
+// and tabs.reload are free, and the url is exposed for hosts the content
+// script matches. Only on a fresh install (never on update: a seller may be
+// mid-edit, and the old script already shows its own reload notice).
+const MELI_HOSTS = new Set(["articulo.mercadolibre.com.mx", "www.mercadolibre.com.mx", "listado.mercadolibre.com.mx"]);
+async function reloadOpenMeliTabs() {
+  let reloaded = 0;
+  try {
+    const tabs = await chrome.tabs.query({});
+    for (const tab of tabs) {
+      let host = "";
+      try {
+        host = new URL(tab.url || tab.pendingUrl || "").hostname;
+      } catch {
+        continue;
+      }
+      if (!MELI_HOSTS.has(host) || !(tab.id >= 0)) continue;
+      try {
+        await chrome.tabs.reload(tab.id);
+        reloaded++;
+      } catch {
+        // a tab that cannot be reloaded (discarded, closing) is skipped
+      }
+    }
+  } catch {
+    // tabs API unavailable: the next navigation injects anyway
+  }
+  return reloaded;
+}
+
 chrome.runtime.onInstalled.addListener(async (details) => {
   try {
     const [local, sync] = await Promise.all([
@@ -125,6 +158,7 @@ chrome.runtime.onInstalled.addListener(async (details) => {
       await chrome.storage.local.set({ [WELCOMED_KEY]: true });
       chrome.tabs.create({ url: chrome.runtime.getURL(WELCOME_URL) }).catch(() => {});
     }
+    if (details?.reason === "install") await reloadOpenMeliTabs();
   } catch {
     // welcome is best-effort
   }

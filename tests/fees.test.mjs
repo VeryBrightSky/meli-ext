@@ -1477,3 +1477,28 @@ test("solveTargetPrice with ads: rate + ads is the same as a higher commission",
   assert.equal(a, b);
   assert.equal(a, 692.31); // 450 / 0.65
 });
+
+test("welcome demo ($499, home-general, 0.3 kg, cost 250) is computed with the real fee logic", () => {
+  // Spanish strings through the same i18n layer the page uses.
+  for (const f of ["src/config/locale-data.js", "src/config/i18n.js"]) new Function(readFileSync(join(root, f), "utf8"))();
+  const src = readFileSync(join(root, "src/onboarding/welcome.js"), "utf8");
+  new Function(src.slice(0, src.indexOf("(async () => {")))();
+  const demo = globalThis.MST_WELCOME_DEMO(globalThis.MST_I18N.t);
+  assert.ok(demo, "demo built");
+  const rows = Object.fromEntries(demo.rows);
+  // 499 × 15% = 74.85; official 0.3 kg, sin reputación, $499–998.99 band = 78.60
+  assert.equal(rows["Precio de venta"], "$499.00");
+  assert.equal(rows["Comisión por venta (15%)"], "−$74.85");
+  assert.equal(rows["Envío estimado (hasta 0.3 kg)"], "−$78.60");
+  assert.equal(rows["Te queda"], "$345.55"); // 499 − 74.85 − 78.60
+  assert.equal(rows["Costo del producto"], "$250.00");
+  assert.equal(rows["Ganancia"], "$95.55 (19.15%)");
+  const pro = Object.fromEntries(demo.pro);
+  // (250 + 78.60 at the solved band) / (1 − 0.15 − 0.30) = 597.46
+  assert.equal(pro["Precio para ganar 30%"], "$597.46");
+  // 499 × 0.55 − 78.60 = 195.85
+  assert.equal(pro["Costo máximo para ganar 30%"], "$195.85");
+  assert.ok(demo.caption.includes("$499.00") && demo.caption.includes("Hogar, moda, deportes y general"), demo.caption);
+  // No fixed charge row at $499 (Clásica from $299 has none).
+  assert.equal(demo.rows.some(([l]) => l.startsWith("Costo fijo")), false);
+});

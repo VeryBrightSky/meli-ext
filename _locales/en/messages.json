@@ -555,10 +555,10 @@
     "message": "The calculator appears under the price with your commission, fixed charge, shipping and profit."
   },
   "welcomeStep2": {
-    "message": "Type your product cost"
+    "message": "Tap or type your product cost"
   },
   "welcomeStep2Body": {
-    "message": "Netio then gives you the break-even price and the price for the margin you want."
+    "message": "One tap on 40, 50 or 60% of the price is enough. With that Netio gives you the break-even price and the price for the margin you want."
   },
   "welcomeStep3": {
     "message": "Search for products and watch the Radar"
@@ -841,5 +841,14 @@
   },
   "trialExpiredProductsOne": {
     "message": "Your PRO trial ended. Your saved product is still here, now without a target price."
+  },
+  "welcomeDemoTitle": {
+    "message": "This is what it looks like on a listing"
+  },
+  "welcomeDemoCaption": {
+    "message": "Real example: a $1 Clásica listing in $2, 0.3 kg, no reputation, $$250 cost. Official fees and shipping table."
+  },
+  "welcomeDemoPro": {
+    "message": "With PRO, on the same card"
   }
 }
