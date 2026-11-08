@@ -30,6 +30,10 @@ globalThis.EXT_BRAND = Object.freeze({
   // Must serve privacidad.html and adios.html from this base; no trailing slash.
   landingUrl: "https://netiox.netlify.app",
   storeReviewsUrl: "https://chromewebstore.google.com/detail/netio/bjhikillfgbpblogloljjhejogfeajac/reviews",
+  // Support contact shown on the options page (same address as the landing).
+  supportEmail: "vitowebpro@gmail.com",
+  // The seller's own listings on Mercado Libre (welcome page step 1).
+  listingsUrl: "https://www.mercadolibre.com.mx/publicaciones/listado",
   plans: Object.freeze({ monthly: "pro-monthly", yearly: "pro-yearly" }),
   // Path relative to the extension root; resolve with chrome.runtime.getURL().
   logoPath: "src/assets/icons/icon16.png",

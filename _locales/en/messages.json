@@ -30,7 +30,7 @@
     "message": "We detected this from the listing. Fix it if it's wrong."
   },
   "hintNoCategory": {
-    "message": "No category detected; the sale commission ranges from $1 to $2."
+    "message": "We could not detect the category. Pick it to see an exact number."
   },
   "rowCommission": {
     "message": "Sale commission ($1)"
@@ -213,7 +213,7 @@
     "message": "Research: cost $1%"
   },
   "optAcquisition": {
-    "message": "Acquisition cost (% of price), research mode"
+    "message": "Radar: assumed cost (% of price) when no cost is saved"
   },
   "optSubscription": {
     "message": "Subscription"
@@ -240,7 +240,7 @@
     "message": "Profit Dashboard"
   },
   "dashEmpty": {
-    "message": "Save a product's cost on its listing to see it here."
+    "message": "Save the cost on any listing and it will show up here"
   },
   "dashCommission": {
     "message": "Commission"
@@ -549,10 +549,10 @@
     "message": "Thanks for subscribing. Here's how to get the most out of it:"
   },
   "welcomeStep1": {
-    "message": "Open any Mercado Libre listing"
+    "message": "Open one of your listings"
   },
   "welcomeStep1Body": {
-    "message": "The calculator appears under the price with your commission, fixed fee, shipping and profit."
+    "message": "The calculator appears under the price with your commission, fixed charge, shipping and profit."
   },
   "welcomeStep2": {
     "message": "Type your product cost"
@@ -567,7 +567,7 @@
     "message": "On search results every product shows green, yellow or red based on your cost."
   },
   "welcomeGo": {
-    "message": "Open Mercado Libre"
+    "message": "Open my listings"
   },
   "welcomeNote": {
     "message": "Your costs and products are saved in your browser; we have no servers. Only the PRO payment goes through ExtensionPay."
@@ -600,7 +600,7 @@
     "message": "Price to earn $1%"
   },
   "summaryNet": {
-    "message": "Mercado Libre pays you $1 per sale"
+    "message": "You keep $1 per sale (before VAT/income tax)"
   },
   "summaryProfit": {
     "message": "Profit $1 · $2"
@@ -700,5 +700,59 @@
   },
   "shippingEstimateTag": {
     "message": "est."
+  },
+  "summaryRetentions": {
+    "message": "Withheld VAT 8% + income tax 2.5%: $1. After withholdings you keep $2"
+  },
+  "costSaved": {
+    "message": "Saved for this listing"
+  },
+  "proDidLine": {
+    "message": "PRO: at $1 you earn $2%"
+  },
+  "noValue": {
+    "message": "no data"
+  },
+  "statusTrialPending": {
+    "message": "7-day PRO trial: it starts when you save your first product cost"
+  },
+  "trialPendingBanner": {
+    "message": "Your 7-day PRO trial starts when you save your first product cost"
+  },
+  "trialEndingWorstLoss": {
+    "message": "$3 days of PRO left. Your worst product: $1, loses $2 per sale."
+  },
+  "trialEndingWorstLossOne": {
+    "message": "Last day of PRO. Your worst product: $1, loses $2 per sale."
+  },
+  "trialEndingWorstThin": {
+    "message": "$3 days of PRO left. Your worst product: $1, leaves only $2 per sale."
+  },
+  "trialEndingWorstThinOne": {
+    "message": "Last day of PRO. Your worst product: $1, leaves only $2 per sale."
+  },
+  "welcomeTitlePending": {
+    "message": "Your PRO trial is ready"
+  },
+  "welcomeLeadPending": {
+    "message": "You get 7 days of Netio PRO: they start when you save your first product cost. No email, no card. Here's how to get value from it today:"
+  },
+  "badgeTrialPending": {
+    "message": "PRO · 7 days when you save your first cost"
+  },
+  "dashExample": {
+    "message": "Example"
+  },
+  "dashExampleTitle": {
+    "message": "Example: Bluetooth headphones"
+  },
+  "dashOpenMeli": {
+    "message": "Open Mercado Libre"
+  },
+  "optSupport": {
+    "message": "Support: $1"
+  },
+  "welcomeStep1Trial": {
+    "message": "Your 7-day PRO trial starts when you save your first product cost."
   }
 }
