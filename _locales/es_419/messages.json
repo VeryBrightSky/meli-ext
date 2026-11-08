@@ -116,6 +116,12 @@
   "stripAssumedCost": {
     "message": "con costo supuesto $1%"
   },
+  "stripOwnCost": {
+    "message": "tu costo"
+  },
+  "stripProfitOwnCost": {
+    "message": "Ganancia (tu costo: $1)"
+  },
   "stripListingType": {
     "message": "Tipo (estimado)"
   },
@@ -608,6 +614,9 @@
   "shareTextProfit": {
     "message": "Mira esto: en una publicación de $1 en Mercado Libre, después de comisión, costo fijo y envío, la ganancia real queda en $2. Lo calculé con Netio, una extensión gratis de Chrome que lo muestra en cada publicación: $3"
   },
+  "rowTargetMet": {
+    "message": "Ya ganas $1% a este precio"
+  },
   "rowTargetPriceFor": {
     "message": "Precio para ganar $1%"
   },
@@ -804,10 +813,10 @@
     "message": "Te queda"
   },
   "stackRetentions": {
-    "message": "Con RFC registrado (IVA 8% + ISR 2.5%)"
+    "message": "Retenciones con RFC (IVA 8% + ISR 2.5%)"
   },
-  "stackRetentionsHint": {
-    "message": "Con RFC registrado (IVA 8% + ISR 2.5%; sin RFC retienen más)"
+  "stackRetentionsNoRfc": {
+    "message": "Sin RFC te retienen más"
   },
   "stackRetentionsValue": {
     "message": "−$1, te depositan $2"
@@ -823,6 +832,9 @@
   },
   "rowAds": {
     "message": "Publicidad (% del precio)"
+  },
+  "summaryAdsProOnly": {
+    "message": "Publicidad ($1%) solo se aplica con PRO"
   },
   "rowAdsCost": {
     "message": "Publicidad ($1%)"

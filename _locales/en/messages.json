@@ -116,6 +116,12 @@
   "stripAssumedCost": {
     "message": "with an assumed cost of $1%"
   },
+  "stripOwnCost": {
+    "message": "your cost"
+  },
+  "stripProfitOwnCost": {
+    "message": "Profit (your cost: $1)"
+  },
   "stripListingType": {
     "message": "Listing (est.)"
   },
@@ -608,6 +614,9 @@
   "shareTextProfit": {
     "message": "Check this: on a $1 Mercado Libre listing, after commission, fixed fee and shipping, the real profit is $2. Calculated with Netio, a free Chrome extension that shows it on every listing: $3"
   },
+  "rowTargetMet": {
+    "message": "You already earn $1% at this price"
+  },
   "rowTargetPriceFor": {
     "message": "Price to earn $1%"
   },
@@ -804,10 +813,10 @@
     "message": "You keep"
   },
   "stackRetentions": {
-    "message": "With a registered RFC (VAT 8% + ISR 2.5%)"
+    "message": "Withholdings with an RFC (VAT 8% + ISR 2.5%)"
   },
-  "stackRetentionsHint": {
-    "message": "With a registered RFC (VAT 8% + ISR 2.5%; without an RFC they withhold more)"
+  "stackRetentionsNoRfc": {
+    "message": "Without an RFC more is withheld"
   },
   "stackRetentionsValue": {
     "message": "−$1, you are paid $2"
@@ -823,6 +832,9 @@
   },
   "rowAds": {
     "message": "Ads (% of price)"
+  },
+  "summaryAdsProOnly": {
+    "message": "Ads ($1%) only apply with PRO"
   },
   "rowAdsCost": {
     "message": "Ads ($1%)"

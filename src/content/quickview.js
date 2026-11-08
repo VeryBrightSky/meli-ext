@@ -44,7 +44,42 @@ globalThis.MST_QUICKVIEW = (() => {
     return cost > 0 ? cost : 0;
   }
 
-  // Quote + breakdown for one result, with the same inputs the card uses.
+  // Saved per-listing values (r4): the cost the seller typed on the card for
+  // this very listing (`<prefix>:cost:<id>`) and, for PRO, its ads % — read
+  // in ONE storage.local.get per scan pass for every new result on the page.
+  //   itemId → { costMXN, adsPct }  saved cost
+  //   itemId → null                 looked up, nothing saved
+  // Cleared by destroy(); a fresh page re-reads storage.
+  let savedByItem = new Map();
+  let lookupInFlight = false;
+
+  const savedFor = (data) => (data.itemId ? savedByItem.get(data.itemId) ?? null : null);
+
+  // Ads only count where the card counts them: on the PRO card (the free card
+  // hides the input and ignores a saved value).
+  const adsPctFor = (saved) => (saved && GATE.isPro() && saved.adsPct > 0 ? saved.adsPct : 0);
+
+  async function lookupSaved(ids, token) {
+    const keys = [];
+    for (const id of ids) keys.push(`${PREFIX}:cost:${id}`, `${PREFIX}:ads:${id}`);
+    let stored = {};
+    try {
+      stored = (await chrome.storage.local.get(keys)) ?? {};
+    } catch {
+      // storage unavailable (extension reloaded): every strip falls back to
+      // the assumed cost
+    }
+    if (token !== initToken) return;
+    for (const id of ids) {
+      const costMXN = CALC.parseMoney(stored[`${PREFIX}:cost:${id}`] ?? 0);
+      const adsPct = Math.min(CALC.parseMoney(stored[`${PREFIX}:ads:${id}`] ?? 0), 99);
+      savedByItem.set(id, costMXN > 0 ? { costMXN, adsPct } : null);
+    }
+  }
+
+  // Quote + breakdown for one result, with the same inputs the card uses:
+  // its saved cost and ads % when the seller has them, so the strip's net,
+  // profit and margin are the card's for the same listing.
   function breakdownFor(data) {
     const quote = SOURCE.getQuote({
       priceMXN: data.priceMXN,
@@ -53,12 +88,14 @@ globalThis.MST_QUICKVIEW = (() => {
       fullWeightKg: shipSettings.usesFull ? STRIP_WEIGHT_KG : null
     });
     const shipping = shippingFor(data.priceMXN);
+    const saved = savedFor(data);
     const b = CALC.computeBreakdown(quote, {
       priceMXN: data.priceMXN,
       shippingCostMXN: shipping,
-      productCostMXN: 0
+      productCostMXN: saved ? saved.costMXN : 0,
+      adsPct: adsPctFor(saved)
     });
-    return { quote, b, shipping };
+    return { quote, b, shipping, saved };
   }
 
   // Per-init lifecycle state (torn down by destroy() on SPA navigation).
@@ -149,9 +186,30 @@ globalThis.MST_QUICKVIEW = (() => {
     return flags;
   }
 
+  // The listing id behind a result, from its links (title, image, "ver más"):
+  // the first href that normalizes like the card's page URL does. Our own
+  // strip has no links, so nothing injected can pass for a result link.
+  // Cached per item: the links do not change once the result is rendered.
+  let idCache = new WeakMap();
+  function extractItemId(item) {
+    if (idCache.has(item)) return idCache.get(item);
+    let id = null;
+    const PAGE = globalThis.MST_PAGE;
+    if (PAGE?.itemIdFromUrl) {
+      for (const a of item.querySelectorAll("a[href]")) {
+        if (a.closest(`.${STRIP_CLASS}`)) continue;
+        id = PAGE.itemIdFromUrl(a.getAttribute("href"));
+        if (id) break;
+      }
+    }
+    idCache.set(item, id);
+    return id;
+  }
+
   function extractItemData(item) {
     const flags = itemFlags(item);
     return {
+      itemId: extractItemId(item),
       priceMXN: extractPrice(item),
       freeShipping: flags.freeShipping,
       listingTypeGuess: flags.listingTypeGuess,
@@ -204,11 +262,14 @@ globalThis.MST_QUICKVIEW = (() => {
 
   // Worst-case verdict for one result: classify by netMin (higher commission
   // bound) so "profitable" survives the conservative case.
-  function evaluateStrip(data, b) {
+  // A saved cost for the listing replaces the assumption: the verdict is
+  // then the card's own worst-case profit and margin.
+  function evaluateStrip(data, b, saved = savedFor(data)) {
     return RADAR.evaluate({
       priceMXN: data.priceMXN,
       netMXN: b.netMinMXN,
       acquisitionPct: costPct(),
+      acquisitionCostMXN: saved ? saved.costMXN : 0,
       targetMarginPct: radarTargetPct
     });
   }
@@ -227,15 +288,17 @@ globalThis.MST_QUICKVIEW = (() => {
     // Net INCLUDES the seller's shipping (r3): the same estimate the card
     // shows for this listing, so the strip, the Radar verdict and the card
     // never disagree about one product.
-    const { quote, b, shipping } = breakdownFor(data);
+    const { quote, b, shipping, saved } = breakdownFor(data);
 
     const strip = el("div", STRIP_CLASS);
+    if (data.itemId) strip.dataset.itemId = data.itemId;
+    if (saved) strip.dataset.savedCost = String(saved.costMXN);
 
     // Radar verdict: stamp the strip so the summary bar, target control,
     // and "only profitable" filter can read it without recomputing. In free
     // preview the verdict is stamped as `preview` (counted, not shown) except
     // for the first few strips, which show their colors for real.
-    const evaln = radarActive() || radarPreview() ? evaluateStrip(data, b) : null;
+    const evaln = radarActive() || radarPreview() ? evaluateStrip(data, b, saved) : null;
     let showVerdict = false;
     if (evaln) {
       strip.dataset.margin = String(evaln.marginPct);
@@ -265,9 +328,14 @@ globalThis.MST_QUICKVIEW = (() => {
     bar.appendChild(logo);
     if (evaln && showVerdict) {
       bar.appendChild(buildVerdict(evaln));
-      // Free preview: the profit is computed with an ASSUMED cost; say so on
-      // the strip itself, not only in the summary bar.
-      if (!radarActive()) bar.appendChild(el("span", `${PREFIX}-strip__assumed`, T("stripAssumedCost", [String(previewPct())])));
+      // The profit's cost basis, on the strip itself: the seller's own saved
+      // cost for this listing, or (free preview) the ASSUMED cost, so a
+      // verdict is never read as more certain than it is.
+      if (saved) {
+        bar.appendChild(el("span", `${PREFIX}-strip__assumed ${PREFIX}-strip__assumed--own`, T("stripOwnCost")));
+      } else if (!radarActive()) {
+        bar.appendChild(el("span", `${PREFIX}-strip__assumed`, T("stripAssumedCost", [String(previewPct())])));
+      }
     } else {
       bar.appendChild(el("span", null, T("stripNet")));
       bar.appendChild(el("b", null, UI.fmtRange(b.netMinMXN, b.netMaxMXN)));
@@ -312,8 +380,16 @@ globalThis.MST_QUICKVIEW = (() => {
         )
       );
     }
+    if (b.adsCostMXN > 0) {
+      panel.appendChild(panelRow(T("rowAdsCost", [String(b.adsPct)]), UI.fmtCharge(b.adsCostMXN)));
+    }
     panel.appendChild(panelRow(T("rowNet"), UI.fmtRange(b.netMinMXN, b.netMaxMXN)));
-    if (globalThis.MST_GATE.isPro()) {
+    if (saved) {
+      // The card's own profit row for this listing (net minus the saved cost).
+      panel.appendChild(
+        panelRow(T("stripProfitOwnCost", [UI.fmtMoney(saved.costMXN)]), UI.fmtRange(b.profitMinMXN, b.profitMaxMXN))
+      );
+    } else if (globalThis.MST_GATE.isPro()) {
       const cost = CALC.round2((data.priceMXN * costPct()) / 100);
       panel.appendChild(
         panelRow(
@@ -701,6 +777,10 @@ globalThis.MST_QUICKVIEW = (() => {
     let skippedNoPrice = 0;
     let failed = 0;
     let capped = false;
+    // Listings whose saved cost has not been read yet: their strips wait for
+    // ONE batched storage read (below) instead of painting an assumed-cost
+    // verdict that flips a moment later.
+    const unknownIds = new Set();
     for (const item of items) {
       // `processed` holds only items to skip for good (no price / poisoned).
       // Items that got a strip are re-checked each pass (a cheap querySelector,
@@ -721,6 +801,10 @@ globalThis.MST_QUICKVIEW = (() => {
           skippedNoPrice++;
           processed.add(item);
           continue;
+        }
+        if (data.itemId && !savedByItem.has(data.itemId)) {
+          unknownIds.add(data.itemId);
+          continue; // built on the pass that follows the lookup
         }
         placeStrip(item, buildStrip(data));
         injected++;
@@ -746,7 +830,26 @@ globalThis.MST_QUICKVIEW = (() => {
       clearTimeout(scanTimer);
       scanTimer = setTimeout(() => SAFE.run("quickview-scan-more", scan), 0);
     }
-    return { injected, total: items.length, selector };
+    // One storage read for every new listing on the page, then the pass that
+    // builds their strips with the saved costs in hand. A lookup already in
+    // flight covers its ids; ids it did not include are read on that pass.
+    if (unknownIds.size > 0 && !lookupInFlight) {
+      lookupInFlight = true;
+      const token = initToken;
+      lookupSaved([...unknownIds], token).then(
+        () => {
+          if (token !== initToken) return; // torn down meanwhile: destroy() reset the flag
+          lookupInFlight = false;
+          SAFE.run("quickview-scan-saved", scan);
+        },
+        (err) => {
+          if (token !== initToken) return;
+          lookupInFlight = false;
+          warn("saved cost lookup failed:", err);
+        }
+      );
+    }
+    return { injected, total: items.length, selector, pending: unknownIds.size };
   }
 
   // Full teardown for SPA navigation: stop observing, remove every injected
@@ -769,6 +872,9 @@ globalThis.MST_QUICKVIEW = (() => {
     }
     processed = new WeakSet();
     flagsCache = new WeakMap();
+    idCache = new WeakMap();
+    savedByItem = new Map();
+    lookupInFlight = false;
     itemSelector = null;
     pageCategoryGroupId = null;
     onlyProfitable = false;

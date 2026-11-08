@@ -356,6 +356,12 @@
   min-width: 0;
 }
 
+/* The verdict uses the seller's own saved cost for this listing (r4). */
+.mst-strip__assumed--own {
+  color: rgba(0, 0, 0, 0.72);
+  font-weight: 600;
+}
+
 .mst-strip__dot {
   width: 8px;
   height: 8px;
@@ -1067,8 +1073,16 @@
 
 .mst-summary__retentions[hidden],
 .mst-summary__pro[hidden],
+.mst-summary__adshint[hidden],
 .mst-saved[hidden] {
   display: none;
+}
+
+/* Free card: a saved ads % is not in the numbers until PRO (r4). */
+.mst-summary__adshint {
+  margin-top: 4px;
+  font-size: 11.5px;
+  color: rgba(0, 0, 0, 0.55);
 }
 
 .mst-summary__pro {
@@ -1362,6 +1376,18 @@
 
 .mst-stack__row .mst-row__label {
   color: rgba(0, 0, 0, 0.65);
+}
+
+/* "Sin RFC te retienen más" under the retentions row (r4). */
+.mst-stack__hint {
+  font-size: 11px;
+  line-height: 1.3;
+  color: rgba(0, 0, 0, 0.5);
+  padding: 0 0 2px;
+}
+
+.mst-stack__hint[hidden] {
+  display: none;
 }
 
 .mst-row--stacktotal .mst-row__label,

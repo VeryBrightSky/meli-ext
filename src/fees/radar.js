@@ -23,10 +23,15 @@ globalThis.MST_RADAR = (() => {
     return "thin";
   }
 
-  // Evaluate one result. netMXN excludes shipping (unknowable in browse
-  // context); acquisitionPct is the assumed buy cost as a % of sale price.
-  function evaluate({ priceMXN, netMXN, acquisitionPct, targetMarginPct }) {
-    const acquisitionCostMXN = round2((priceMXN * acquisitionPct) / 100);
+  // Evaluate one result. netMXN is the seller's net at that price (callers
+  // fold shipping in); acquisitionPct is the assumed buy cost as a % of sale
+  // price. A saved per-listing cost (acquisitionCostMXN > 0) replaces the
+  // assumption, so the verdict is the card's own profit and margin.
+  function evaluate({ priceMXN, netMXN, acquisitionPct, acquisitionCostMXN: savedCostMXN, targetMarginPct }) {
+    const acquisitionCostMXN =
+      Number.isFinite(savedCostMXN) && savedCostMXN > 0
+        ? round2(savedCostMXN)
+        : round2((priceMXN * acquisitionPct) / 100);
     const profitMXN = round2(netMXN - acquisitionCostMXN);
     const marginPct = priceMXN > 0 ? round2((profitMXN / priceMXN) * 100) : 0;
     return {

@@ -465,6 +465,7 @@ globalThis.MST_CARD = (() => {
     refs.summaryRetentions.hidden = true;
     refs.summaryUpto.hidden = true;
     refs.proLine.hidden = true;
+    refs.adsHint.hidden = true;
     refs.stack.hidden = true;
     for (const node of [
       refs.profit?.root, refs.breakeven?.root, refs.target?.root, refs.targetTeaser?.root,
@@ -724,6 +725,11 @@ globalThis.MST_CARD = (() => {
     if (b.adsCostMXN > 0) {
       patchRow(refs.ads, T("rowAdsCost", [String(b.adsPct)]), fmtCharge(b.adsCostMXN), flash);
     }
+    // Free/expired card with a saved ads %: the numbers above ignore it (the
+    // input is PRO), so one line says the percentage is waiting for PRO.
+    const adsDropped = !pro && state.adsPct > 0;
+    refs.adsHint.hidden = !adsDropped;
+    if (adsDropped) refs.adsHint.textContent = T("summaryAdsProOnly", [String(state.adsPct)]);
 
     patchRow(refs.net, null, fmtRange(b.netMinMXN, b.netMaxMXN), flash);
     // Headline: one number. With an exact rate it is the number; with an
@@ -884,15 +890,29 @@ globalThis.MST_CARD = (() => {
         refs.maxCost.root.classList.toggle(`${PREFIX}-row--loss`, maxCost === null);
       }
       if (hasTarget) {
-        refs.target.label.textContent = T("rowTargetPriceFor", [String(margin)]);
         const lo = solve(quote.pctMin, margin);
         const hi = solve(quote.pctMax, margin);
-        patchRow(
-          refs.target,
-          null,
-          lo !== null && hi !== null ? fmtRange(lo, hi) : T("targetUnreachable"),
-          flash
-        );
+        // r4: one proposed price per card, never a price below the current
+        // one for a lower margin. When the current worst-case margin already
+        // meets the target, the bold row says so at the current price ("Ya
+        // ganas 30.5% a este precio: $827.00"); the max-cost row under it
+        // keeps the target's number, and the PRO line below the summary is
+        // the only place that proposes a (higher) price.
+        const currentMargin = b.marginMinPct ?? 0;
+        const targetMet = currentMargin >= margin;
+        refs.target.root.classList.toggle(`${PREFIX}-row--met`, targetMet);
+        if (targetMet) {
+          refs.target.label.textContent = T("rowTargetMet", [String(currentMargin)]);
+          patchRow(refs.target, null, fmtMoney(state.priceMXN), flash);
+        } else {
+          refs.target.label.textContent = T("rowTargetPriceFor", [String(margin)]);
+          patchRow(
+            refs.target,
+            null,
+            lo !== null && hi !== null ? fmtRange(lo, hi) : T("targetUnreachable"),
+            flash
+          );
+        }
         // One short line under the summary so the seller sees what PRO just
         // did for this listing (worst-case price for the margin in effect).
         // r3: never recommend a LOWER price for a margin the seller already
@@ -900,8 +920,7 @@ globalThis.MST_CARD = (() => {
         // the line points up instead: the price for 10 more points, or, if
         // no price reaches that, the most this unit may cost at the current
         // price for the target margin.
-        const currentMargin = b.marginMinPct ?? 0;
-        if (currentMargin >= margin) {
+        if (targetMet) {
           const upMargin = Math.min(99, Math.ceil(currentMargin + 10));
           const up = upMargin > currentMargin ? solve(quote.pctMax, upMargin) : null;
           if (up !== null && up > state.priceMXN) {
@@ -1013,15 +1032,18 @@ globalThis.MST_CARD = (() => {
     rows.ads.root.style.display = b.adsCostMXN > 0 ? "" : "none";
     if (b.adsCostMXN > 0) patchRow(rows.ads, T("rowAdsCost", [String(b.adsPct)]), fmtCharge(b.adsCostMXN), false);
     const w = CALC.computeWithholdings(b.priceMXN, SOURCE.withholdings);
-    // The RFC rates shown are the registered-RFC ones; while the seller has
-    // not opened the retentions rows, say that an unregistered account is
-    // withheld more (r3), so the figure is never read as the only case.
+    // The RFC rates shown are the registered-RFC ones. The label stays short
+    // so the value keeps one line at 340 px (r4); while the seller has not
+    // opened the retentions rows, a small line under it says that an
+    // unregistered account is withheld more (r3), so the figure is never
+    // read as the only case.
     patchRow(
       rows.retentions,
-      state.showWithholdings ? T("stackRetentions") : T("stackRetentionsHint"),
+      T("stackRetentions"),
       T("stackRetentionsValue", [fmtMoney(w.totalMXN), fmtRange(CALC.round2(b.netMinMXN - w.totalMXN), CALC.round2(b.netMaxMXN - w.totalMXN))]),
       false
     );
+    refs.stackNoRfc.hidden = state.showWithholdings;
   }
 
   // Cost chips (40/50/60 % of the page price) show until a cost is saved.
@@ -1100,6 +1122,10 @@ globalThis.MST_CARD = (() => {
     refs.summaryProfit.hidden = true;
     refs.proLine = el("div", `${PREFIX}-summary__pro`, "");
     refs.proLine.hidden = true;
+    // r4 (minor d): a saved ads % is ignored on the free card (the input is
+    // PRO); say so instead of silently dropping it from the numbers.
+    refs.adsHint = el("div", `${PREFIX}-summary__adshint`, "");
+    refs.adsHint.hidden = true;
     // Zero-typing value: while no cost is saved, the whole fee stack at the
     // page price (commission, fixed charge, shipping, retentions) sits under
     // the headline as hard numbers. Once a cost exists the profit lines take
@@ -1115,7 +1141,11 @@ globalThis.MST_CARD = (() => {
       refs.stackRows[id] = r;
       refs.stack.appendChild(r.root);
     }
-    refs.summary.append(refs.summaryNet, refs.summaryUpto, refs.summaryRetentions, refs.summaryProfit, refs.proLine, refs.stack);
+    // Under the retentions row: the registered-RFC rates are not the only
+    // case. Hidden once the seller opens the retentions rows.
+    refs.stackNoRfc = el("div", `${PREFIX}-stack__hint`, T("stackRetentionsNoRfc"));
+    refs.stack.appendChild(refs.stackNoRfc);
+    refs.summary.append(refs.summaryNet, refs.summaryUpto, refs.summaryRetentions, refs.summaryProfit, refs.proLine, refs.adsHint, refs.stack);
     body.appendChild(refs.summary);
 
     // Product cost: the one input that turns fees into profit, so it sits

@@ -1745,3 +1745,33 @@ test("v1.5.5 r3 history.isRecordableUrl: listing URLs only, never cart/checkout"
     globalThis.location = prevLoc;
   }
 });
+
+test("v1.5.5 r4 page-data itemIdFromUrl: result links normalize to the card's storage id", () => {
+  const prevBrand = globalThis.EXT_BRAND;
+  const prevUI = globalThis.MST_UI;
+  globalThis.EXT_BRAND = { name: "Netio" };
+  globalThis.MST_UI = globalThis.MST_UI ?? { isMsiText: () => false };
+  try {
+    new Function(readFileSync(join(root, "src/content/page-data.js"), "utf8"))();
+    const id = globalThis.MST_PAGE.itemIdFromUrl;
+    // The same id the card uses for the page it saves a cost on.
+    assert.equal(id("https://www.mercadolibre.com.mx/celular-test-pro/p/MLM12345678"), "MLM12345678");
+    assert.equal(id("https://www.mercadolibre.com.mx/celular/p/MLM12345678?pdp_filters=x#reviews"), "MLM12345678");
+    assert.equal(id("https://www.mercadolibre.com.mx/funda/up/MLMU987654321"), "MLMU987654321");
+    assert.equal(id("https://www.mercadolibre.com.mx/MLM-123456789-funda-_JM"), "MLM123456789");
+    assert.equal(id("https://articulo.mercadolibre.com.mx/MLM-123456789-funda-_JM#polycard"), "MLM123456789");
+    // Relative links and tracking links that embed the product URL.
+    assert.equal(id("/MLM-55-funda-_JM"), "MLM55");
+    assert.equal(id("https://click1.mercadolibre.com.mx/x?u=" + encodeURIComponent("https://articulo.mercadolibre.com.mx/MLM-777-x-_JM")), "MLM777");
+    assert.equal(id("https://click1.mercadolibre.com.mx/x?u=" + encodeURIComponent("https://www.mercadolibre.com.mx/y/p/MLM888")), "MLM888");
+    // Not an item: category ids in a query, bare hosts, garbage.
+    assert.equal(id("https://listado.mercadolibre.com.mx/celulares?category=MLM1055"), null);
+    assert.equal(id("https://www.mercadolibre.com.mx/"), null);
+    assert.equal(id("#"), null);
+    assert.equal(id(""), null);
+    assert.equal(id(null), null);
+  } finally {
+    globalThis.EXT_BRAND = prevBrand;
+    globalThis.MST_UI = prevUI;
+  }
+});

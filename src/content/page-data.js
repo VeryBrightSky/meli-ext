@@ -6,8 +6,14 @@
 globalThis.MST_PAGE = (() => {
   const TAG = `[${globalThis.EXT_BRAND.name}]`;
 
-  function extractItemId() {
-    const { pathname, search } = window.location;
+  // The storage key every per-listing value (cost, ads, weight…) hangs off.
+  // One normalization for the card (page URL) and the search strips (result
+  // links), so a catalog page and its result link resolve to the SAME id:
+  //   /{slug}/p/MLM123        → MLM123   (catalog)
+  //   /{slug}/up/MLMU123      → MLMU123  (unified)
+  //   /MLM-123-{slug}         → MLM123   (item, articulo. or www.)
+  //   ?pdp_filters=item_id:MLM123 → MLM123
+  function itemIdFromParts(pathname, search) {
     const catalog = pathname.match(/\/p\/(MLM\d+)/);
     if (catalog) return catalog[1];
     // Unified product pages: /up/MLMU123…
@@ -18,6 +24,37 @@ globalThis.MST_PAGE = (() => {
     const q = new URLSearchParams(search).get("pdp_filters")?.match(/item_id[:%3A]+(MLM\d+)/i);
     if (q) return q[1];
     return null;
+  }
+
+  function extractItemId() {
+    const { pathname, search } = window.location;
+    return itemIdFromParts(pathname, search);
+  }
+
+  // Same normalization for an arbitrary link (a search result's href). A
+  // tracking link that carries the product URL encoded in its query is
+  // resolved from the decoded text, but only on the strict path shapes
+  // (/p/MLM…, /up/MLMU…, /MLM-…) so a category id in a query never passes
+  // for an item id.
+  function itemIdFromUrl(href) {
+    if (typeof href !== "string" || href === "") return null;
+    let url;
+    try {
+      url = new URL(href, globalThis.location?.href ?? "https://www.mercadolibre.com.mx/");
+    } catch {
+      return null;
+    }
+    const direct = itemIdFromParts(url.pathname, url.search);
+    if (direct) return direct;
+    let decoded = href;
+    try {
+      decoded = decodeURIComponent(href);
+    } catch {
+      // malformed escape: scan the raw text
+    }
+    const embedded = decoded.match(/\/p\/(MLM\d+)|\/up\/(MLMU\d+)|\/MLM-(\d+)/);
+    if (!embedded) return null;
+    return embedded[1] ?? embedded[2] ?? `MLM${embedded[3]}`;
   }
 
   // Parse one Andes money component (fraction + optional cents spans).
@@ -186,5 +223,5 @@ globalThis.MST_PAGE = (() => {
     return data;
   }
 
-  return Object.freeze({ collect });
+  return Object.freeze({ collect, itemIdFromUrl });
 })();
