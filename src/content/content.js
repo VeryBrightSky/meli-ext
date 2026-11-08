@@ -539,6 +539,9 @@
     log("page type:", pageType ?? "(not a product/search page)");
     if (!pageType) return;
 
+    // UI language (Spanish unless the seller chose English in the options),
+    // applied before any string is rendered.
+    await globalThis.MST_I18N.init().catch(() => {});
     const settings = await chrome.storage.sync
       .get({ enabled: true, cardEnabled: true, stripsEnabled: true })
       .catch(() => ({ enabled: true, cardEnabled: true, stripsEnabled: true }));

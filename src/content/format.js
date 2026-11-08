@@ -1,24 +1,20 @@
 // Shared UI helpers for injected surfaces (PDP card, search Quick View).
-// Formatting is es-MX everywhere; charges (money leaving the seller) keep
+// Formatting is es-MX everywhere ("$", never "MX$"); charges (money leaving the seller) keep
 // the minus sign on BOTH bounds of a range.
 "use strict";
 
 globalThis.MST_UI = (() => {
-  // All amounts are MXN. Spanish UI formats es-MX ("$1,234.50" — locals read
-  // that as pesos). English UI formats en-US, which renders MXN as "MX$1,234.50"
-  // so a cross-border US seller can't mistake it for USD. Resolved lazily so it
-  // tracks whichever locale i18n picked, regardless of script load order.
-  const cache = {};
-  const formatter = () => {
-    const en = globalThis.MST_I18N && globalThis.MST_I18N.locale === "en";
-    const locale = en ? "en-US" : "es-MX";
-    return (cache[locale] ||= new Intl.NumberFormat(locale, {
+  // All amounts are MXN and always print the way a Mexican seller reads them:
+  // es-MX, "$1,234.50". The English UI keeps the same "$" (r3): "MX$" looked
+  // like a different currency next to Mercado Libre's own "$" prices.
+  let mxn = null;
+  const formatter = () =>
+    (mxn ||= new Intl.NumberFormat("es-MX", {
       style: "currency",
       currency: "MXN",
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     }));
-  };
 
   const fmtMoney = (v) => formatter().format(v);
 

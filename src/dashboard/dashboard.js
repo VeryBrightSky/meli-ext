@@ -6,6 +6,7 @@
 (async () => {
   const BRAND = globalThis.EXT_BRAND;
   const PREFIX = BRAND.cssPrefix;
+  await globalThis.MST_I18N.init(); // the seller's language choice, before any string
   const T = globalThis.MST_I18N.t;
   const SOURCE = globalThis.MST_FEE_SOURCE;
   const CALC = globalThis.MST_CALC;

@@ -3,8 +3,13 @@
 "use strict";
 
 const BRAND = globalThis.EXT_BRAND;
-const T = globalThis.MST_I18N.t;
 const parseMoney = globalThis.MST_CALC.parseMoney;
+
+(async () => {
+// The seller's language choice (Spanish by default) must be known before the
+// first label renders.
+await globalThis.MST_I18N.init();
+const T = globalThis.MST_I18N.t;
 
 const DEFAULT_SETTINGS = {
   enabled: true,
@@ -32,6 +37,8 @@ document.getElementById("opt-premium").textContent = T("typePremium");
 document.getElementById("reset-btn").textContent = T("optReset");
 document.getElementById("reset-hint").textContent = T("optResetHint");
 document.getElementById("lbl-acquisition").textContent = T("optAcquisition");
+document.getElementById("lbl-lang").textContent = T("optLanguage");
+document.getElementById("lbl-privacy").textContent = T("optPrivacyNote");
 document.getElementById("lbl-subscription").textContent = T("optSubscription");
 document.getElementById("manage-btn").textContent = T("optManage");
 document.getElementById("login-btn").textContent = T("optLogin");
@@ -82,6 +89,15 @@ defaultShipping.addEventListener("change", () => {
 defaultType.addEventListener("change", () =>
   chrome.storage.sync.set({ defaultListingType: defaultType.value })
 );
+// UI language: Spanish unless the seller picks English here. Saved under
+// MST_I18N.LANG_KEY (storage.sync) and read by every surface on load; the
+// options page itself reloads so its labels switch at once.
+const langSelect = document.getElementById("lang");
+langSelect.value = globalThis.MST_I18N.locale;
+langSelect.addEventListener("change", async () => {
+  await chrome.storage.sync.set({ [globalThis.MST_I18N.LANG_KEY]: langSelect.value === "en" ? "en" : "es_419" });
+  location.reload();
+});
 
 // Pro subscription status + actions (via the service worker / ExtPay).
 const acquisitionInput = document.getElementById("acquisition-pct");
@@ -252,7 +268,9 @@ loadTelemetry().catch(() => {});
 const KEEP_LOCAL = new Set([
   `${BRAND.cssPrefix}:installedAt`,
   `${BRAND.cssPrefix}:trialStartedAt`,
+  `${BRAND.cssPrefix}:trialSchema`,
   `${BRAND.cssPrefix}:metrics`,
+  globalThis.MST_I18N.LANG_KEY, // a language choice is not "saved data"
   globalThis.MST_OWNER.STORAGE_KEY,
   globalThis.MST_OWNER.HASH_OVERRIDE_KEY,
   ...Object.values(globalThis.MST_TELEMETRY_CORE.KEYS)
@@ -284,3 +302,4 @@ resetBtn.addEventListener("click", async () => {
 });
 
 load();
+})();

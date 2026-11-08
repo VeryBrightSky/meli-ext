@@ -11,39 +11,67 @@ import { fileURLToPath } from "node:url";
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const read = (p) => readFileSync(join(root, p), "utf8");
 
-// Load locale-data.js + i18n.js with a chrome stub for a given UI language.
-function loadI18n(uiLang) {
+// Load locale-data.js + i18n.js with a chrome stub whose storage.sync holds
+// the seller's stored language (mst:lang), or none. uiLang is what
+// chrome.i18n would report: it must never matter.
+function loadI18n(uiLang, storedLang) {
   const prev = globalThis.chrome;
   globalThis.chrome =
     uiLang === undefined
       ? undefined
-      : { i18n: { getUILanguage: () => uiLang, getMessage: () => "" } };
+      : {
+          i18n: { getUILanguage: () => uiLang, getMessage: () => "" },
+          storage: { sync: { get: async () => (storedLang === undefined ? {} : { "mst:lang": storedLang }) } }
+        };
   new Function(read("src/config/locale-data.js"))();
   new Function(read("src/config/i18n.js"))();
   const i18n = globalThis.MST_I18N;
   globalThis.chrome = prev;
   return i18n;
 }
+// Same, after init() read the stored choice.
+async function loadI18nReady(uiLang, storedLang) {
+  const prev = globalThis.chrome;
+  globalThis.chrome =
+    uiLang === undefined
+      ? undefined
+      : {
+          i18n: { getUILanguage: () => uiLang, getMessage: () => "" },
+          storage: { sync: { get: async () => (storedLang === undefined ? {} : { "mst:lang": storedLang }) } }
+        };
+  new Function(read("src/config/locale-data.js"))();
+  new Function(read("src/config/i18n.js"))();
+  const i18n = globalThis.MST_I18N;
+  await i18n.init();
+  globalThis.chrome = prev;
+  return i18n;
+}
 
-test("i18n is Spanish-first: only English UI gets English", () => {
-  assert.equal(loadI18n("es-419").locale, "es_419");
-  assert.equal(loadI18n("es").locale, "es_419");
-  assert.equal(loadI18n("es-MX").locale, "es_419");
-  assert.equal(loadI18n("fr").locale, "es_419"); // unknown → Spanish default
-  assert.equal(loadI18n("").locale, "es_419");
+test("i18n is Spanish by default on every browser locale; English only via the stored mst:lang toggle", async () => {
+  for (const ui of ["es-419", "es", "es-MX", "fr", "", "en", "en-US", "en-GB"]) {
+    assert.equal(loadI18n(ui).locale, "es_419", `before init, ui=${ui}`);
+    assert.equal((await loadI18nReady(ui)).locale, "es_419", `nothing stored, ui=${ui}`);
+    assert.equal((await loadI18nReady(ui, "es_419")).locale, "es_419", `stored es, ui=${ui}`);
+    assert.equal((await loadI18nReady(ui, "en")).locale, "en", `stored en, ui=${ui}`);
+    assert.equal((await loadI18nReady(ui, "garbage")).locale, "es_419", `stored junk, ui=${ui}`);
+  }
   assert.equal(loadI18n(undefined).locale, "es_419"); // no chrome → Spanish
-  assert.equal(loadI18n("en").locale, "en");
-  assert.equal(loadI18n("en-US").locale, "en");
-  assert.equal(loadI18n("en-GB").locale, "en");
+  assert.equal((await loadI18nReady(undefined)).locale, "es_419"); // storage unavailable → Spanish
+  const i = loadI18n("en");
+  assert.equal(i.LANG_KEY, "mst:lang");
+  assert.equal(i.setLocale("en"), "en");
+  assert.equal(i.t("rowPrice"), "Sale price");
+  assert.equal(i.setLocale("es_419"), "es_419");
+  assert.equal(i.t("rowPrice"), "Precio de venta");
 });
 
-test("i18n returns the localized string for the active locale", () => {
+test("i18n returns the localized string for the active locale", async () => {
   const es = loadI18n("es-419");
   assert.equal(es.t("rowPrice"), "Precio de venta");
   assert.equal(es.t("rowNet"), "Recibes aprox.");
   assert.equal(es.t("rowCategory"), "Categoría");
   assert.equal(es.t("rowTargetPrice"), "Precio objetivo");
-  const en = loadI18n("en");
+  const en = await loadI18nReady("es-419", "en");
   assert.equal(en.t("rowPrice"), "Sale price");
 });
 
@@ -279,7 +307,7 @@ test("v1.4.3 options page uses localized Clásica/Premium labels, not hardcoded 
 // v1.5.2 audit (E): the welcome page used `trialDaysLeft || 7`, so a reinstall
 // after an expired trial was told PRO was on for 7 days. The header copy is a
 // pure function of the entitlement status.
-test("v1.5.2 welcome copy: expired trial, paid/owner and active trial each get honest copy", () => {
+test("v1.5.2 welcome copy: expired trial, paid/owner and active trial each get honest copy", async () => {
   const src = read("src/onboarding/welcome.js");
   // Only the pure helper: the page IIFE below it needs a DOM.
   new Function(src.slice(0, src.indexOf("(async () => {")))();
@@ -304,7 +332,7 @@ test("v1.5.2 welcome copy: expired trial, paid/owner and active trial each get h
   // A lapsed subscriber (not a trial) gets the plain free copy, never "tu prueba terminó".
   const lapsed = copy({ pro: false, paid: false, lapsed: true, trialActive: false, trialExpired: false, trialDaysLeft: 0 }, es.t);
   assert.equal(lapsed.title, "Netio está listo");
-  const en = loadI18n("en");
+  const en = await loadI18nReady("es-419", "en");
   assert.equal(copy({ trialExpired: true }, en.t).title, "Your PRO trial has ended");
   assert.equal(copy({ trialExpired: true }, en.t).lead, "Keep using the free calculator or activate PRO. Here's how to get value from it:");
 });

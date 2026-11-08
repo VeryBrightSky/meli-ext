@@ -42,7 +42,7 @@
     "message": "Your shipping cost"
   },
   "rowShippingFree": {
-    "message": "Your shipping cost (free shipping ≥ $$299)"
+    "message": "Your shipping cost (from $$299 you pay it)"
   },
   "rowNet": {
     "message": "You receive approx."
@@ -186,7 +186,7 @@
     "message": "PRO tells you the price to sell at for the margin you want, what each interest-free installment term costs you, and paints every search result green or red. No account needed to use Netio; your costs never leave your browser."
   },
   "upsellPricing": {
-    "message": "$$699 a year is $$369 less than 12 months at $$89. Monthly comes to under $$3 a day. Cancel anytime."
+    "message": "PRO yearly: $$699 a year (save $$369). Monthly: $$89 a month (under $$3 a day). Cancel anytime."
   },
   "rowSales": {
     "message": "Sales per month"
@@ -214,6 +214,12 @@
   },
   "optAcquisition": {
     "message": "Radar: assumed cost (% of price) when no cost is saved"
+  },
+  "optLanguage": {
+    "message": "Language"
+  },
+  "optPrivacyNote": {
+    "message": "Your costs, sales and the price history of the listings you open are stored only in your browser. We have no servers."
   },
   "optSubscription": {
     "message": "Subscription"
@@ -435,7 +441,7 @@
     "message": "You lose $1 per sale at this price"
   },
   "upsellBody_loss": {
-    "message": "PRO tells you the price to earn $2%, with commission, fixed fee and shipping included. Right now you lose $1 per sale; PRO costs $$89 a month."
+    "message": "PRO tells you the price to earn $2%, with commission, fixed fee and shipping included. Right now you lose $1 per sale."
   },
   "upsellLead_msi": {
     "message": "With $1 interest-free months your profit drops to $2"
@@ -470,8 +476,14 @@
   "upsellLead_expired": {
     "message": "Your PRO trial has ended"
   },
+  "upsellLead_trial": {
+    "message": "Keep PRO when your trial ends"
+  },
+  "upsellBody_trial": {
+    "message": "Target price, max cost, Radar and Dashboard stay with you. Pick a plan: yearly (save $$369) or monthly ($$89 a month)."
+  },
   "upsellBody_expired": {
-    "message": "Your costs are still saved. Reactivate target price, Radar and Dashboard for $$89 a month."
+    "message": "Your costs are still saved. Reactivate target price, Radar and Dashboard: $$699 a year (save $$369) or $$89 a month (under $$3 a day)."
   },
   "alertCta": {
     "message": "See price"
@@ -501,7 +513,7 @@
     "message": "Your PRO trial ends in $1 days. After that you lose target price, Radar and Dashboard."
   },
   "trialKeep": {
-    "message": "Keep PRO · $$89/mo"
+    "message": "Keep PRO"
   },
   "trialExpiredBanner": {
     "message": "Your PRO trial has ended. Your saved costs and Dashboard are still here."
