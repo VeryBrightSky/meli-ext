@@ -186,7 +186,7 @@
     "message": "PRO te dice a qué precio vender para ganar el margen que quieres, cuánto te cuesta cada plazo de meses sin intereses y pinta en verde o rojo cada resultado de búsqueda. No necesitas cuenta para usar Netio; tus costos nunca salen de tu navegador."
   },
   "upsellPricing": {
-    "message": "$$89 MXN/mes (menos de $$3 al día) o $$699 MXN/año (ahorra 35%). Sin permanencia."
+    "message": "$$699 al año son $$369 menos que 12 meses a $$89. El mes sale en menos de $$3 al día. Sin permanencia."
   },
   "rowSales": {
     "message": "Ventas al mes"
@@ -315,10 +315,10 @@
     "message": "Ya incluido en la tabla ($1%)"
   },
   "upsellMonthly": {
-    "message": "Activar PRO · $$89 al mes"
+    "message": "$$89 al mes (menos de $$3 al día)"
   },
   "upsellYearly": {
-    "message": "$$699 al año (≈ $$58 al mes)"
+    "message": "Activar PRO · $$699 al año (ahorras $$369)"
   },
   "dashTotalsLabel": {
     "message": "Totales · productos: $1"
@@ -814,5 +814,32 @@
   },
   "maxCostNone": {
     "message": "A este precio no se alcanza ese margen"
+  },
+  "upsellLead_expiredOwn": {
+    "message": "Tu prueba PRO terminó: tus productos guardados ($1) se quedaron sin precio objetivo"
+  },
+  "upsellLead_expiredOwnOne": {
+    "message": "Tu prueba PRO terminó: tu producto guardado se quedó sin precio objetivo"
+  },
+  "upsellBody_expiredLoss": {
+    "message": "Tu peor producto, $1, pierde $2 por venta. PRO te vuelve a dar el precio para ganar 30% y el costo máximo en cada publicación."
+  },
+  "upsellBody_expiredThin": {
+    "message": "Tu peor producto, $1, deja solo $2 por venta. PRO te vuelve a dar el precio para ganar 30% y el costo máximo en cada publicación."
+  },
+  "upsellBody_expiredCount": {
+    "message": "Tus costos siguen guardados. PRO te vuelve a dar el precio objetivo, el costo máximo, el Radar y el Tablero."
+  },
+  "trialExpiredWorstLoss": {
+    "message": "Tu prueba PRO terminó. De tus productos guardados ($1), el peor, $2, pierde $3 por venta."
+  },
+  "trialExpiredWorstThin": {
+    "message": "Tu prueba PRO terminó. De tus productos guardados ($1), el peor, $2, deja solo $3 por venta."
+  },
+  "trialExpiredProducts": {
+    "message": "Tu prueba PRO terminó. Tus productos guardados ($1) siguen aquí, ya sin precio objetivo."
+  },
+  "trialExpiredProductsOne": {
+    "message": "Tu prueba PRO terminó. Tu producto guardado sigue aquí, ya sin precio objetivo."
   }
 }

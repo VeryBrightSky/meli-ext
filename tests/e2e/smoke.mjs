@@ -140,7 +140,10 @@ function tap(page, label) {
 
 const rowValue = (label) => `
   (() => {
+    // r2: the zero-cost fee stack repeats breakdown labels; once a cost is
+    // saved it is hidden and its rows are stale, so they never count.
     const row = [...document.querySelectorAll(".mst-row")]
+      .filter((r) => !r.closest(".mst-stack[hidden]"))
       .find((r) => r.querySelector(".mst-row__label")?.textContent.includes(${JSON.stringify(label)}));
     return row?.querySelector(".mst-row__value")?.textContent ?? null;
   })()
@@ -290,7 +293,7 @@ try {
   assert.equal(await seed.$eval("#pill", (e) => e.textContent), "Plan gratuito");
   assert.ok(!(await seed.$eval("main", (e) => e.textContent)).includes("7 días"), "welcome must not promise 7 días after the trial");
   const upg = await seed.$eval("#upgrade", (b) => ({ hidden: b.hidden, text: b.textContent, shown: b.offsetWidth > 0 }));
-  assert.deepEqual(upg, { hidden: false, text: "Activar PRO · $89 al mes", shown: true });
+  assert.deepEqual(upg, { hidden: false, text: "Activar PRO · $699 al año (ahorras $369)", shown: true });
   pass("welcome after an expired trial: 'Tu prueba PRO ya terminó', free pill, no '7 días', 'Activar PRO' button");
   await seed.close();
 
@@ -477,9 +480,11 @@ try {
   assert.ok(upsellText.includes("Ya calculamos a qué precio venderlo para ganar 30%"), `contextual headline missing: ${upsellText}`);
   // The blurred number must NOT be revealed in clear text by the panel.
   assert.ok(!upsellText.includes("$750.00"), "panel must not leak the blurred target price");
-  assert.ok(upsellText.includes("$89 al mes"), "upsell missing monthly price");
-  assert.ok(upsellText.includes("$699 al año"), "upsell missing yearly price");
-  assert.ok(upsellText.includes("≈ $58 al mes"), "upsell missing yearly monthly-equivalent");
+  // r2: yearly first with the saving in pesos (12 × 89 − 699 = 369), monthly
+  // second with the per-day figure (89 / 30 = 2.97), and the pricing line.
+  const planOrder = await page.$$eval(".mst-upsell__actions button", (b) => b.map((x) => x.textContent));
+  assert.deepEqual(planOrder, ["Activar PRO · $699 al año (ahorras $369)", "$89 al mes (menos de $3 al día)"], "yearly first, monthly second");
+  assert.ok(upsellText.includes("$699 al año son $369 menos que 12 meses a $89"), "upsell missing the pricing line");
   assert.ok(upsellText.includes("Ya pagué: iniciar sesión"), "upsell missing the 'already paid' login link");
   // Panel opens next to the clicked teaser, not at the bottom of the card.
   assert.equal(
@@ -487,7 +492,7 @@ try {
     true,
     "upsell should open right after the clicked teaser"
   );
-  pass("teaser click opens the upsell beside it, without leaking the blurred price ($89/mes, $699/año ≈ $58/mes)");
+  pass("teaser click opens the upsell beside it, without leaking the blurred price (yearly $699 ahorras $369 first, $89/mes menos de $3 al día second)");
 
   // MSI teaser: Premium listings show the real profit after 12 MSI (free),
   // the per-term breakdown is PRO.
@@ -1510,7 +1515,7 @@ try {
   await fp.waitForSelector(".mst-row--teaser", { visible: true });
   await fp.click(".mst-row--teaser");
   await sleep(300);
-  await fp.click(".mst-upsell__cta"); // monthly
+  await fp.click(".mst-upsell__alt"); // monthly (second since r2; yearly is the cta)
   await sleep(1500);
   await sendMsg({ type: "telemetryFlush" });
   await sleep(500);

@@ -186,7 +186,7 @@
     "message": "PRO tells you the price to sell at for the margin you want, what each interest-free installment term costs you, and paints every search result green or red. No account needed to use Netio; your costs never leave your browser."
   },
   "upsellPricing": {
-    "message": "$$89 MXN/mo (under $$3 a day) or $$699 MXN/yr (save 35%). No lock-in."
+    "message": "$$699 a year is $$369 less than 12 months at $$89. Monthly comes to under $$3 a day. Cancel anytime."
   },
   "rowSales": {
     "message": "Sales per month"
@@ -315,10 +315,10 @@
     "message": "Already in the table ($1%)"
   },
   "upsellMonthly": {
-    "message": "Activate PRO · $$89 a month"
+    "message": "$$89 a month (under $$3 a day)"
   },
   "upsellYearly": {
-    "message": "$$699 a year (works out to $$58 a month)"
+    "message": "Get PRO · $$699 a year (save $$369)"
   },
   "dashTotalsLabel": {
     "message": "Totals · products: $1"
@@ -814,5 +814,32 @@
   },
   "maxCostNone": {
     "message": "That margin is out of reach at this price"
+  },
+  "upsellLead_expiredOwn": {
+    "message": "Your PRO trial ended: your saved products ($1) lost their target price"
+  },
+  "upsellLead_expiredOwnOne": {
+    "message": "Your PRO trial ended: your saved product lost its target price"
+  },
+  "upsellBody_expiredLoss": {
+    "message": "Your worst product, $1, loses $2 per sale. PRO gives you back the price for 30% and the max cost on every listing."
+  },
+  "upsellBody_expiredThin": {
+    "message": "Your worst product, $1, leaves only $2 per sale. PRO gives you back the price for 30% and the max cost on every listing."
+  },
+  "upsellBody_expiredCount": {
+    "message": "Your costs are still saved. PRO gives you back the target price, the max cost, the Radar and the Dashboard."
+  },
+  "trialExpiredWorstLoss": {
+    "message": "Your PRO trial ended. Of your saved products ($1), the worst, $2, loses $3 per sale."
+  },
+  "trialExpiredWorstThin": {
+    "message": "Your PRO trial ended. Of your saved products ($1), the worst, $2, leaves only $3 per sale."
+  },
+  "trialExpiredProducts": {
+    "message": "Your PRO trial ended. Your saved products ($1) are still here, now without a target price."
+  },
+  "trialExpiredProductsOne": {
+    "message": "Your PRO trial ended. Your saved product is still here, now without a target price."
   }
 }
