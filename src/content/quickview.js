@@ -457,7 +457,10 @@ globalThis.MST_QUICKVIEW = (() => {
       T("csvNetMin"),
       T("csvNetMax")
     ];
-    if (active) header.push(T("csvProfit"), T("csvMargin"));
+    // Radar columns: the cost each profit was computed from and its basis
+    // (the seller's own saved cost, or the assumed % of price), then the
+    // profit and margin. A reader can tell an estimate from a real figure.
+    if (active) header.push(T("csvCost"), T("csvCostBasis"), T("csvProfit"), T("csvMargin"));
     const groups = SOURCE.listCategoryGroups();
     const groupLabelOf = (id) => groups.find((g) => g.id === id)?.label ?? "";
 
@@ -468,7 +471,7 @@ globalThis.MST_QUICKVIEW = (() => {
       if (!item.querySelector(`.${STRIP_CLASS}`)) continue; // export what's shown
       const data = extractItemData(item);
       if (!data.priceMXN) continue;
-      const { b, listingTypeId, categoryGroupId } = breakdownFor(data);
+      const { b, saved, listingTypeId, categoryGroupId } = breakdownFor(data);
       const title =
         item.querySelector("h2, .poly-component__title")?.textContent.trim() ?? "";
       const cells = [
@@ -485,9 +488,14 @@ globalThis.MST_QUICKVIEW = (() => {
       ];
       let marginPct = 0;
       if (active) {
-        const evaln = evaluateStrip(data, b);
+        const evaln = evaluateStrip(data, b, saved);
         if (onlyProfitable && evaln.bucket !== "profit") continue; // shortlist
-        cells.push(UI.csvFixed(evaln.profitMXN), UI.csvFixed(evaln.marginPct, 1));
+        cells.push(
+          UI.csvFixed(evaln.acquisitionCostMXN),
+          saved ? T("stripOwnCost") : T("csvAssumedBasis", [String(costPct())]),
+          UI.csvFixed(evaln.profitMXN),
+          UI.csvFixed(evaln.marginPct, 1)
+        );
         marginPct = evaln.marginPct;
       }
       rows.push({ cells, marginPct });
@@ -725,15 +733,7 @@ globalThis.MST_QUICKVIEW = (() => {
       wrap.append(logo, btn);
       if (GATE.isPro()) {
         btn.addEventListener("click", downloadCsv);
-        wrap.appendChild(
-          el(
-            "span",
-            `${PREFIX}-export__research`,
-            acquisitionPct > 0
-              ? T("researchActive", [String(acquisitionPct)])
-              : T("researchAssumed", [String(DEFAULT_ASSUMED_COST_PCT)])
-          )
-        );
+        wrap.appendChild(el("span", `${PREFIX}-export__research`, ""));
       } else {
         const upsell = globalThis.MST_UPSELL.attach(bar);
         upsellOpen = (reason, vars) => upsell.open(reason, vars);
@@ -761,6 +761,22 @@ globalThis.MST_QUICKVIEW = (() => {
     if (radarActive()) reapplyRadar();
     if (radarPreview()) refreshPreviewSummary();
     refreshExportBtn();
+    refreshResearchLabel();
+  }
+
+  // The cost basis line on the PRO bar. The assumption (the seller's % or
+  // the 60 % default) is the page-wide rule; once at least one strip on the
+  // page uses a saved cost the line says so, so the page is never read as
+  // "all assumed" while some verdicts are the seller's own figures.
+  function refreshResearchLabel() {
+    const label = document.querySelector(`.${PREFIX}-export__research`);
+    if (!label) return;
+    const anySaved = document.querySelector(`.${STRIP_CLASS}[data-saved-cost]`) !== null;
+    const pct = String(costPct());
+    let text;
+    if (acquisitionPct > 0) text = T(anySaved ? "researchActiveMixed" : "researchActive", [pct]);
+    else text = T(anySaved ? "researchAssumedMixed" : "researchAssumed", [pct]);
+    if (label.textContent !== text) label.textContent = text;
   }
 
   // The upsell panel (free bar) must stay last so the preview row sits above it.

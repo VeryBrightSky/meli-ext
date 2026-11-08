@@ -518,6 +518,28 @@ try {
       });
       assert.equal(second["Categoría"], "Tecnología y electrónica", JSON.stringify(second));
       assert.equal(Object.keys(second).some((k) => k.includes("hasta 1 kg")), false, JSON.stringify(second));
+      // r5 (minor 3): the bar names the mixed basis once a strip uses a saved
+      // cost, and the CSV carries the cost each profit came from and whether
+      // it is the seller's own or the assumption.
+      assert.equal(
+        await linked.$eval(".mst-export__research", (e) => e.textContent),
+        "Costo supuesto 60% salvo donde ya guardaste tu costo"
+      );
+      const dlDirR5 = mkdtempSync(join(tmpdir(), "meli-e2e-dl-"));
+      const cdpR5 = await linked.createCDPSession();
+      await cdpR5.send("Browser.setDownloadBehavior", { behavior: "allow", downloadPath: dlDirR5 });
+      await linked.click(".mst-export__btn");
+      let csvR5 = null;
+      for (let i = 0; i < 50 && !csvR5; i++) {
+        await sleep(100);
+        csvR5 = readdirSync(dlDirR5).find((f) => f.endsWith(".csv"));
+      }
+      assert.ok(csvR5, "CSV download with a saved cost");
+      const csvLines = readFileSync(join(dlDirR5, csvR5), "utf8").replace(/^\ufeff/, "").split("\r\n");
+      rmSync(dlDirR5, { recursive: true, force: true });
+      assert.ok(csvLines[0].endsWith(",Neto mín. (MXN),Neto máx. (MXN),Costo (MXN),Base del costo,Ganancia est. (MXN),Margen est. (%)"), csvLines[0]);
+      assert.ok(csvLines[1].includes(",Premium,Herramientas,") && csvLines[1].endsWith(",588.74,588.74,413.50,tu costo,175.24,21.2"), csvLines[1]);
+      assert.match(csvLines[2], /,72\.00,supuesto 60%,-?\d+\.\d{2},-?\d+\.\d$/, csvLines[2]); // $120 result: 60 % = $72
       await linked.close();
       // Back to the card's defaults so the phases below see the r4 numbers.
       await first.$$eval(".mst-toggle__btn", (btns) => btns.find((b) => b.textContent === "Clásica").click());
@@ -1510,7 +1532,7 @@ try {
     "Exportar a CSV (3)"
   );
   const research = await search.$eval(".mst-export__research", (e) => e.textContent);
-  assert.ok(research.includes("60"), research);
+  assert.equal(research, "Modo investigación: costo 60% del precio", research);
   const dlDir = mkdtempSync(join(tmpdir(), "meli-e2e-dl-"));
   const cdp = await search.createCDPSession();
   await cdp.send("Browser.setDownloadBehavior", { behavior: "allow", downloadPath: dlDir });
@@ -1526,7 +1548,8 @@ try {
   const lines = csv.replace(/^﻿/, "").split("\r\n");
   assert.equal(lines.length, 4);
   assert.ok(lines[0].startsWith("Título,"), lines[0]);
-  assert.ok(lines[1].includes("827.00") && lines[1].includes("Clásica"), lines[1]);
+  assert.ok(lines[0].includes(",Costo (MXN),Base del costo,Ganancia est. (MXN),Margen est. (%)"), lines[0]);
+  assert.ok(lines[1].includes("827.00") && lines[1].includes("Clásica") && lines[1].includes(",496.20,supuesto 60%,"), lines[1]);
   assert.ok(lines[2].includes("120.00") && lines[2].includes("Premium"), lines[2]);
   pass("CSV export (Pro): real download, header + 3 rows");
 
