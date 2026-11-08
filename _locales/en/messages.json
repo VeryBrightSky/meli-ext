@@ -813,10 +813,10 @@
     "message": "You keep"
   },
   "stackRetentions": {
-    "message": "With a registered RFC (VAT 8% + ISR 2.5%)"
+    "message": "Withholdings with an RFC (VAT 8% + ISR 2.5%)"
   },
-  "stackRetentionsHint": {
-    "message": "With a registered RFC (VAT 8% + ISR 2.5%; without an RFC they withhold more)"
+  "stackRetentionsNoRfc": {
+    "message": "Without an RFC more is withheld"
   },
   "stackRetentionsValue": {
     "message": "−$1, you are paid $2"

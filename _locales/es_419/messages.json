@@ -813,10 +813,10 @@
     "message": "Te queda"
   },
   "stackRetentions": {
-    "message": "Con RFC registrado (IVA 8% + ISR 2.5%)"
+    "message": "Retenciones con RFC (IVA 8% + ISR 2.5%)"
   },
-  "stackRetentionsHint": {
-    "message": "Con RFC registrado (IVA 8% + ISR 2.5%; sin RFC retienen más)"
+  "stackRetentionsNoRfc": {
+    "message": "Sin RFC te retienen más"
   },
   "stackRetentionsValue": {
     "message": "−$1, te depositan $2"

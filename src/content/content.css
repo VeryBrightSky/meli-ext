@@ -1378,6 +1378,18 @@
   color: rgba(0, 0, 0, 0.65);
 }
 
+/* "Sin RFC te retienen más" under the retentions row (r4). */
+.mst-stack__hint {
+  font-size: 11px;
+  line-height: 1.3;
+  color: rgba(0, 0, 0, 0.5);
+  padding: 0 0 2px;
+}
+
+.mst-stack__hint[hidden] {
+  display: none;
+}
+
 .mst-row--stacktotal .mst-row__label,
 .mst-row--stacktotal .mst-row__value {
   font-weight: 700;

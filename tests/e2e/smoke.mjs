@@ -279,8 +279,11 @@ try {
       ["Precio de venta", "$827.00"],
       ["Comisión por venta (10%)", "−$82.70"],
       ["Envío estimado (hasta 0.3 kg)", "−$78.60"],
-      ["Con RFC registrado (IVA 8% + ISR 2.5%; sin RFC retienen más)", "−$74.85, te depositan $590.85"]
+      ["Retenciones con RFC (IVA 8% + ISR 2.5%)", "−$74.85, te depositan $590.85"]
     ]);
+    // r4 (minor e): the "sin RFC" caveat is a small line under the row, so
+    // the row itself is label + value (the value never wraps).
+    assert.equal(await first.$eval(".mst-stack__hint", (e) => ({ hidden: e.hidden, text: e.textContent })).then((h) => JSON.stringify(h)), JSON.stringify({ hidden: false, text: "Sin RFC te retienen más" }));
     assert.equal(await first.$eval(".mst-summary__net", (e) => e.textContent), "Te queda $665.70 por venta (antes de IVA/ISR)");
     assert.equal(await first.$$eval(".mst-card .mst-row__label", (ls) => ls.filter((l) => l.textContent === "Te queda").length), 0, "no second 'Te queda' row");
     assert.equal(await first.$$eval(".mst-card .mst-row__label", (ls) => ls.filter((l) => l.textContent === "Recibes aprox.").length), 1, "exactly one 'Recibes aprox.' row");

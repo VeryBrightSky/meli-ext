@@ -1032,15 +1032,18 @@ globalThis.MST_CARD = (() => {
     rows.ads.root.style.display = b.adsCostMXN > 0 ? "" : "none";
     if (b.adsCostMXN > 0) patchRow(rows.ads, T("rowAdsCost", [String(b.adsPct)]), fmtCharge(b.adsCostMXN), false);
     const w = CALC.computeWithholdings(b.priceMXN, SOURCE.withholdings);
-    // The RFC rates shown are the registered-RFC ones; while the seller has
-    // not opened the retentions rows, say that an unregistered account is
-    // withheld more (r3), so the figure is never read as the only case.
+    // The RFC rates shown are the registered-RFC ones. The label stays short
+    // so the value keeps one line at 340 px (r4); while the seller has not
+    // opened the retentions rows, a small line under it says that an
+    // unregistered account is withheld more (r3), so the figure is never
+    // read as the only case.
     patchRow(
       rows.retentions,
-      state.showWithholdings ? T("stackRetentions") : T("stackRetentionsHint"),
+      T("stackRetentions"),
       T("stackRetentionsValue", [fmtMoney(w.totalMXN), fmtRange(CALC.round2(b.netMinMXN - w.totalMXN), CALC.round2(b.netMaxMXN - w.totalMXN))]),
       false
     );
+    refs.stackNoRfc.hidden = state.showWithholdings;
   }
 
   // Cost chips (40/50/60 % of the page price) show until a cost is saved.
@@ -1138,6 +1141,10 @@ globalThis.MST_CARD = (() => {
       refs.stackRows[id] = r;
       refs.stack.appendChild(r.root);
     }
+    // Under the retentions row: the registered-RFC rates are not the only
+    // case. Hidden once the seller opens the retentions rows.
+    refs.stackNoRfc = el("div", `${PREFIX}-stack__hint`, T("stackRetentionsNoRfc"));
+    refs.stack.appendChild(refs.stackNoRfc);
     refs.summary.append(refs.summaryNet, refs.summaryUpto, refs.summaryRetentions, refs.summaryProfit, refs.proLine, refs.adsHint, refs.stack);
     body.appendChild(refs.summary);
 
