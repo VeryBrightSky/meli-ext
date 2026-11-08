@@ -724,6 +724,41 @@ test("portfolioSummary: single row is both best and worst; avg rounds to 2dp", (
   assert.equal(s.avgMarginPct, 33.34);
 });
 
+test("v1.5.5 r3 dashboard rows fold the per-product ads % in like the card (10% ads)", () => {
+  const all = {
+    "mst:cost:MLM1": 413.5,
+    "mst:ads:MLM1": 10,
+    "mst:meta:MLM1": { title: "Celular", priceMXN: 827, listingTypeId: "classic", categoryGroupId: "tech" },
+    "mst:cost:MLM2": 413.5,
+    "mst:meta:MLM2": { title: "Sin ads", priceMXN: 827, listingTypeId: "classic", categoryGroupId: "tech" }
+  };
+  const rows = DASH.computeRows(all, "mst", 0, { shippingUnset: true, reputationId: "none" });
+  const withAds = rows.find((r) => r.itemId === "MLM1");
+  const noAds = rows.find((r) => r.itemId === "MLM2");
+  // The card at $827, tech 10%, 0.3 kg estimate 78.60, ads 10% = 82.70:
+  // net 583.00, profit 169.50, margin 20.5% (the card's own numbers).
+  const expected = CALC.computeBreakdown(
+    SOURCE.getQuote({ priceMXN: 827, listingTypeId: "classic", categoryGroupId: "tech" }),
+    { priceMXN: 827, shippingCostMXN: 78.6, productCostMXN: 413.5, adsPct: 10 }
+  );
+  assert.equal(withAds.adsPct, 10);
+  assert.equal(withAds.b.adsCostMXN, 82.7);
+  assert.deepEqual([withAds.b.netMinMXN, withAds.b.profitMinMXN, withAds.b.marginMinPct], [583, 169.5, 20.5]);
+  assert.deepEqual([withAds.b.netMinMXN, withAds.b.profitMinMXN, withAds.b.marginMinPct], [expected.netMinMXN, expected.profitMinMXN, expected.marginMinPct]);
+  assert.deepEqual([noAds.b.netMinMXN, noAds.b.profitMinMXN, noAds.b.marginMinPct], [665.7, 252.2, 30.5]);
+  // The worst product (what the trial banners quote) is the one paying ads.
+  const summary = DASH.portfolioSummary(rows);
+  assert.equal(summary.worstMargin.itemId, "MLM1");
+  assert.equal(summary.worstMargin.marginPct, 20.5);
+  // Free callers (card without the ads row) get the same numbers as the free card.
+  const free = DASH.computeRows(all, "mst", 0, { shippingUnset: true, reputationId: "none", includeAds: false });
+  assert.equal(free.find((r) => r.itemId === "MLM1").b.adsCostMXN, 0);
+  assert.equal(free.find((r) => r.itemId === "MLM1").b.marginMinPct, 30.5);
+  // Ads are capped at 99 like the card input.
+  const capped = DASH.computeRows({ ...all, "mst:ads:MLM1": 500 }, "mst", 0, { shippingUnset: true, reputationId: "none" });
+  assert.equal(capped.find((r) => r.itemId === "MLM1").adsPct, 99);
+});
+
 test("portfolioSummary: derives from live computeRows (worst-case margin/profit)", () => {
   const all = {
     "mst:cost:A": 400, "mst:meta:A": { title: "A", priceMXN: 827, listingTypeId: "classic", categoryGroupId: "tech", url: "u" },
@@ -1043,7 +1078,7 @@ test("v1.4.3 gate: a lapsed subscriber is not told their trial ended", () => {
 });
 
 // v1.5.5: the 7 PRO days start at the first saved cost, not at install.
-test("v1.5.5 trial: no cost → not started (pending), first cost → 7 days, 30-day fallback, migration", () => {
+test("v1.5.5 trial: no cost → not started (pending), first cost → 7 days, day-30 reminder (no auto start), migration", () => {
   const DAY = 86400000;
   const now = Date.UTC(2026, 10, 7);
   const base = GATE.computeProStatus({ paid: false }, now);
@@ -1070,18 +1105,35 @@ test("v1.5.5 trial: no cost → not started (pending), first cost → 7 days, 30
   assert.deepEqual([m.pro, m.trialExpired, m.trialPending, m.trialDaysSinceEnd], [false, true, false, 0]);
   m = GATE.mergeStatus(base, GATE.computeLocalTrial(now - 9 * DAY, now));
   assert.deepEqual([m.trialExpired, m.trialDaysSinceEnd], [true, 2]);
-  // 30-day fallback: no cost ever saved → starts by itself 30 days after install.
-  d = GATE.deriveTrialStart({ installedAt: now - 29 * DAY, trialStartedAt: null, hasCost: false }, now);
-  assert.equal(d.reason, "pending");
-  d = GATE.deriveTrialStart({ installedAt: now - 30 * DAY, trialStartedAt: null, hasCost: false }, now);
-  assert.deepEqual(d, { startedAt: now, reason: "auto" });
-  assert.equal(GATE.mergeStatus(base, GATE.computeLocalTrial(d.startedAt, now)).trialDaysLeft, 7);
-  d = GATE.deriveTrialStart({ installedAt: now - 35 * DAY, trialStartedAt: null, hasCost: false }, now);
-  assert.equal(d.startedAt, now - 5 * DAY);
-  assert.equal(GATE.mergeStatus(base, GATE.computeLocalTrial(d.startedAt, now)).trialDaysLeft, 2);
-  d = GATE.deriveTrialStart({ installedAt: now - 60 * DAY, trialStartedAt: null, hasCost: false }, now);
-  m = GATE.mergeStatus(base, GATE.computeLocalTrial(d.startedAt, now));
-  assert.deepEqual([m.pro, m.trialExpired, m.trialPending], [false, true, false]);
+  // r3: NO automatic start. 30, 60, 365 days without a cost stay pending;
+  // from day 30 the status carries trialRemind so the card shows the
+  // "empieza cuando guardes tu primer costo" reminder.
+  for (const days of [29, 30, 35, 60, 365]) {
+    d = GATE.deriveTrialStart({ installedAt: now - days * DAY, trialStartedAt: null, hasCost: false }, now);
+    assert.deepEqual(d, { startedAt: null, reason: "pending" }, `${days} days`);
+    const local = GATE.computeLocalTrial(d.startedAt, now);
+    local.daysSinceInstall = GATE.daysSinceInstall(now - days * DAY, now);
+    m = GATE.mergeStatus(base, local);
+    assert.deepEqual([m.pro, m.trialExpired, m.trialPending, m.trialActive], [false, false, true, false], `${days} days`);
+    assert.equal(m.trialRemind, days >= 30, `remind at ${days} days`);
+    assert.equal(m.trialDaysSinceInstall, days);
+  }
+  assert.equal(GATE.daysSinceInstall(NaN, now), 0);
+  assert.equal(GATE.daysSinceInstall(now + DAY, now), 0);
+  // Schema 2 (stamped by the service worker since 1.5.5): a cost with no
+  // start stamp is never migrated, whatever the install age.
+  d = GATE.deriveTrialStart({ installedAt: now - 3 * DAY, trialStartedAt: null, hasCost: true, trialSchema: 2 }, now);
+  assert.deepEqual(d, { startedAt: null, reason: "pending" });
+  d = GATE.deriveTrialStart({ installedAt: now - 90 * DAY, trialStartedAt: null, hasCost: true, trialSchema: 2 }, now);
+  assert.deepEqual(d, { startedAt: null, reason: "pending" });
+  // ...but a stamp still wins under schema 2.
+  d = GATE.deriveTrialStart({ installedAt: now - 90 * DAY, trialStartedAt: now - DAY, hasCost: true, trialSchema: 2 }, now);
+  assert.deepEqual(d, { startedAt: now - DAY, reason: "stamp" });
+  // A trialRemind never shows for paid or lapsed users, nor once expired.
+  const lapsedLocal = GATE.computeLocalTrial(null, now);
+  lapsedLocal.daysSinceInstall = 40;
+  assert.equal(GATE.mergeStatus(GATE.computeProStatus({ paid: false, paidAt: new Date(now - 40 * DAY).toISOString() }, now), lapsedLocal).trialRemind, false);
+  assert.equal(Boolean(GATE.mergeStatus(GATE.computeProStatus({ paid: true }, now), lapsedLocal).trialRemind), false);
   // A future-dated stamp (clock ahead on another device, NTP step back) is
   // clamped to now, never dropped into "migrated" (which would backdate the
   // trial to install and lock an old install out forever).
@@ -1172,14 +1224,143 @@ test("v1.5.5 gate.readLocalTrial + startTrial: stamps, migrates, notifies", asyn
     await new Promise((res) => setTimeout(res, 0));
     assert.equal(localStore["mst:trialStartedAt"], localStore["mst:installedAt"]);
     assert.equal(syncStore["mst:trialStartedAt"], localStore["mst:installedAt"]);
-    // 30-day fallback persists its derived start too.
+    // r3: no 30-day fallback. 31 days without a cost: still pending, no stamp
+    // written, and the status says "remind".
     for (const k of Object.keys(localStore)) delete localStore[k];
     for (const k of Object.keys(syncStore)) delete syncStore[k];
     localStore["mst:installedAt"] = Date.now() - 31 * DAY;
     r = await GATE.readLocalTrial();
-    assert.equal(r.local.daysLeft, 6);
+    assert.deepEqual([r.trialStartedAt, r.local.pending, r.local.daysSinceInstall], [null, true, 31]);
     await new Promise((res) => setTimeout(res, 0));
-    assert.equal(localStore["mst:trialStartedAt"], localStore["mst:installedAt"] + GATE.TRIAL_AUTO_START_MS);
+    assert.equal(localStore["mst:trialStartedAt"], undefined, "no automatic start stamp");
+    st = await GATE.refresh({ timeoutMs: 10 });
+    assert.deepEqual([st.pro, st.trialPending, st.trialRemind], [false, true, true]);
+    // Schema 2 + a cost key + no stamp (a cost saved on a page without an
+    // item id, or storage cleared): never migrated, stays pending, and the
+    // cost scan is skipped entirely.
+    for (const k of Object.keys(localStore)) delete localStore[k];
+    for (const k of Object.keys(syncStore)) delete syncStore[k];
+    localStore["mst:installedAt"] = Date.now() - 3 * DAY;
+    localStore["mst:trialSchema"] = 2;
+    localStore["mst:cost:MLM9"] = 120;
+    const getAll = [];
+    const origGet = globalThis.chrome.storage.local.get;
+    globalThis.chrome.storage.local.get = async (keys) => {
+      if (keys === null) getAll.push(1);
+      return origGet(keys);
+    };
+    r = await GATE.readLocalTrial();
+    globalThis.chrome.storage.local.get = origGet;
+    assert.deepEqual([r.trialStartedAt, r.local.pending, getAll.length], [null, true, 0]);
+    await new Promise((res) => setTimeout(res, 0));
+    assert.equal(localStore["mst:trialStartedAt"], undefined);
+    // trialStampForFirstCost: the entries the card merges into its first
+    // cost write; startTrial({ stampedAt }) then mirrors (no second local
+    // write) and announces PRO.
+    st = await GATE.refresh({ timeoutMs: 10 });
+    assert.equal(st.trialPending, true);
+    const stampNow = Date.now();
+    const stamp = GATE.trialStampForFirstCost(stampNow);
+    assert.deepEqual(stamp, { "mst:trialStartedAt": stampNow });
+    const writes = [];
+    const origSet = globalThis.chrome.storage.local.set;
+    globalThis.chrome.storage.local.set = async (obj) => {
+      writes.push(obj);
+      return origSet(obj);
+    };
+    // The card's single write: cost + stamp together.
+    await globalThis.chrome.storage.local.set({ "mst:cost:MLM1": 400, ...stamp });
+    assert.equal(await GATE.startTrial({ stampedAt: stampNow }), true);
+    globalThis.chrome.storage.local.set = origSet;
+    assert.equal(writes.filter((w) => "mst:trialStartedAt" in w).length, 1, "the stamp is written once, with the cost");
+    assert.equal(localStore["mst:trialStartedAt"], stampNow);
+    await new Promise((res) => setTimeout(res, 0));
+    assert.equal(syncStore["mst:trialStartedAt"], stampNow);
+    assert.deepEqual([GATE.isPro(), GATE.status().trialDaysLeft], [true, 7]);
+    assert.equal(GATE.trialStampForFirstCost(), null, "no stamp once the trial runs");
+  } finally {
+    globalThis.chrome = prevChrome;
+    globalThis.EXT_BRAND = prevBrand;
+  }
+});
+
+test("v1.5.5 r3 gate.migrateTrialOnUpdate: schema stamp once; pre-1.5.5 update with a cost migrates once; nothing else does", async () => {
+  const prevChrome = globalThis.chrome;
+  const prevBrand = globalThis.EXT_BRAND;
+  const DAY = 86400000;
+  const localStore = {};
+  const syncStore = {};
+  const area = (store) => ({
+    get: async (keys) => {
+      if (keys === null) return { ...store };
+      const out = {};
+      for (const k of [].concat(keys)) if (k in store) out[k] = store[k];
+      return out;
+    },
+    set: async (obj) => Object.assign(store, obj)
+  });
+  globalThis.EXT_BRAND = { cssPrefix: "mst" };
+  globalThis.chrome = {
+    runtime: { sendMessage: async () => ({ ok: false }) },
+    storage: { local: area(localStore), sync: area(syncStore) }
+  };
+  const clear = () => {
+    for (const k of Object.keys(localStore)) delete localStore[k];
+    for (const k of Object.keys(syncStore)) delete syncStore[k];
+  };
+  try {
+    const now = Date.now();
+    assert.equal(GATE.versionBefore("1.5.4", "1.5.5"), true);
+    assert.equal(GATE.versionBefore("1.5.5", "1.5.5"), false);
+    assert.equal(GATE.versionBefore("1.5.10", "1.5.5"), false);
+    assert.equal(GATE.versionBefore(undefined, "1.5.5"), true);
+    // Fresh install: schema stamped, nothing migrated.
+    localStore["mst:installedAt"] = now;
+    let r = await GATE.migrateTrialOnUpdate({ reason: "install" }, now);
+    assert.deepEqual(r, { schemaStamped: true, migrated: false });
+    assert.equal(localStore["mst:trialSchema"], 2);
+    assert.equal(localStore["mst:trialStartedAt"], undefined);
+    // Update from 1.5.4 with a saved cost and no stamp: migrated to install.
+    clear();
+    localStore["mst:installedAt"] = now - 3 * DAY;
+    localStore["mst:cost:MLM1"] = 300;
+    r = await GATE.migrateTrialOnUpdate({ reason: "update", previousVersion: "1.5.4" }, now);
+    assert.deepEqual(r, { schemaStamped: true, migrated: true });
+    assert.equal(localStore["mst:trialStartedAt"], now - 3 * DAY);
+    assert.equal(localStore["mst:trialSchema"], 2);
+    await new Promise((res) => setTimeout(res, 0));
+    assert.equal(syncStore["mst:trialStartedAt"], now - 3 * DAY);
+    // Running again (worker restart, 1.5.5 → 1.5.6): nothing more happens,
+    // even if the stamp was removed meanwhile.
+    delete localStore["mst:trialStartedAt"];
+    delete syncStore["mst:trialStartedAt"];
+    r = await GATE.migrateTrialOnUpdate({ reason: "update", previousVersion: "1.5.5" }, now);
+    assert.deepEqual(r, { schemaStamped: false, migrated: false });
+    assert.equal(localStore["mst:trialStartedAt"], undefined);
+    // Update from 1.5.4 WITHOUT a cost: schema only, pending.
+    clear();
+    localStore["mst:installedAt"] = now - 3 * DAY;
+    r = await GATE.migrateTrialOnUpdate({ reason: "update", previousVersion: "1.5.4" }, now);
+    assert.deepEqual(r, { schemaStamped: true, migrated: false });
+    // Update from 1.5.4 with a cost AND a stamp already: the stamp is kept.
+    clear();
+    localStore["mst:installedAt"] = now - 30 * DAY;
+    localStore["mst:cost:MLM1"] = 300;
+    syncStore["mst:trialStartedAt"] = now - DAY;
+    r = await GATE.migrateTrialOnUpdate({ reason: "update", previousVersion: "1.5.4" }, now);
+    assert.deepEqual(r, { schemaStamped: true, migrated: false });
+    assert.equal(localStore["mst:trialStartedAt"], undefined);
+    // Update from 1.5.5 itself (no legacy) with a cost and no stamp: no
+    // migration (a cost saved on a page without an item id is not a trial).
+    clear();
+    localStore["mst:installedAt"] = now - 3 * DAY;
+    localStore["mst:cost:MLM1"] = 300;
+    r = await GATE.migrateTrialOnUpdate({ reason: "update", previousVersion: "1.5.5" }, now);
+    assert.deepEqual(r, { schemaStamped: true, migrated: false });
+    // After the worker ran, readLocalTrial agrees: pending, no scan-based
+    // migration under schema 2.
+    const rl = await GATE.readLocalTrial(now);
+    assert.deepEqual([rl.trialStartedAt, rl.local.pending], [null, true]);
   } finally {
     globalThis.chrome = prevChrome;
     globalThis.EXT_BRAND = prevBrand;
@@ -1203,9 +1384,10 @@ test("v1.4.3 gate.refresh: an answer after the timeout is applied, cached and an
     runtime: { sendMessage: () => new Promise((r) => setTimeout(() => r(paidAnswer), 80)) },
     storage: { local: area(localStore), sync: area(syncStore) }
   };
-  // Local trial long over: installed 60 days ago, never saved a cost, so the
-  // 30-day fallback started it 30 days ago and it ended 23 days ago.
+  // Local trial long over: installed 60 days ago, first cost saved 30 days
+  // ago, so the 7 days ended 23 days ago.
   localStore["mst:installedAt"] = Date.now() - 60 * 86400000;
+  localStore["mst:trialStartedAt"] = Date.now() - 30 * 86400000;
   try {
     const events = [];
     GATE.onChange((st) => events.push(st.pro));
@@ -1501,4 +1683,65 @@ test("welcome demo ($499, home-general, 0.3 kg, cost 250) is computed with the r
   assert.ok(demo.caption.includes("$499.00") && demo.caption.includes("Hogar, moda, deportes y general"), demo.caption);
   // No fixed charge row at $499 (Clásica from $299 has none).
   assert.equal(demo.rows.some(([l]) => l.startsWith("Costo fijo")), false);
+});
+
+// v1.5.5 r3: price history is written only for listing pages (the URL shapes
+// content.js treats as a product), never for cart, checkout or payment pages.
+test("v1.5.5 r3 history.isRecordableUrl: listing URLs only, never cart/checkout", async () => {
+  const prevChrome = globalThis.chrome;
+  const prevBrand = globalThis.EXT_BRAND;
+  const prevLoc = globalThis.location;
+  globalThis.EXT_BRAND = { cssPrefix: "mst" };
+  const store = {};
+  globalThis.chrome = {
+    storage: {
+      local: {
+        get: async (keys) => {
+          const out = {};
+          for (const k of [].concat(keys)) if (k in store) out[k] = store[k];
+          return out;
+        },
+        set: async (obj) => Object.assign(store, obj),
+        remove: async (keys) => {
+          for (const k of [].concat(keys)) delete store[k];
+        }
+      }
+    }
+  };
+  try {
+    new Function(readFileSync(join(root, "src/content/history.js"), "utf8"))();
+    const H = globalThis.MST_HISTORY;
+    const yes = [
+      "https://www.mercadolibre.com.mx/celular-test-pro/p/MLM12345678",
+      "https://www.mercadolibre.com.mx/celular/p/MLM12345678?pdp_filters=x#reviews",
+      "https://www.mercadolibre.com.mx/funda/up/MLMU987654321",
+      "https://www.mercadolibre.com.mx/MLM-123456789-funda-_JM",
+      "https://articulo.mercadolibre.com.mx/MLM-123456789-funda-_JM"
+    ];
+    const no = [
+      "https://www.mercadolibre.com.mx/gz/checkout/buyingflow/MLM12345678",
+      "https://www.mercadolibre.com.mx/checkout/MLM12345678/p/MLM12345678",
+      "https://www.mercadolibre.com.mx/gz/cart",
+      "https://www.mercadolibre.com.mx/carrito",
+      "https://www.mercadolibre.com.mx/pagos/MLM12345678",
+      "https://www.mercadolibre.com.mx/",
+      "https://listado.mercadolibre.com.mx/celulares",
+      "https://www.mercadolibre.com.mx/ayuda/Comprar_123",
+      "https://evil.example/p/MLM12345678",
+      "not a url",
+      undefined
+    ];
+    for (const u of yes) assert.equal(H.isRecordableUrl(u), true, u);
+    for (const u of no) assert.equal(H.isRecordableUrl(String(u)), false, String(u));
+    // record() honors it: a checkout page writes nothing, a listing does.
+    await H.record("MLM12345678", 827, "https://www.mercadolibre.com.mx/gz/checkout/buyingflow/MLM12345678");
+    assert.deepEqual(store, {});
+    await H.record("MLM12345678", 827, "https://www.mercadolibre.com.mx/celular-test-pro/p/MLM12345678");
+    assert.equal(store["mst:hist:MLM12345678"].length, 1);
+    assert.equal(store["mst:hist:MLM12345678"][0].p, 827);
+  } finally {
+    globalThis.chrome = prevChrome;
+    globalThis.EXT_BRAND = prevBrand;
+    globalThis.location = prevLoc;
+  }
 });

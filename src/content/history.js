@@ -12,14 +12,35 @@ globalThis.MST_HISTORY = (() => {
 
   const key = (itemId) => `${PREFIX}:hist:${itemId}`;
 
+  // Only listing pages are recorded: the same URL shapes content.js treats as
+  // a product (catalog /p/MLM…, unified /up/MLMU…, item /MLM-…, the articulo
+  // host). Cart, checkout and payment pages carry a price too, but a price
+  // seen there is not a listing visit and is never written down.
+  const EXCLUDED_PATH = /\/(checkout|gz\/checkout|gz\/cart|cart|carrito|pago|pagos|compra|comprar)(\/|$)/i;
+  const PRODUCT_PATH = /\/p\/MLM\d+|\/up\/MLMU\d+|^\/MLM-\d+/;
+  function isRecordableUrl(href) {
+    let u;
+    try {
+      u = new URL(String(href));
+    } catch {
+      return false;
+    }
+    const host = u.hostname.toLowerCase();
+    if (!(host === "mercadolibre.com.mx" || host.endsWith(".mercadolibre.com.mx"))) return false;
+    if (EXCLUDED_PATH.test(u.pathname)) return false;
+    if (host === "articulo.mercadolibre.com.mx") return true;
+    return PRODUCT_PATH.test(u.pathname);
+  }
+
   // Bound the number of items kept: one key per visited listing, forever,
   // would grow storage.local without limit. Oldest-visited histories are
   // pruned once the index passes MAX_ITEMS.
   const MAX_ITEMS = 300;
   const INDEX_KEY = `${PREFIX}:hist-index`;
 
-  async function record(itemId, priceMXN) {
+  async function record(itemId, priceMXN, href = globalThis.location?.href) {
     if (!itemId || !(priceMXN > 0)) return;
+    if (!isRecordableUrl(href)) return;
     const k = key(itemId);
     const stored = await chrome.storage.local.get([k, INDEX_KEY]);
     const points = Array.isArray(stored[k]) ? stored[k] : [];
@@ -80,5 +101,5 @@ globalThis.MST_HISTORY = (() => {
     return svg;
   }
 
-  return Object.freeze({ record, get, sparkline, MAX_POINTS });
+  return Object.freeze({ isRecordableUrl, record, get, sparkline, MAX_POINTS });
 })();

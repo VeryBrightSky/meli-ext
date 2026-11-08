@@ -42,7 +42,7 @@
     "message": "Tu costo de envío"
   },
   "rowShippingFree": {
-    "message": "Tu costo de envío (gratis desde $$299)"
+    "message": "Tu costo de envío (desde $$299 lo pagas tú)"
   },
   "rowNet": {
     "message": "Recibes aprox."
@@ -113,6 +113,9 @@
   "stripNet": {
     "message": "Neto aprox."
   },
+  "stripAssumedCost": {
+    "message": "con costo supuesto $1%"
+  },
   "stripListingType": {
     "message": "Tipo (estimado)"
   },
@@ -133,9 +136,6 @@
   },
   "stripFixedCost": {
     "message": "Costo fijo"
-  },
-  "stripNetBeforeShipping": {
-    "message": "Neto antes del envío"
   },
   "stripFooter": {
     "message": "$1 · estimado, tarifas al $2"
@@ -186,7 +186,7 @@
     "message": "PRO te dice a qué precio vender para ganar el margen que quieres, cuánto te cuesta cada plazo de meses sin intereses y pinta en verde o rojo cada resultado de búsqueda. No necesitas cuenta para usar Netio; tus costos nunca salen de tu navegador."
   },
   "upsellPricing": {
-    "message": "$$699 al año son $$369 menos que 12 meses a $$89. El mes sale en menos de $$3 al día. Sin permanencia."
+    "message": "PRO anual: $$699 al año (ahorras $$369). Mensual: $$89 al mes (menos de $$3 al día). Sin permanencia."
   },
   "rowSales": {
     "message": "Ventas al mes"
@@ -214,6 +214,12 @@
   },
   "optAcquisition": {
     "message": "Radar: costo supuesto (% del precio) cuando no hay costo guardado"
+  },
+  "optLanguage": {
+    "message": "Idioma"
+  },
+  "optPrivacyNote": {
+    "message": "Tus costos, ventas y el historial de precios de las publicaciones que abres se guardan solo en tu navegador. No tenemos servidores."
   },
   "optSubscription": {
     "message": "Suscripción"
@@ -435,7 +441,7 @@
     "message": "Pierdes $1 por venta a este precio"
   },
   "upsellBody_loss": {
-    "message": "PRO te dice a qué precio venderlo para ganar $2%, ya con comisión, costo fijo y envío. Hoy pierdes $1 en cada venta; PRO cuesta $$89 al mes."
+    "message": "PRO te dice a qué precio venderlo para ganar $2%, ya con comisión, costo fijo y envío. Hoy pierdes $1 en cada venta."
   },
   "upsellLead_msi": {
     "message": "Con $1 meses sin intereses tu ganancia baja a $2"
@@ -470,8 +476,14 @@
   "upsellLead_expired": {
     "message": "Tu prueba PRO terminó"
   },
+  "upsellLead_trial": {
+    "message": "Quédate con PRO cuando termine tu prueba"
+  },
+  "upsellBody_trial": {
+    "message": "El precio objetivo, el costo máximo, el Radar y el Tablero siguen contigo. Elige el plan: anual (ahorras $$369) o mensual ($$89 al mes)."
+  },
   "upsellBody_expired": {
-    "message": "Tus costos siguen guardados. Reactiva el precio objetivo, el Radar y el Tablero por $$89 al mes."
+    "message": "Tus costos siguen guardados. Reactiva el precio objetivo, el Radar y el Tablero: $$699 al año (ahorras $$369) o $$89 al mes (menos de $$3 al día)."
   },
   "alertCta": {
     "message": "Ver precio"
@@ -501,7 +513,7 @@
     "message": "Tu prueba PRO termina en $1 días. Después pierdes el precio objetivo, el Radar y el Tablero."
   },
   "trialKeep": {
-    "message": "Quedarme con PRO · $$89/mes"
+    "message": "Quedarme con PRO"
   },
   "trialExpiredBanner": {
     "message": "Tu prueba PRO terminó. Tus costos guardados y tu Tablero siguen aquí."
@@ -570,7 +582,7 @@
     "message": "Abrir mis publicaciones"
   },
   "welcomeNote": {
-    "message": "Tus costos y productos se guardan en tu navegador; no tenemos servidores. Solo el pago de PRO pasa por ExtensionPay."
+    "message": "Tus costos, productos y el historial de precios de las publicaciones que abres se guardan en tu navegador; no tenemos servidores. Solo el pago de PRO pasa por ExtensionPay."
   },
   "badgeTrialOne": {
     "message": "PRO · último día de prueba"
@@ -710,6 +722,9 @@
   "proDidLine": {
     "message": "PRO: a $1 ganas el $2%"
   },
+  "proDidLineMaxCost": {
+    "message": "PRO: costo máximo para ganar $1%: $2"
+  },
   "noValue": {
     "message": "sin dato"
   },
@@ -718,6 +733,9 @@
   },
   "trialPendingBanner": {
     "message": "Tu prueba PRO de 7 días empieza cuando guardes tu primer costo"
+  },
+  "trialRemindBanner": {
+    "message": "Tu prueba PRO empieza cuando guardes tu primer costo"
   },
   "trialEndingWorstLoss": {
     "message": "Te quedan $3 días de PRO. Tu peor producto: $1, pierde $2 por venta."
@@ -788,6 +806,9 @@
   "stackRetentions": {
     "message": "Con RFC registrado (IVA 8% + ISR 2.5%)"
   },
+  "stackRetentionsHint": {
+    "message": "Con RFC registrado (IVA 8% + ISR 2.5%; sin RFC retienen más)"
+  },
   "stackRetentionsValue": {
     "message": "−$1, te depositan $2"
   },
@@ -846,7 +867,7 @@
     "message": "Así se ve en una publicación"
   },
   "welcomeDemoCaption": {
-    "message": "Ejemplo real: publicación Clásica de $1 en $2, 0.3 kg, sin reputación, costo de $$250. Tarifas y tabla de envío oficiales."
+    "message": "Ejemplo con tarifas oficiales: publicación Clásica de $1 en $2, 0.3 kg, sin reputación, costo de $$250. Tarifas y tabla de envío oficiales."
   },
   "welcomeDemoPro": {
     "message": "Con PRO, en la misma tarjeta"

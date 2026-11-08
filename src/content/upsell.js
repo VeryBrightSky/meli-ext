@@ -21,7 +21,7 @@ globalThis.MST_UPSELL = (() => {
   // Reasons map to a headline + body pair in the locale files:
   //   upsell.<reason>.lead / upsell.<reason>.body (vars = $1, $2 …)
   // Fallback is the generic product-page pitch.
-  const KNOWN = new Set(["generic", "target", "sweetspot", "breakeven", "loss", "msi", "radar", "dashboard", "whatif", "compare", "expired"]);
+  const KNOWN = new Set(["generic", "target", "sweetspot", "breakeven", "loss", "msi", "radar", "dashboard", "whatif", "compare", "expired", "trial"]);
   const NEEDS_VARS = { target: 1, sweetspot: 1, loss: 2, msi: 2, radar: 1 };
 
   // One panel per container (card body / export bar parent).
@@ -222,7 +222,8 @@ globalThis.MST_UPSELL = (() => {
       defaultShippingMXN: null, usesFull: false, reputationId: "none", freeShipping: false
     });
     const ship = DASH.resolveShipping(sync, all[`${PREFIX}:defaults`]);
-    const rows = DASH.computeRows(all, PREFIX, ship.value, { ...sync, shippingUnset: ship.unset });
+    // Ads count only while PRO, exactly like the card's own profit line.
+    const rows = DASH.computeRows(all, PREFIX, ship.value, { ...sync, shippingUnset: ship.unset, includeAds: GATE.isPro() });
     if (!rows.length) return null;
     rows.sort((a, b) => a.b.profitMinMXN - b.b.profitMinMXN);
     const w = rows[0];
@@ -256,18 +257,15 @@ globalThis.MST_UPSELL = (() => {
     close.setAttribute("aria-label", T("upsellClose"));
     root.append(text, btn, close);
 
-    // Offline checkout: say so in the banner instead of a dead button.
-    const failNote = (res) => {
-      if (!res?.ok) text.textContent = T("upsellOpenFailed");
-    };
-
     let stateKey = null;
     if (status.trialPending && !status.paid) {
       // 1.5.5: the 7 days have not started; say what starts them. No button:
-      // the cost input right below is the action.
-      stateKey = "pending";
+      // the cost input right below is the action. From day 30 after install
+      // (r3: there is no automatic start any more) the reminder comes back
+      // under its own dismissal key.
+      stateKey = status.trialRemind ? "remind" : "pending";
       root.dataset.tone = "pending";
-      text.textContent = T("trialPendingBanner");
+      text.textContent = status.trialRemind ? T("trialRemindBanner") : T("trialPendingBanner");
       btn.hidden = true;
     } else if (status.trialActive && status.localTrial) {
       stateKey = status.trialDaysLeft <= 3 ? "ending" : "active";
@@ -301,7 +299,9 @@ globalThis.MST_UPSELL = (() => {
         }).catch(() => {});
       }
       btn.textContent = T("trialKeep");
-      btn.addEventListener("click", () => GATE.openUpgrade(BRAND.plans.monthly, "trial-banner").then(failNote));
+      // One plan message everywhere: the panel under the banner lists the
+      // yearly plan first (ahorras $369), then monthly; no direct checkout.
+      btn.addEventListener("click", () => onOpen("trial"));
     } else if (status.trialExpired && (status.trialDaysSinceEnd ?? 0) <= 14) {
       stateKey = "expired";
       root.dataset.tone = "expired";

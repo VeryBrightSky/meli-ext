@@ -42,6 +42,10 @@ globalThis.MST_DASH = (() => {
   // card for the same listing (Full fees, reputation shipping table).
   // opts.shippingUnset: no shipping configured anywhere; $299+ listings then
   // take the per-weight estimate, like the card (v1.5.2 parity).
+  // opts.includeAds (default true): fold the per-product Mercado Ads % (the
+  // `<prefix>:ads:` key the card saves) into net, profit and margin exactly
+  // as the card does. The card only counts ads while PRO (the input that
+  // sets them is a PRO row), so a free caller passes false.
   function computeRows(all, prefix, defaultShipping, opts = {}) {
     const SOURCE = globalThis.MST_FEE_SOURCE;
     const CALC = globalThis.MST_CALC;
@@ -55,6 +59,7 @@ globalThis.MST_DASH = (() => {
       if (!(cost > 0) || !meta || !(meta.priceMXN > 0)) continue;
       const sales = CALC.parseMoney(all[`${prefix}:sales:${itemId}`]);
       const weight = CALC.parseMoney(all[`${prefix}:weight:${itemId}`] ?? 0);
+      const adsPct = opts.includeAds === false ? 0 : Math.min(CALC.parseMoney(all[`${prefix}:ads:${itemId}`] ?? 0), 99);
       const fullWeightKg = opts.usesFull === true ? (weight > 0 ? weight : 0.3) : null;
       const quote = SOURCE.getQuote({
         priceMXN: meta.priceMXN,
@@ -77,9 +82,10 @@ globalThis.MST_DASH = (() => {
       const b = CALC.computeBreakdown(quote, {
         priceMXN: meta.priceMXN,
         shippingCostMXN: shipping,
-        productCostMXN: cost
+        productCostMXN: cost,
+        adsPct
       });
-      rows.push({ itemId, meta, cost, sales, b, shippingEstimated: estimated });
+      rows.push({ itemId, meta, cost, sales, adsPct, b, shippingEstimated: estimated });
     }
     return rows;
   }

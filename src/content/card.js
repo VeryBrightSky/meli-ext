@@ -77,6 +77,12 @@ globalThis.MST_CARD = (() => {
 
   // Live references into the current card DOM, repopulated on each build().
   const refs = {};
+  // "Guardado" survives the rebuild the first saved cost triggers (the trial
+  // starts and the card is rebuilt as PRO on the spot): the note is shown
+  // again on the new card for what is left of its 2 s.
+  const SAVED_NOTE_MS = 2000;
+  let savedNoteUntil = 0;
+  let savedNoteItemId = null;
 
   const { fmtMoney, fmtRange, fmtCharge, fmtPctRange } = UI;
 
@@ -172,7 +178,9 @@ globalThis.MST_CARD = (() => {
   // Money input: type=text + inputmode=decimal so commas are typeable.
   // Never reformatted while focused; normalized to "123.45" on blur.
   // Enter confirms (blurs). Recalc is debounced on 'input'.
-  function moneyInput(getValue, onValue) {
+  // onCommit(value) fires on blur/Enter (after the pending edit is applied):
+  // the moment a typed value is final, as opposed to a debounced keystroke.
+  function moneyInput(getValue, onValue, { onCommit } = {}) {
     const input = document.createElement("input");
     input.type = "text";
     input.inputMode = "decimal";
@@ -197,6 +205,7 @@ globalThis.MST_CARD = (() => {
       debouncedApply.flush();
       const v = getValue();
       input.value = v > 0 ? v.toFixed(2) : "";
+      if (onCommit) onCommit(v);
     });
 
     input.syncFromState = () => {
@@ -212,7 +221,11 @@ globalThis.MST_CARD = (() => {
   // cost/sales/weight keys full of zeros just because a toggle was clicked.
   const persistedKeys = new Set();
 
-  function persistInputs() {
+  // extra: entries written in the SAME storage write as the per-item keys
+  // (the trial start stamp rides with the first saved cost, so a navigation
+  // right after a chip tap can never separate the two). Only written when
+  // the item has an id, like the cost itself.
+  function persistInputs(extra = null) {
     if (!SAFE.alive()) {
       showStale();
       return;
@@ -252,6 +265,7 @@ globalThis.MST_CARD = (() => {
           persistedKeys.add(key);
         }
       }
+      if (extra) Object.assign(entries, extra);
       if (Object.keys(entries).length) save("local", entries);
       // Listing snapshot for the dashboard (only meaningful with a cost).
       if (state.productCostMXN > 0) {
@@ -725,8 +739,9 @@ globalThis.MST_CARD = (() => {
     renderCostChips();
     // Share only once there is a real number to share (a saved cost): a
     // "recommend the app" button on first sight is noise.
+    // ...and only a profit worth showing: nobody forwards a loss (r3).
     if (refs.shareBtn) {
-      const canShare = state.productCostMXN > 0;
+      const canShare = state.productCostMXN > 0 && b.profitMinMXN !== undefined && b.marginMinPct > 0;
       refs.shareBtn.hidden = !canShare;
       if (canShare) {
         refs.shareBtn.href = buildShareUrl();
@@ -880,7 +895,33 @@ globalThis.MST_CARD = (() => {
         );
         // One short line under the summary so the seller sees what PRO just
         // did for this listing (worst-case price for the margin in effect).
-        if (hi !== null) {
+        // r3: never recommend a LOWER price for a margin the seller already
+        // has. When the current worst-case margin already meets the target,
+        // the line points up instead: the price for 10 more points, or, if
+        // no price reaches that, the most this unit may cost at the current
+        // price for the target margin.
+        const currentMargin = b.marginMinPct ?? 0;
+        if (currentMargin >= margin) {
+          const upMargin = Math.min(99, Math.ceil(currentMargin + 10));
+          const up = upMargin > currentMargin ? solve(quote.pctMax, upMargin) : null;
+          if (up !== null && up > state.priceMXN) {
+            refs.proLine.textContent = T("proDidLine", [fmtMoney(up), String(upMargin)]);
+            refs.proLine.hidden = false;
+          } else {
+            const maxCost = CALC.solveMaxCost({
+              priceMXN: state.priceMXN,
+              marginPct: margin,
+              ratePct: quote.pctMax,
+              adsPct: effectiveAdsPct(),
+              fixedCostMXN: b.fixedCostMXN,
+              shippingMXN: effectiveShipping
+            });
+            if (maxCost !== null) {
+              refs.proLine.textContent = T("proDidLineMaxCost", [String(margin), fmtMoney(maxCost)]);
+              refs.proLine.hidden = false;
+            }
+          }
+        } else if (hi !== null) {
           refs.proLine.textContent = T("proDidLine", [fmtMoney(hi), String(margin)]);
           refs.proLine.hidden = false;
         }
@@ -971,11 +1012,13 @@ globalThis.MST_CARD = (() => {
     }
     rows.ads.root.style.display = b.adsCostMXN > 0 ? "" : "none";
     if (b.adsCostMXN > 0) patchRow(rows.ads, T("rowAdsCost", [String(b.adsPct)]), fmtCharge(b.adsCostMXN), false);
-    patchRow(rows.net, T("stackNet"), fmtRange(b.netMinMXN, b.netMaxMXN), false);
     const w = CALC.computeWithholdings(b.priceMXN, SOURCE.withholdings);
+    // The RFC rates shown are the registered-RFC ones; while the seller has
+    // not opened the retentions rows, say that an unregistered account is
+    // withheld more (r3), so the figure is never read as the only case.
     patchRow(
       rows.retentions,
-      T("stackRetentions"),
+      state.showWithholdings ? T("stackRetentions") : T("stackRetentionsHint"),
       T("stackRetentionsValue", [fmtMoney(w.totalMXN), fmtRange(CALC.round2(b.netMinMXN - w.totalMXN), CALC.round2(b.netMaxMXN - w.totalMXN))]),
       false
     );
@@ -1064,8 +1107,10 @@ globalThis.MST_CARD = (() => {
     refs.stack = el("div", `${PREFIX}-stack`);
     refs.stack.hidden = true;
     refs.stackRows = {};
-    for (const id of ["price", "commission", "fixed", "shipping", "ads", "net", "retentions"]) {
-      const r = buildRow("", id === "net" ? "stacktotal" : undefined);
+    // No net row here: the headline right above IS the net ("Te queda"), one
+    // number, said once (r3).
+    for (const id of ["price", "commission", "fixed", "shipping", "ads", "retentions"]) {
+      const r = buildRow("");
       r.root.classList.add(`${PREFIX}-stack__row`);
       refs.stackRows[id] = r;
       refs.stack.appendChild(r.root);
@@ -1082,38 +1127,58 @@ globalThis.MST_CARD = (() => {
     refs.savedNote = el("div", `${PREFIX}-saved`, T("costSaved"));
     refs.savedNote.hidden = true;
     let savedTimer = null;
-    const showSaved = () => {
+    const showSaved = (ms = SAVED_NOTE_MS) => {
       refs.savedNote.hidden = false;
       clearTimeout(savedTimer);
       savedTimer = setTimeout(() => {
         refs.savedNote.hidden = true;
-      }, 2000);
+      }, ms);
     };
-    const startTrialSoon = debounced(() => {
-      if (state.productCostMXN > 0 && globalThis.MST_GATE.status().trialPending) {
-        globalThis.MST_GATE.startTrial().catch(() => {});
-      }
-    }, 1500);
-    // One path for a typed cost and a tapped chip: both save, confirm and
-    // start the trial the same way.
-    const applyCost = (v, { how }) => {
-      const changed = v !== state.productCostMXN;
+    if (savedNoteItemId !== null && savedNoteItemId === state.itemId && Date.now() < savedNoteUntil) {
+      showSaved(savedNoteUntil - Date.now());
+    }
+    // One path for a typed cost and a tapped chip. A keystroke only
+    // recalculates; the cost is saved when it is final (blur/Enter, or a chip
+    // tap), and the FIRST saved cost carries the trial start stamp in the
+    // same storage write (no debounce, no second write a navigation could
+    // cut off). A page without an item id saves nothing and starts nothing.
+    let lastCommittedCost = state.productCostMXN;
+    let costDirty = false; // typed since the last commit
+    refs.markCostCommitted = (v) => {
+      lastCommittedCost = v;
+      costDirty = false;
+    };
+    const applyCost = (v, { how, commit }) => {
       state.productCostMXN = v;
       update();
-      persistInputs();
+      if (!commit) {
+        costDirty = true;
+        return;
+      }
+      // A blur that typed nothing (focus in, focus out) is not a save.
+      if (!costDirty && how !== "chip" && v === lastCommittedCost) return;
+      costDirty = false;
+      lastCommittedCost = v;
+      const GATE = globalThis.MST_GATE;
+      const stamp = v > 0 && state.itemId ? GATE.trialStampForFirstCost() : null;
+      persistInputs(stamp);
       if (v > 0) {
         TRACK.once("first_cost_entered");
         TRACK.count("cost_entries");
-        if (how === "chip") globalThis.MST_GATE.track("cost:chip"); // local funnel counter only
-        if (changed && state.itemId && SAFE.alive()) showSaved();
-        startTrialSoon();
+        if (how === "chip") GATE.track("cost:chip"); // local funnel counter only
+        if (state.itemId && SAFE.alive()) {
+          savedNoteUntil = Date.now() + SAVED_NOTE_MS;
+          savedNoteItemId = state.itemId;
+          showSaved();
+        }
+        if (stamp) GATE.startTrial({ stampedAt: Object.values(stamp)[0] }).catch(() => {});
       }
     };
     refs.costInput = moneyInput(
       () => state.productCostMXN,
-      (v) => applyCost(v, { how: "typed" })
+      (v) => applyCost(v, { how: "typed", commit: false }),
+      { onCommit: (v) => applyCost(v, { how: "typed", commit: true }) }
     );
-    refs.costInput.addEventListener("blur", () => startTrialSoon.flush());
     refs.costInput.setAttribute("aria-label", T("inputProductCostAria"));
     // Cost chips: the first cost is one tap. 40 / 50 / 60 % of the page
     // price, each showing the peso amount it stands for; hidden once a cost
@@ -1127,7 +1192,7 @@ globalThis.MST_CARD = (() => {
       chip.addEventListener("click", () => {
         const v = CALC.round2((state.pagePriceMXN * pct) / 100);
         if (!(v > 0)) return;
-        applyCost(v, { how: "chip" });
+        applyCost(v, { how: "chip", commit: true });
         refs.costInput.syncFromState();
       });
       refs.chipButtons.push(chip);
@@ -1736,27 +1801,34 @@ globalThis.MST_CARD = (() => {
     });
     refs.summary.appendChild(refs.shareBtn);
 
-    // Fee breakdown: collapsed by default so the card answers first and
-    // explains on demand. The seller's choice (open/closed) is remembered.
+    // Fee breakdown ("cargos y envío"): collapsed by default so the card
+    // answers first and explains on demand. The seller's choice (open/closed)
+    // is remembered. Order (r3): the charges, then the shipping inputs and
+    // the shipping cost, then ads (a % of the price, like shipping a cost the
+    // seller controls, never next to "Costo total de Mercado Libre"), then the
+    // net ("Recibes aprox.", said once here; the summary says "Te queda"),
+    // then the retentions.
     const details = el("details", `${PREFIX}-breakdown`);
     details.appendChild(el("summary", `${PREFIX}-breakdown__toggle`, T("breakdownToggle")));
+    const shipRowEl = refs.shippingInput.closest(`.${PREFIX}-row`);
     const moveIntoDetails = [
       refs.commission?.root,
       refs.fixed?.root,
-      refs.ads?.root,
       refs.effective?.root,
       refs.weightSelect?.closest(`.${PREFIX}-row`),
       refs.fullToggle?.closest(`.${PREFIX}-row`),
       refs.reputationSelect?.closest(`.${PREFIX}-row`),
       refs.freeShippingToggle?.closest(`.${PREFIX}-row`),
+      shipRowEl,
       refs.shippingSubsidy?.root,
+      refs.ads?.root,
+      refs.net?.root,
       refs.withholdingsToggle?.closest(`.${PREFIX}-row`),
       refs.iva?.root,
       refs.isr?.root,
       refs.netAfter?.root,
       refs.withholdingsHint
     ].filter(Boolean);
-    const shipRowEl = refs.shippingInput.closest(`.${PREFIX}-row`);
     shipRowEl.before(details);
     for (const node of moveIntoDetails) details.appendChild(node);
     refs.breakdown = details;
@@ -1945,6 +2017,7 @@ globalThis.MST_CARD = (() => {
       refs.priceInput.syncFromState();
       refs.shippingInput.syncFromState();
       refs.costInput.syncFromState();
+      refs.markCostCommitted?.(state.productCostMXN);
       refs.marginInput?.syncFromState();
       refs.salesInput?.syncFromState();
       refs.adsInput?.syncFromState();

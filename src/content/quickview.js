@@ -22,6 +22,44 @@ globalThis.MST_QUICKVIEW = (() => {
   const SAFE = globalThis.MST_SAFE;
 
   let pageCategoryGroupId = null;
+  // The seller's account-wide card settings (storage.sync), read per init so
+  // a strip's net is the card's net for the same listing: Full fees, the
+  // reputation's shipping table, the free-shipping toggle and a configured
+  // default shipping cost.
+  let shipSettings = { configured: false, value: 0, reputationId: "none", freeShipping: false, usesFull: false };
+  const STRIP_WEIGHT_KG = 0.3;
+
+  // What the seller pays to ship a result at its price: the configured
+  // default (options, else the card's last typed value) as is, otherwise the
+  // official Mercado Envíos estimate for the smallest bracket (0.3 kg) from
+  // the reputation's table wherever shipping applies (from $299 it is
+  // mandatory; below it only when the seller offers free shipping). This is
+  // card.js shipAt() for a listing with no weight chosen.
+  function shippingFor(priceMXN) {
+    if (shipSettings.configured) return shipSettings.value;
+    const applies = shipSettings.freeShipping || priceMXN >= SOURCE.freeShippingThresholdMXN;
+    if (!applies) return 0;
+    const DASH = globalThis.MST_DASH;
+    const cost = DASH ? DASH.estimatedShipping(STRIP_WEIGHT_KG, priceMXN, shipSettings.reputationId) : 0;
+    return cost > 0 ? cost : 0;
+  }
+
+  // Quote + breakdown for one result, with the same inputs the card uses.
+  function breakdownFor(data) {
+    const quote = SOURCE.getQuote({
+      priceMXN: data.priceMXN,
+      listingTypeId: data.listingTypeGuess,
+      categoryGroupId: pageCategoryGroupId,
+      fullWeightKg: shipSettings.usesFull ? STRIP_WEIGHT_KG : null
+    });
+    const shipping = shippingFor(data.priceMXN);
+    const b = CALC.computeBreakdown(quote, {
+      priceMXN: data.priceMXN,
+      shippingCostMXN: shipping,
+      productCostMXN: 0
+    });
+    return { quote, b, shipping };
+  }
 
   // Per-init lifecycle state (torn down by destroy() on SPA navigation).
   let observer = null;
@@ -186,18 +224,10 @@ globalThis.MST_QUICKVIEW = (() => {
   }
 
   function buildStrip(data) {
-    const quote = SOURCE.getQuote({
-      priceMXN: data.priceMXN,
-      listingTypeId: data.listingTypeGuess,
-      categoryGroupId: pageCategoryGroupId
-    });
-    // Net excludes shipping here: per-result shipping cost is unknowable in
-    // browse context (noted in the expanded panel).
-    const b = CALC.computeBreakdown(quote, {
-      priceMXN: data.priceMXN,
-      shippingCostMXN: 0,
-      productCostMXN: 0
-    });
+    // Net INCLUDES the seller's shipping (r3): the same estimate the card
+    // shows for this listing, so the strip, the Radar verdict and the card
+    // never disagree about one product.
+    const { quote, b, shipping } = breakdownFor(data);
 
     const strip = el("div", STRIP_CLASS);
 
@@ -235,6 +265,9 @@ globalThis.MST_QUICKVIEW = (() => {
     bar.appendChild(logo);
     if (evaln && showVerdict) {
       bar.appendChild(buildVerdict(evaln));
+      // Free preview: the profit is computed with an ASSUMED cost; say so on
+      // the strip itself, not only in the summary bar.
+      if (!radarActive()) bar.appendChild(el("span", `${PREFIX}-strip__assumed`, T("stripAssumedCost", [String(previewPct())])));
     } else {
       bar.appendChild(el("span", null, T("stripNet")));
       bar.appendChild(el("b", null, UI.fmtRange(b.netMinMXN, b.netMaxMXN)));
@@ -269,11 +302,17 @@ globalThis.MST_QUICKVIEW = (() => {
       )
     );
     if (b.fixedCostMXN > 0) {
-      panel.appendChild(panelRow(T("stripFixedCost"), UI.fmtCharge(b.fixedCostMXN)));
+      panel.appendChild(panelRow(quote.isFullServiceCost ? T("rowServiceCost") : T("stripFixedCost"), UI.fmtCharge(b.fixedCostMXN)));
     }
-    panel.appendChild(
-      panelRow(T("stripNetBeforeShipping"), UI.fmtRange(b.netMinMXN, b.netMaxMXN))
-    );
+    if (shipping > 0) {
+      panel.appendChild(
+        panelRow(
+          shipSettings.configured ? T("rowShipping") : T("stackShippingEstimate", [String(STRIP_WEIGHT_KG)]),
+          UI.fmtCharge(shipping)
+        )
+      );
+    }
+    panel.appendChild(panelRow(T("rowNet"), UI.fmtRange(b.netMinMXN, b.netMaxMXN)));
     if (globalThis.MST_GATE.isPro()) {
       const cost = CALC.round2((data.priceMXN * costPct()) / 100);
       panel.appendChild(
@@ -313,6 +352,7 @@ globalThis.MST_QUICKVIEW = (() => {
       T("stripFreeShipping"),
       T("csvCommissionMin"),
       T("csvCommissionMax"),
+      T("dashShipping"),
       T("csvNetMin"),
       T("csvNetMax")
     ];
@@ -327,16 +367,7 @@ globalThis.MST_QUICKVIEW = (() => {
       if (!item.querySelector(`.${STRIP_CLASS}`)) continue; // export what's shown
       const data = extractItemData(item);
       if (!data.priceMXN) continue;
-      const quote = SOURCE.getQuote({
-        priceMXN: data.priceMXN,
-        listingTypeId: data.listingTypeGuess,
-        categoryGroupId: pageCategoryGroupId
-      });
-      const b = CALC.computeBreakdown(quote, {
-        priceMXN: data.priceMXN,
-        shippingCostMXN: 0,
-        productCostMXN: 0
-      });
+      const { b } = breakdownFor(data);
       const title =
         item.querySelector("h2, .poly-component__title")?.textContent.trim() ?? "";
       const cells = [
@@ -347,6 +378,7 @@ globalThis.MST_QUICKVIEW = (() => {
         data.freeShipping ? T("yes") : T("no"),
         UI.csvFixed(b.commissionMinMXN),
         UI.csvFixed(b.commissionMaxMXN),
+        UI.csvFixed(b.shippingCostMXN),
         UI.csvFixed(b.netMinMXN),
         UI.csvFixed(b.netMaxMXN)
       ];
@@ -469,6 +501,9 @@ globalThis.MST_QUICKVIEW = (() => {
     const more = document.querySelector(`.${PREFIX}-radar--preview .${PREFIX}-radar__more`);
     const hidden = Math.max(0, c.total - FREE_VERDICTS);
     if (more) more.textContent = hidden > 0 ? T("radarMoreLocked", [String(hidden)]) : "";
+    // Every verdict on the page is already visible: nothing to "see".
+    const cta = document.querySelector(`.${PREFIX}-radar--preview .${PREFIX}-radar__cta`);
+    if (cta) cta.hidden = hidden === 0;
   }
 
   // Inline acquisition-cost input so a PRO/trial user can switch the Radar on
@@ -767,9 +802,32 @@ globalThis.MST_QUICKVIEW = (() => {
     upsellOpen = null;
     const settings = await chrome.storage.sync.get({
       acquisitionPct: 0,
-      radarTargetPct: RADAR.DEFAULT_TARGET_PCT
+      radarTargetPct: RADAR.DEFAULT_TARGET_PCT,
+      defaultShippingMXN: null,
+      reputationId: "none",
+      freeShipping: false,
+      usesFull: false
     });
+    let localDefaults = null;
+    try {
+      localDefaults = (await chrome.storage.local.get(`${PREFIX}:defaults`))[`${PREFIX}:defaults`] ?? null;
+    } catch {
+      // local storage unavailable: options value or the estimate
+    }
     if (myToken !== initToken) return; // torn down while awaiting
+    // Same shipping source of truth as the card and the dashboard
+    // (MST_DASH.resolveShipping): an options value, else the card's last
+    // typed value, else the official estimate where shipping applies.
+    const resolved = globalThis.MST_DASH
+      ? globalThis.MST_DASH.resolveShipping(settings, localDefaults)
+      : { value: 0, unset: true };
+    shipSettings = {
+      configured: !resolved.unset,
+      value: resolved.value,
+      reputationId: typeof settings.reputationId === "string" ? settings.reputationId : "none",
+      freeShipping: settings.freeShipping === true,
+      usesFull: settings.usesFull === true
+    };
     acquisitionPct = CALC.parseMoney(settings.acquisitionPct);
     radarTargetPct = Math.max(0, Math.min(90, Math.round(Number(settings.radarTargetPct) || 0)));
     // Category browse pages have a breadcrumb; keyword searches usually don't.

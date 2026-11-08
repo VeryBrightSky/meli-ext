@@ -91,22 +91,30 @@ globalThis.MST_GATE = (() => {
   // Every install gets PRO for TRIAL_MS, no email, no card. Since 1.5.5 the
   // clock starts at the FIRST SAVED COST (<prefix>:trialStartedAt), not at
   // install: a seller who installs and only reads the free card for a week
-  // no longer burns 7 invisible PRO days. Safety nets:
-  //   - no cost ever saved: the trial starts by itself TRIAL_AUTO_START_MS
-  //     after install, so nobody is stuck in "not started" forever
-  //   - pre-1.5.5 installs with a saved cost keep their old window
-  //     (trialStartedAt is migrated to installedAt)
+  // no longer burns 7 invisible PRO days. There is no automatic start: a
+  // seller who never saves a cost stays "pending" and, from day 30 after
+  // install, the card reminds them what starts the trial (TRIAL_REMIND_MS).
+  //   - pre-1.5.5 installs with a saved cost keep their old window: the
+  //     service worker migrates trialStartedAt = installedAt ONCE on the
+  //     update to 1.5.5 (migrateTrialOnUpdate) and stamps trialSchema = 2
+  //   - with trialSchema = 2 a cost key without a stamp is never migrated
+  //     (the stamp is written in the same storage write as the first cost,
+  //     so "cost but no stamp" is a cost saved on a page without an item id,
+  //     never a lost trial)
   // When it ends the seller visibly loses the target price, radar colors and
   // dashboard they were using, so nothing here is hidden or quiet.
-  const TRIAL_AUTO_START_MS = 30 * 24 * 60 * 60 * 1000;
+  const TRIAL_REMIND_MS = 30 * 24 * 60 * 60 * 1000;
+  const TRIAL_SCHEMA = 2;
+  // The release that moved the trial start to the first saved cost.
+  const TRIAL_SCHEMA_SINCE = "1.5.5";
 
   // Pure: where the 7-day window starts, from the stamps in storage.
   //   stamp     a trialStartedAt stamp exists
-  //   migrated  pre-1.5.5 install with a saved cost: the window ran from install
-  //   auto      nothing saved for TRIAL_AUTO_START_MS: starts by itself
+  //   migrated  pre-1.5.5 install (no trialSchema stamp) with a saved cost:
+  //             the window ran from install
   //   pending   installed, no cost yet: not started
   //   none      no stamps at all (first run before the service worker ran)
-  function deriveTrialStart({ installedAt, trialStartedAt, hasCost }, nowMs) {
+  function deriveTrialStart({ installedAt, trialStartedAt, hasCost, trialSchema }, nowMs) {
     const ok = (v) => Number.isFinite(v) && v > 0 && v <= nowMs + CLOCK_SKEW_MS;
     // An existing stamp always wins, even one from a clock that was ahead:
     // clamp it to now instead of dropping it (dropping it would fall through
@@ -115,12 +123,15 @@ globalThis.MST_GATE = (() => {
       return { startedAt: Math.min(trialStartedAt, nowMs), reason: "stamp" };
     }
     if (!ok(installedAt)) return { startedAt: null, reason: "none" };
-    if (hasCost) return { startedAt: installedAt, reason: "migrated" };
-    if (nowMs - installedAt >= TRIAL_AUTO_START_MS) {
-      return { startedAt: installedAt + TRIAL_AUTO_START_MS, reason: "auto" };
-    }
+    // Schema 2 installs never migrate: the service worker already did it
+    // once on the update, so a missing stamp means "not started".
+    if (hasCost && trialSchema !== TRIAL_SCHEMA) return { startedAt: installedAt, reason: "migrated" };
     return { startedAt: null, reason: "pending" };
   }
+
+  // Pure: days since install, for the day-30 reminder on a pending trial.
+  const daysSinceInstall = (installedAt, nowMs) =>
+    Number.isFinite(installedAt) && installedAt > 0 ? Math.floor(Math.max(0, nowMs - installedAt) / 86400000) : 0;
 
   // Pure helper: trialStartedAtMs → { active, expired, pending, daysLeft }.
   // No start yet is "pending" (PRO not started, nothing lost, nothing expired).
@@ -163,6 +174,10 @@ globalThis.MST_GATE = (() => {
       trialPending: Boolean(local.pending && !base.trialExpired && !base.lapsed),
       trialDaysLeft: 0,
       trialDaysSinceEnd: local.daysSinceEnd,
+      // Pending only: days since install, so the card can remind a seller
+      // who has not saved a cost in 30 days what starts the trial.
+      trialDaysSinceInstall: local.pending ? (local.daysSinceInstall ?? 0) : 0,
+      trialRemind: Boolean(local.pending && !base.trialExpired && !base.lapsed && (local.daysSinceInstall ?? 0) * 86400000 >= TRIAL_REMIND_MS),
       localTrial: false
     };
   }
@@ -175,6 +190,7 @@ globalThis.MST_GATE = (() => {
     const PREFIX = globalThis.EXT_BRAND?.cssPrefix ?? "mst";
     const INSTALLED_KEY = `${PREFIX}:installedAt`;
     const TRIAL_KEY = `${PREFIX}:trialStartedAt`;
+    const SCHEMA_KEY = `${PREFIX}:trialSchema`;
     // No upper bound: a future-dated stamp is clamped by deriveTrialStart,
     // never discarded.
     const valid = (v) => Number.isFinite(v) && v > 0;
@@ -182,7 +198,7 @@ globalThis.MST_GATE = (() => {
     let installedAt = null;
     let trialStartedAt = null;
     try {
-      const stored = await chrome.storage.local.get([INSTALLED_KEY, TRIAL_KEY]);
+      const stored = await chrome.storage.local.get([INSTALLED_KEY, TRIAL_KEY, SCHEMA_KEY]);
       let sync = {};
       try {
         sync = (await chrome.storage.sync.get([INSTALLED_KEY, TRIAL_KEY])) ?? {};
@@ -198,14 +214,15 @@ globalThis.MST_GATE = (() => {
         // First run before the service worker stamped it: install is now.
         installedAt = nowMs;
       }
+      const trialSchema = stored[SCHEMA_KEY];
       let hasCost = false;
-      if (trialStartedAt === null) {
-        // Only scanned until the stamp exists (one storage read per page
-        // view at most, and only for installs that never saved a cost).
+      if (trialStartedAt === null && trialSchema !== TRIAL_SCHEMA) {
+        // Legacy (pre-1.5.5) install the service worker has not migrated
+        // yet: scan for a saved cost. Schema 2 installs never need this.
         const all = await chrome.storage.local.get(null);
         hasCost = Object.keys(all ?? {}).some((k) => k.startsWith(`${PREFIX}:cost:`) && Number(all[k]) > 0);
       }
-      const derived = deriveTrialStart({ installedAt, trialStartedAt, hasCost }, nowMs);
+      const derived = deriveTrialStart({ installedAt, trialStartedAt, hasCost, trialSchema }, nowMs);
       trialStartedAt = derived.startedAt;
       const writes = {};
       if (stored[INSTALLED_KEY] !== installedAt) writes[INSTALLED_KEY] = installedAt;
@@ -221,7 +238,67 @@ globalThis.MST_GATE = (() => {
     } catch {
       // storage unavailable: pending (free) until it answers
     }
-    return { installedAt, trialStartedAt, local: computeLocalTrial(trialStartedAt, nowMs) };
+    const local = computeLocalTrial(trialStartedAt, nowMs);
+    local.daysSinceInstall = daysSinceInstall(installedAt, nowMs);
+    return { installedAt, trialStartedAt, local };
+  }
+
+  // Service worker, onInstalled: stamp the trial schema and, ONCE, migrate a
+  // pre-1.5.5 install that has a saved cost and no start stamp to
+  // trialStartedAt = installedAt (its old window ran from install). Runs for
+  // every reason so a fresh install is schema 2 from its first second; only
+  // an update from before TRIAL_SCHEMA_SINCE migrates. Returns what it did.
+  async function migrateTrialOnUpdate({ reason, previousVersion } = {}, nowMs = Date.now()) {
+    const PREFIX = globalThis.EXT_BRAND?.cssPrefix ?? "mst";
+    const INSTALLED_KEY = `${PREFIX}:installedAt`;
+    const TRIAL_KEY = `${PREFIX}:trialStartedAt`;
+    const SCHEMA_KEY = `${PREFIX}:trialSchema`;
+    const valid = (v) => Number.isFinite(v) && v > 0;
+    const out = { schemaStamped: false, migrated: false };
+    try {
+      const all = await chrome.storage.local.get(null);
+      let sync = {};
+      try {
+        sync = (await chrome.storage.sync.get([INSTALLED_KEY, TRIAL_KEY])) ?? {};
+      } catch {
+        // sync unavailable
+      }
+      const hasStamp = valid(all?.[TRIAL_KEY]) || valid(sync?.[TRIAL_KEY]);
+      const legacy = reason === "update" && versionBefore(previousVersion, TRIAL_SCHEMA_SINCE);
+      const alreadySchema = all?.[SCHEMA_KEY] === TRIAL_SCHEMA;
+      const writes = {};
+      if (!alreadySchema) {
+        writes[SCHEMA_KEY] = TRIAL_SCHEMA;
+        out.schemaStamped = true;
+      }
+      if (legacy && !alreadySchema && !hasStamp) {
+        const hasCost = Object.keys(all ?? {}).some((k) => k.startsWith(`${PREFIX}:cost:`) && Number(all[k]) > 0);
+        const installedAt = [all?.[INSTALLED_KEY], sync?.[INSTALLED_KEY]].filter(valid).sort((a, b) => a - b)[0];
+        if (hasCost && valid(installedAt)) {
+          writes[TRIAL_KEY] = Math.min(installedAt, nowMs);
+          out.migrated = true;
+        }
+      }
+      if (Object.keys(writes).length) {
+        await chrome.storage.local.set(writes);
+        if (writes[TRIAL_KEY]) quiet(chrome.storage.sync.set({ [TRIAL_KEY]: writes[TRIAL_KEY] }));
+      }
+    } catch {
+      // storage unavailable: readLocalTrial keeps the legacy fallback
+    }
+    return out;
+  }
+
+  // "1.3.1" < "1.4.0" → true. Numeric, segment by segment.
+  function versionBefore(a, b) {
+    const pa = String(a ?? "0").split(".").map((n) => Number(n) || 0);
+    const pb = String(b).split(".").map((n) => Number(n) || 0);
+    for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+      const x = pa[i] ?? 0;
+      const y = pb[i] ?? 0;
+      if (x !== y) return x < y;
+    }
+    return false;
   }
 
   // Subscribers notified when a status that arrived AFTER the timeout changes
@@ -284,18 +361,27 @@ globalThis.MST_GATE = (() => {
     return current;
   }
 
-  // The first saved cost starts the 7 PRO days. Stamps trialStartedAt (local
-  // + sync mirror), recomputes the status and announces the change through
-  // onChange so the card rebuilds as PRO on the spot. Resolves true when a
-  // trial was started by this call.
+  // The first saved cost starts the 7 PRO days. The card writes the stamp in
+  // the SAME storage write as the cost (trialStampForFirstCost) so a
+  // navigation right after a chip tap can never leave a cost without its
+  // stamp; this then mirrors it to sync, recomputes the status and announces
+  // the change through onChange so the card rebuilds as PRO on the spot.
+  // Without `stampedAt` (no card write) it writes the stamp itself.
+  // Resolves true when a trial was started by this call.
   let lastFresh = null;
-  async function startTrial() {
+  const trialKey = () => `${globalThis.EXT_BRAND?.cssPrefix ?? "mst"}:trialStartedAt`;
+  // The entries the card must merge into its first-cost write, or null when
+  // no trial is to be started (already running, paid, owner, expired).
+  function trialStampForFirstCost(nowMs = Date.now()) {
+    if (!current.trialPending || current.paid || current.owner) return null;
+    return { [trialKey()]: nowMs };
+  }
+  async function startTrial({ stampedAt } = {}) {
     if (!current.trialPending || current.paid || current.owner) return false;
-    const PREFIX = globalThis.EXT_BRAND?.cssPrefix ?? "mst";
-    const TRIAL_KEY = `${PREFIX}:trialStartedAt`;
-    const now = Date.now();
+    const TRIAL_KEY = trialKey();
+    const now = Number.isFinite(stampedAt) && stampedAt > 0 ? stampedAt : Date.now();
     try {
-      await chrome.storage.local.set({ [TRIAL_KEY]: now });
+      if (!(Number.isFinite(stampedAt) && stampedAt > 0)) await chrome.storage.local.set({ [TRIAL_KEY]: now });
       quiet(chrome.storage.sync.set({ [TRIAL_KEY]: now }));
     } catch {
       return false;
@@ -386,12 +472,17 @@ globalThis.MST_GATE = (() => {
 
   return Object.freeze({
     TRIAL_MS,
-    TRIAL_AUTO_START_MS,
+    TRIAL_REMIND_MS,
+    TRIAL_SCHEMA,
     METRICS_KEY,
     computeProStatus,
     computeLocalTrial,
     deriveTrialStart,
+    daysSinceInstall,
     readLocalTrial,
+    migrateTrialOnUpdate,
+    versionBefore,
+    trialStampForFirstCost,
     startTrial,
     mergeStatus,
     resolveStatus,

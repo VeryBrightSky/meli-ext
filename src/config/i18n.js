@@ -1,24 +1,23 @@
 // Self-hosted i18n. The injected UI localizes from the bundled MST_MESSAGES
-// (generated into locale-data.js from _locales/) instead of chrome.i18n —
-// chrome.i18n's message resolution depends on the browser/OS locale config in
-// ways that proved unreliable (Spanish Chrome still served English). This is
-// deterministic, synchronous, Spanish-first (the product is MX-only), and
-// unit-testable.
+// (generated into locale-data.js from _locales/) instead of chrome.i18n, whose
+// message resolution depends on the browser/OS locale config in ways that
+// proved unreliable (Spanish Chrome still served English). Deterministic,
+// Spanish by default (the product is MX-only), English only when the seller
+// picks it in the options, and unit-testable.
 //
 // locale-data.js MUST load before this script.
 "use strict";
 
 globalThis.MST_I18N = (() => {
-  // Spanish-first: only switch to English when the UI language is clearly
-  // English; anything else (incl. unknown) stays es_419.
-  function pickLocale() {
-    let ui = "";
-    try {
-      ui = (chrome.i18n.getUILanguage() || "").toLowerCase();
-    } catch {
-      ui = "";
-    }
-    return ui.startsWith("en") ? "en" : "es_419";
+  // Spanish only by default: the product is for Mercado Libre Mexico sellers,
+  // and a Mexican seller on an English Chrome must still see Spanish. The
+  // seller switches to English with the options toggle ("Idioma"), stored in
+  // chrome.storage.sync under LANG_KEY and applied by init() before any UI
+  // renders. The browser locale is never consulted.
+  const LANG_KEY = "mst:lang";
+  const SUPPORTED = ["es_419", "en"];
+  function pickLocale(stored) {
+    return stored === "en" ? "en" : "es_419";
   }
 
   // chrome.i18n placeholder semantics: "$1".."$9" are substitutions, "$$" is a
@@ -32,22 +31,34 @@ globalThis.MST_I18N = (() => {
   }
 
   const messages = globalThis.MST_MESSAGES || {};
-  const locale = pickLocale();
-  const dict = messages[locale] || messages.es_419 || {};
+  const api = { t, pickLocale, applySubs, init, setLocale, LANG_KEY, SUPPORTED, locale: "es_419" };
+  let dict = messages.es_419 || {};
+
+  function setLocale(l) {
+    const next = pickLocale(l);
+    api.locale = next;
+    dict = messages[next] || messages.es_419 || {};
+    return next;
+  }
+
+  // Read the stored choice once per context. Resolves to the active locale;
+  // Spanish when storage is unavailable or nothing was chosen.
+  async function init() {
+    try {
+      const stored = await chrome.storage.sync.get(LANG_KEY);
+      return setLocale(stored?.[LANG_KEY]);
+    } catch {
+      return setLocale(null);
+    }
+  }
 
   function t(key, subs) {
     const message = dict[key];
     if (message != null) return applySubs(message, subs);
-    // Last-resort fallbacks: chrome.i18n, then the key itself (visible, never
-    // blank) so a missing key is obvious rather than silently English.
-    try {
-      const m = chrome.i18n.getMessage(key, subs);
-      if (m) return m;
-    } catch {
-      /* not in an extension context */
-    }
+    // Last-resort fallback: the key itself (visible, never blank) so a
+    // missing key is obvious rather than silently English.
     return key;
   }
 
-  return Object.freeze({ t, locale, pickLocale, applySubs });
+  return Object.seal(api);
 })();

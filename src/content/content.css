@@ -346,6 +346,16 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Free preview: the verdict is computed with an assumed cost; say so inline. */
+.mst-strip__assumed {
+  color: rgba(0, 0, 0, 0.5);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
 .mst-strip__dot {
   width: 8px;
   height: 8px;
@@ -1022,18 +1032,19 @@
   font-weight: 600;
 }
 
-/* Share with another seller (WhatsApp) */
+/* Share with another seller (WhatsApp). A quiet secondary link, smaller than
+   the cost input next to it: it only shows once there is a profit to share. */
 .mst-share {
-  display: block;
-  text-align: center;
-  margin-top: 8px;
-  font-size: 12px;
-  font-weight: 600;
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.3;
   color: #0a5c34;
   text-decoration: none;
-  padding: 7px 10px;
-  border-radius: 6px;
-  border: 1px solid rgba(0, 166, 80, 0.4);
+  padding: 2px 8px;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 166, 80, 0.35);
   background: #e8f7ee;
 }
 

@@ -73,6 +73,7 @@ globalThis.MST_WELCOME_DEMO = function welcomeDemo(T, { priceMXN = 499, costMXN 
 
 (async () => {
   const BRAND = globalThis.EXT_BRAND;
+  await globalThis.MST_I18N.init(); // the seller's language choice, before any string
   const T = globalThis.MST_I18N.t;
   document.title = `${BRAND.name} · ${T("welcomeTitle")}`;
   document.getElementById("brand-logo").src = chrome.runtime.getURL("src/assets/icons/icon48.png");
