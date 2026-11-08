@@ -240,21 +240,110 @@ try {
     // one-tap chips at 40/50/60 % of the price.
     const stack = await first.$$eval(".mst-stack:not([hidden]) .mst-stack__row", (rows) =>
       rows.filter((r) => r.style.display !== "none").map((r) => [r.querySelector(".mst-row__label").textContent, r.querySelector(".mst-row__value").textContent]));
+    // r3: the headline IS the net ("Te queda $665.70 por venta"), so the
+    // stack does not repeat it; the retentions row says the RFC rates are
+    // the registered case. "Recibes aprox." lives in the breakdown only.
     assert.deepEqual(stack, [
       ["Precio de venta", "$827.00"],
       ["Comisión por venta (10%)", "−$82.70"],
       ["Envío estimado (hasta 0.3 kg)", "−$78.60"],
-      ["Te queda", "$665.70"],
-      ["Con RFC registrado (IVA 8% + ISR 2.5%)", "−$74.85, te depositan $590.85"]
+      ["Con RFC registrado (IVA 8% + ISR 2.5%; sin RFC retienen más)", "−$74.85, te depositan $590.85"]
     ]);
+    assert.equal(await first.$eval(".mst-summary__net", (e) => e.textContent), "Te queda $665.70 por venta (antes de IVA/ISR)");
+    assert.equal(await first.$$eval(".mst-card .mst-row__label", (ls) => ls.filter((l) => l.textContent === "Te queda").length), 0, "no second 'Te queda' row");
+    assert.equal(await first.$$eval(".mst-card .mst-row__label", (ls) => ls.filter((l) => l.textContent === "Recibes aprox.").length), 1, "exactly one 'Recibes aprox.' row");
+    assert.ok(await first.$eval(".mst-breakdown", (d) => [...d.querySelectorAll(".mst-row__label")].some((l) => l.textContent === "Recibes aprox.")), "'Recibes aprox.' is inside the breakdown");
     assert.equal(await first.$eval(".mst-row--cost .mst-row__label", (e) => e.textContent), "¿Cuánto te cuesta?");
     assert.deepEqual(await first.$$eval(".mst-chips:not([hidden]) .mst-chip", (c) => c.map((x) => x.textContent)), ["40% · $330.80", "50% · $413.50", "60% · $496.20"]);
     assert.equal(await first.$eval(".mst-summary__profit", (e) => e.textContent), "Toca un costo abajo, o escribe el tuyo, para ver tu ganancia.");
-    pass("fresh install, no cost: fee stack ($827, −$82.70, −$78.60, Te queda $665.70, retenciones −$74.85 → $590.85) and 40/50/60 % chips");
+    pass("fresh install, no cost: fee stack ($827, −$82.70, −$78.60, retenciones −$74.85 → $590.85, no duplicate net row) and 40/50/60 % chips");
+    // r3 (blocker 1): the trial stamp is written in the SAME storage write as
+    // the first cost. Tap a chip and navigate away within 500 ms (before the
+    // card can rebuild): the next page must already be in the 7-day trial,
+    // and the cost must be saved. Then put the install back to "pending".
+    await first.$$eval(".mst-chip", (c) => c[1].click()); // 50% → $413.50
+    await first.goto(`https://www.mercadolibre.com.mx:${PORT}/otro-celular/p/MLM99999999`, { waitUntil: "load" });
+    await first.waitForSelector("#mst-card-root", { visible: true, timeout: 20000 });
+    await first.waitForFunction(() => {
+      const b = document.querySelector(".mst-trialbar");
+      return b && !b.hidden && b.offsetHeight > 0;
+    }, { timeout: 5000 });
+    assert.equal(await first.$eval(".mst-trialbar", (e) => e.dataset.tone), "active", "trial active on the very next page");
+    assert.ok((await first.$eval(".mst-trialbar__text", (e) => e.textContent)).includes("te quedan 7 días"), "7 days on the next page");
+    const raced = await seed.evaluate(async () => ({
+      local: await chrome.storage.local.get(["mst:cost:MLM12345678", "mst:trialStartedAt", "mst:trialSchema"]),
+      sync: await chrome.storage.sync.get("mst:trialStartedAt")
+    }));
+    assert.equal(raced.local["mst:cost:MLM12345678"], 413.5, "chip cost saved despite the navigation");
+    assert.ok(raced.local["mst:trialStartedAt"] > 0, "stamp written with the cost");
+    assert.equal(raced.local["mst:trialSchema"], 2, "worker stamped the trial schema on install");
+    assert.equal(raced.sync["mst:trialStartedAt"], raced.local["mst:trialStartedAt"], "stamp mirrored to sync");
+    pass("chip tap + navigation within 500 ms: next page shows 'te quedan 7 días', cost and stamp saved together");
+    await seed.evaluate(async () => {
+      await chrome.storage.local.remove(["mst:cost:MLM12345678", "mst:meta:MLM12345678", "mst:trialStartedAt", "mst:hist:MLM99999999"]);
+      await chrome.storage.sync.remove("mst:trialStartedAt");
+    });
+    // Schema 2: a cost key alone never migrates (the cost is gone here too,
+    // but a stale cost would not start anything either).
+    await first.goto(PRODUCT_URL, { waitUntil: "load" });
+    await first.waitForSelector("#mst-card-root", { visible: true, timeout: 20000 });
+    await first.waitForFunction(() => (document.querySelector(".mst-trialbar")?.dataset.tone ?? "") === "pending", { timeout: 5000 });
+    assert.equal(await first.$eval(".mst-chips", (e) => e.hidden), false, "chips back (no cost)");
+    // r3 (minor 15): no automatic start at day 30. An install 31 days old with
+    // no cost is still pending and the banner reminds what starts the trial.
+    const installedNow = (await seed.evaluate(async () => chrome.storage.local.get("mst:installedAt")))["mst:installedAt"];
+    await seed.evaluate(async () => {
+      const back = Date.now() - 31 * 24 * 3600 * 1000;
+      await chrome.storage.local.set({ "mst:installedAt": back });
+      await chrome.storage.sync.set({ "mst:installedAt": back });
+    });
+    await first.reload({ waitUntil: "load" });
+    await first.waitForSelector("#mst-card-root", { visible: true, timeout: 20000 });
+    await first.waitForFunction(() => {
+      const b = document.querySelector(".mst-trialbar");
+      return b && !b.hidden && b.offsetHeight > 0;
+    }, { timeout: 5000 });
+    assert.equal(await first.$eval(".mst-trialbar", (e) => e.dataset.tone), "pending", "still pending at day 31");
+    assert.equal(await first.$eval(".mst-trialbar__text", (e) => e.textContent), "Tu prueba PRO empieza cuando guardes tu primer costo");
+    assert.ok((await first.$$eval(".mst-prochip", (els) => els.length)) > 0, "still the free card: no automatic trial");
+    const day31 = await seed.evaluate(async () => chrome.storage.local.get("mst:trialStartedAt"));
+    assert.equal(day31["mst:trialStartedAt"], undefined, "no start stamp written by itself");
+    pass("day 31 without a cost: no automatic trial, banner 'Tu prueba PRO empieza cuando guardes tu primer costo'");
+    await seed.evaluate(async (ts) => {
+      await chrome.storage.local.set({ "mst:installedAt": ts });
+      await chrome.storage.sync.set({ "mst:installedAt": ts });
+    }, installedNow);
+    // r3 (minor 8): Spanish regardless of the browser locale, English only via
+    // the options toggle (storage.sync mst:lang); money stays "$" (never MX$).
+    await seed.reload({ waitUntil: "load" });
+    await seed.waitForFunction(() => (document.getElementById("lbl-lang")?.textContent ?? "") !== "", { timeout: 10000 });
+    assert.equal(await seed.$eval("#lbl-lang", (e) => e.textContent), "Idioma");
+    assert.equal(await seed.$eval("#lang", (e) => e.value), "es_419");
+    assert.equal(await seed.$eval("#lbl-privacy", (e) => e.textContent), "Tus costos, ventas y el historial de precios de las publicaciones que abres se guardan solo en tu navegador. No tenemos servidores.");
+    await seed.select("#lang", "en");
+    await seed.waitForFunction(() => (document.getElementById("lbl-lang")?.textContent ?? "") === "Language", { timeout: 10000 });
+    assert.equal(await seed.evaluate(async () => (await chrome.storage.sync.get("mst:lang"))["mst:lang"]), "en");
+    assert.equal(await seed.$eval("#lbl-card", (e) => e.textContent), "Show the calculator on listings");
+    await first.reload({ waitUntil: "load" });
+    await first.waitForSelector("#mst-card-root", { visible: true, timeout: 20000 });
+    await first.waitForFunction(() => (document.querySelector(".mst-summary__net")?.textContent ?? "").includes("$665.70"), { timeout: 5000 });
+    assert.equal(await first.$eval(".mst-summary__net", (e) => e.textContent), "You keep $665.70 per sale (before VAT/income tax)");
+    assert.equal(await first.$eval("#mst-card-root", (c) => c.textContent.includes("MX$")), false, "money stays '$' in English");
+    await seed.select("#lang", "es_419");
+    await seed.waitForFunction(() => (document.getElementById("lbl-lang")?.textContent ?? "") === "Idioma", { timeout: 10000 });
+    await first.reload({ waitUntil: "load" });
+    await first.waitForSelector("#mst-card-root", { visible: true, timeout: 20000 });
+    await first.waitForFunction(() => (document.querySelector(".mst-summary__net")?.textContent ?? "").startsWith("Te queda"), { timeout: 5000 });
+    pass("language: Spanish by default, options 'Idioma' → English switches the card ('You keep $665.70 per sale', still '$'), back to Spanish");
     // r2 (a): a chip tap saves the cost exactly like typing: input filled,
     // 'Guardado', chips and stack gone, profit shown, trial started.
     await first.$$eval(".mst-chip", (c) => c[1].click()); // 50% → $413.50
-    await first.waitForFunction(() => !document.querySelector(".mst-saved")?.hidden, { timeout: 3000 });
+    // The first cost starts the trial and the card is rebuilt as PRO at
+    // once; "Guardado" must still be visible on the rebuilt card (r3).
+    await first.waitForFunction(() => {
+      const n = document.querySelector(".mst-saved");
+      return n && !n.hidden && document.querySelectorAll(".mst-prochip").length === 0;
+    }, { timeout: 3000, polling: 50 });
     assert.equal(await first.$eval(".mst-saved", (e) => e.textContent), "Guardado para esta publicación");
     assert.equal(await first.$$eval(".mst-card input.mst-input", (i, k) => i[k].value, IDX.cost), "413.50");
     assert.equal(await first.$eval(".mst-chips", (e) => e.hidden), true, "chips hide once a cost is saved");
@@ -268,14 +357,35 @@ try {
     assert.ok((await first.$eval(".mst-trialbar__text", (e) => e.textContent)).includes("te quedan 7 días"), "active banner after the first cost");
     const proLine = await first.$eval(".mst-summary__pro", (e) => ({ hidden: e.hidden, text: e.textContent }));
     assert.equal(proLine.hidden, false, "PRO line visible with a cost");
-    assert.match(proLine.text, /^PRO: a \$[\d,]+\.\d{2} ganas el 30%$/, proLine.text);
+    // r3: the margin here (30.49 %) already meets the 30 % target, so the
+    // line must not point at a LOWER price ($820.17 for 30 %): it names the
+    // price for 10 more points instead (41 %: $1,004.29).
+    assert.equal(proLine.text, "PRO: a $1,004.29 ganas el 41%");
     assert.equal(await first.$eval(".mst-share", (a) => a.hidden), false, "share shown once a cost is saved");
     // 665.70 − 413.50 = 252.20 → 30.49 % of 827
     assert.equal(await first.$eval(".mst-summary__profit", (e) => e.textContent), "Ganancia $252.20 · 30.5%");
     // r2 (c): PRO max cost at the page price for the default 30 %:
     // 827 × (1 − 0.10 − 0.30) − 78.60 = 417.60
     assert.equal(await first.evaluate(rowValue("Costo máximo para ganar 30%")), "$417.60");
-    pass("chip tap = first saved cost: 'Guardado', $413.50 in the input, trial starts (7 días), card rebuilds as PRO, Ganancia $252.20 · 30.5%, costo máximo $417.60");
+    pass("chip tap = first saved cost: 'Guardado', $413.50 in the input, trial starts (7 días), card rebuilds as PRO, Ganancia $252.20 · 30.5%, PRO line points up (41%), costo máximo $417.60");
+    // r3 (major 7): the banner button opens the plan panel (yearly first,
+    // "ahorras $369"; monthly "$89 al mes (menos de $3 al día)"), never a
+    // bare "$89/mes" checkout.
+    assert.equal(await first.$eval(".mst-trialbar__btn", (b) => b.textContent), "Quedarme con PRO");
+    await first.click(".mst-trialbar__btn");
+    await first.waitForFunction(() => !document.querySelector(".mst-upsell")?.hidden, { timeout: 3000 });
+    const trialPanel = await first.$eval(".mst-upsell", (p) => ({
+      reason: p.dataset.reason,
+      lead: p.querySelector(".mst-upsell__lead").textContent,
+      pricing: p.querySelector(".mst-upsell__price").textContent,
+      buttons: [...p.querySelectorAll(".mst-upsell__actions button")].map((b) => b.textContent)
+    }));
+    assert.equal(trialPanel.reason, "trial");
+    assert.equal(trialPanel.lead, "Quédate con PRO cuando termine tu prueba");
+    assert.equal(trialPanel.pricing, "PRO anual: $699 al año (ahorras $369). Mensual: $89 al mes (menos de $3 al día). Sin permanencia.");
+    assert.deepEqual(trialPanel.buttons, ["Activar PRO · $699 al año (ahorras $369)", "$89 al mes (menos de $3 al día)"]);
+    assert.equal(await first.$eval("#mst-card-root", (c) => /89\/mes/.test(c.textContent)), false, "no '$89/mes' anywhere on the card");
+    pass("trial banner 'Quedarme con PRO' opens the plan panel: yearly (ahorras $369) first, monthly ($89 al mes, menos de $3 al día) second");
     await first.close();
     await seed.reload({ waitUntil: "load" });
     await seed.waitForFunction(
@@ -348,6 +458,12 @@ try {
     "commission row lives inside the breakdown"
   );
   pass("summary leads with 'Te queda $665.70 por venta (antes de IVA/ISR)' (0.3 kg official estimate, sin reputación, $499–998.99 band); fee breakdown collapsed by default");
+  // r3: the shipping label says who pays from $299, and the shipping input
+  // sits inside the breakdown ("Ver desglose de cargos y envío").
+  const shipLabels = await page.$$eval(".mst-card .mst-row__label", (ls) => ls.map((l) => l.textContent).filter((t) => t.startsWith("Tu costo de envío")));
+  assert.deepEqual(shipLabels, ["Tu costo de envío (desde $299 lo pagas tú)"]);
+  assert.ok(await page.$eval("details.mst-breakdown", (d) => d.contains(document.querySelectorAll(".mst-card input.mst-input")[2])), "shipping input inside the breakdown");
+  pass("shipping label 'Tu costo de envío (desde $299 lo pagas tú)', input inside the breakdown");
   // The estimate sits in the shipping row, marked as an estimate, editable.
   const shipEst = await page.$$eval(".mst-card input.mst-input", (inputs, k) => ({
     value: inputs[k].value,
@@ -526,7 +642,9 @@ try {
   assert.equal(await alertVisible(), true);
   const alertText = await page.$eval(".mst-alert__text", (e) => e.textContent);
   assert.ok(alertText.includes("Pierdes $205.70 por venta"), `alert text: ${alertText}`);
-  pass("red-number moment: alert strip names the real loss ($205.70) and offers the fix");
+  // r3: nobody forwards a loss: the share link hides while the margin is ≤ 0.
+  assert.equal(await page.$eval(".mst-share", (a) => a.hidden), true, "share hidden on a loss");
+  pass("red-number moment: alert strip names the real loss ($205.70) and offers the fix; share link hidden on a loss");
   await typeInto(page, IDX.cost, "400");
   assert.equal(await alertVisible(), false, "alert must actually disappear (display) once profitable again");
   pass("alert strip hides again when the listing is profitable");
@@ -545,7 +663,8 @@ try {
   // second with the per-day figure (89 / 30 = 2.97), and the pricing line.
   const planOrder = await page.$$eval(".mst-upsell__actions button", (b) => b.map((x) => x.textContent));
   assert.deepEqual(planOrder, ["Activar PRO · $699 al año (ahorras $369)", "$89 al mes (menos de $3 al día)"], "yearly first, monthly second");
-  assert.ok(upsellText.includes("$699 al año son $369 menos que 12 meses a $89"), "upsell missing the pricing line");
+  assert.ok(upsellText.includes("PRO anual: $699 al año (ahorras $369). Mensual: $89 al mes (menos de $3 al día)."), "upsell missing the one plan message");
+  assert.ok(!/89\/mes|89 al mes(?! \(menos)/.test(upsellText), `stray monthly-only price: ${upsellText}`);
   assert.ok(upsellText.includes("Ya pagué: iniciar sesión"), "upsell missing the 'already paid' login link");
   // Panel opens next to the clicked teaser, not at the bottom of the card.
   assert.equal(
@@ -625,21 +744,46 @@ try {
   await freeSearch.goto(SEARCH_URL, { waitUntil: "load" });
   await freeSearch.waitForSelector(".mst-radar--preview", { timeout: 20000 });
   await sleep(500);
+  // r3 (blocker 2): every strip pays the same shipping the card does for the
+  // listing: the seller's typed $50 (card default) on all three results.
+  // 827: 694.30 − 496.20 = 198.10 (23.95 %, thin); 2,499: 699.70 (28 %, thin);
+  // the $120 Premium item: 52.60 − 72 = −19.40 (loss). No winner at 30 %.
   const preview = await freeSearch.$eval(".mst-radar--preview .mst-radar__summary", (e) => e.textContent);
-  assert.equal(preview, "Analizados: 3 · rentables: 2 · marginales: 1 · en pérdida: 0 (costo supuesto: 60% del precio)", preview);
-  pass("free search bar: real radar counts at the assumed 60% cost");
+  assert.equal(preview, "Analizados: 3 · rentables: 0 · marginales: 2 · en pérdida: 1 (costo supuesto: 60% del precio)", preview);
+  pass("free search bar: real radar counts at the assumed 60% cost, shipping included (0 rentables, 2 marginales, 1 pérdida)");
   const previewBuckets = await freeSearch.$$eval(".mst-strip", (els) => els.map((e) => e.dataset.preview));
   assert.deepEqual(previewBuckets.filter(Boolean).length, 3, `preview stamps: ${previewBuckets}`);
   const shownVerdicts = await freeSearch.$$eval(".mst-strip__verdict", (els) => els.length);
-  assert.ok(shownVerdicts >= 1 && shownVerdicts <= 3, `free verdict pills: ${shownVerdicts}`);
-  pass(`free strips: first ${shownVerdicts} show a colored verdict, rest stay plain`);
+  assert.equal(shownVerdicts, 3, `free verdict pills: ${shownVerdicts}`);
+  // Each visible free verdict names its assumption inline.
+  const assumedLabels = await freeSearch.$$eval(".mst-strip__assumed", (els) => els.map((e) => e.textContent));
+  assert.deepEqual(assumedLabels, ["con costo supuesto 60%", "con costo supuesto 60%", "con costo supuesto 60%"]);
+  // The first strip ($827) shows the same net the card shows for it.
+  await freeSearch.click(".mst-strip__bar");
+  await sleep(150);
+  const freePanel = await freeSearch.$eval(".mst-strip__panel", (e) => e.textContent);
+  assert.ok(freePanel.includes("Tu costo de envío") && freePanel.includes("−$50.00"), `strip panel lacks the shipping row: ${freePanel}`);
+  assert.ok(freePanel.includes("Recibes aprox.") && freePanel.includes("$694.30"), `strip net must match the card ($694.30): ${freePanel}`);
+  await freeSearch.click(".mst-strip__bar");
+  pass("free strips: all 3 show a verdict labeled 'con costo supuesto 60%'; the $827 strip nets $694.30 like the card");
+  // All verdicts on the page are visible: there is nothing to "see", so the
+  // CTA hides. A 4th result (lazy load) brings it back with the hidden count.
+  assert.equal(await freeSearch.$eval(".mst-radar__cta", (e) => e.hidden), true, "CTA hidden when every verdict is visible");
+  assert.equal(await freeSearch.$eval(".mst-radar__more", (e) => e.textContent), "");
+  await freeSearch.evaluate(() => {
+    const list = document.querySelector(".ui-search-layout");
+    const item = list.lastElementChild.cloneNode(true);
+    item.querySelector(".mst-strip")?.remove();
+    item.querySelector("h2").textContent = "Celular Lazy Load 512 GB";
+    list.appendChild(item);
+  });
+  await freeSearch.waitForFunction(() => document.querySelectorAll(".mst-strip").length === 4 && !document.querySelector(".mst-radar__cta").hidden, { timeout: 5000, polling: 200 });
+  assert.equal(await freeSearch.$eval(".mst-radar__more", (e) => e.textContent), "Más resultados con veredicto en PRO: 1");
   assert.equal(await freeSearch.$eval(".mst-upsell", (e) => e.hidden), true);
   await freeSearch.click(".mst-radar__cta");
   await sleep(200);
   assert.equal(await freeSearch.$eval(".mst-upsell", (e) => e.hidden), false);
-  const radarUpsell = await freeSearch.$eval(".mst-upsell", (e) => e.textContent);
-  assert.ok(radarUpsell.includes("Productos de esta búsqueda que sí dejan ganancia: 2"), radarUpsell);
-  pass("'Ver cuáles son · PRO' opens the radar upsell with the real winner count");
+  pass("'Ver cuáles son · PRO' hides with 3 visible verdicts, returns with a 4th result and opens the radar upsell");
   if (process.env.E2E_SHOTS) {
     await freeSearch.screenshot({ path: join(process.env.E2E_SHOTS, "search-free.png") });
   }
@@ -855,8 +999,10 @@ try {
 
   // PRO shows the target price by default at 30% as soon as a cost exists.
   assert.equal(await page.evaluate(rowValue("Precio para ganar 30%")), "$750.00");
-  assert.equal(await page.$eval(".mst-summary__pro", (e) => (e.hidden ? "" : e.textContent)), "PRO: a $750.00 ganas el 30%");
-  pass("PRO target price visible by default at 30% margin ($750.00) + 'PRO: a $750.00 ganas el 30%' under the summary");
+  // r3: at $827 this listing already makes 35.59 % (> 30 %), so the PRO line
+  // never suggests $750 (a lower price); it points up: 46 % at $1,022.73.
+  assert.equal(await page.$eval(".mst-summary__pro", (e) => (e.hidden ? "" : e.textContent)), "PRO: a $1,022.73 ganas el 46%");
+  pass("PRO target price visible by default at 30% margin ($750.00); the PRO line points up ('a $1,022.73 ganas el 46%'), never below the current price");
   // Review ask (v1.5.5): paid PRO with 3+ used listings → shown once,
   // links to the store reviews, dismiss is permanent.
   {
@@ -897,6 +1043,17 @@ try {
   await typeInto(page, IDX.ads, "5");
   assert.equal(await page.evaluate(rowValue("Publicidad (5%)")), "−$41.35");
   assert.equal(await page.evaluate(rowValue("Recibes aprox.")), "$652.95");
+  // r3 (minor 11): breakdown order: the ads row sits under the shipping
+  // input, right before "Recibes aprox.", never right above "Costo total".
+  const order = await page.$eval("details.mst-breakdown", (d) =>
+    [...d.querySelectorAll(".mst-row")].filter((r) => r.style.display !== "none").map((r) => r.querySelector(".mst-row__label")?.textContent ?? ""));
+  const iAds = order.findIndex((t) => t.startsWith("Publicidad ("));
+  const iShip = order.findIndex((t) => t.startsWith("Tu costo de envío"));
+  const iNet = order.indexOf("Recibes aprox.");
+  const iTotal = order.findIndex((t) => t.startsWith("Costo total de Mercado Libre"));
+  assert.ok(iAds > iShip && iAds < iNet, `ads row not between shipping and net: ${order.join(" | ")}`);
+  assert.notEqual(order[iTotal - 1], order[iAds], "ads must not sit right above 'Costo total'");
+  assert.ok(iAds > iTotal, `ads row must come after 'Costo total': ${order.join(" | ")}`);
   assert.equal(await page.evaluate(rowValue("Precio para ganar 20%")), "$692.31");
   assert.equal(await page.evaluate(rowValue("Costo máximo para ganar 20%")), "$487.55");
   assert.equal(await page.evaluate(rowValue("Ganancia mensual")), "$2,529.50");
@@ -905,6 +1062,20 @@ try {
   await page.waitForSelector("#mst-card-root", { visible: true, timeout: 20000 });
   await page.waitForFunction((k) => document.querySelectorAll(".mst-card input.mst-input")[k]?.value === "5.00", { timeout: 10000 }, IDX.ads);
   assert.equal(await page.evaluate(rowValue("Precio para ganar 20%")), "$692.31");
+  // r3 (major 4): the dashboard folds the saved 5 % ads in exactly like the
+  // card: monthly (652.95 − 400) × 10 = $2,529.50, not $2,943.00.
+  {
+    const dashAds = await browser.newPage();
+    await dashAds.goto(`chrome-extension://${extId}/src/dashboard/dashboard.html`, { waitUntil: "load" });
+    await dashAds.waitForFunction(() => !document.getElementById("content")?.hidden, { timeout: 10000 });
+    const t = await dashAds.$eval("#totals-row", (e) => e.textContent);
+    assert.ok(t.includes("$2,529.50"), `dashboard ignores the ads %: ${t}`);
+    const rowText = await dashAds.$eval("#rows", (e) => e.textContent);
+    assert.ok(rowText.includes("$652.95") && rowText.includes("$252.95"), `dashboard row net/profit without ads: ${rowText}`);
+    await dashAds.close();
+    await page.bringToFront();
+    pass("dashboard folds the product's 5% ads in: net $652.95, profit $252.95, monthly $2,529.50 (same as the card)");
+  }
   await typeInto(page, IDX.ads, "0");
   assert.equal(await page.evaluate(rowValue("Precio para ganar 20%")), "$642.86");
   assert.equal(await page.evaluate(rowValue("Costo máximo para ganar 20%")), "$528.90");
@@ -1105,6 +1276,14 @@ try {
   await dash2.close();
 
   console.log("\nPHASE 4 — SEARCH, PRO");
+  // r3 (blocker 2): the card's own net for the $827 listing right now (PRO,
+  // options default shipping $50, cost 400): the strip must show the same.
+  await page.bringToFront();
+  await page.goto(PRODUCT_URL, { waitUntil: "load" });
+  await page.waitForSelector("#mst-card-root", { visible: true, timeout: 20000 });
+  await sleep(600);
+  const cardNet827 = await page.evaluate(rowValue("Recibes aprox."));
+  assert.equal(cardNet827, "$694.30", `card net for the fixture: ${cardNet827}`);
   const search = tap(await browser.newPage(), "search");
   await search.bringToFront();
   await search.goto(SEARCH_URL, { waitUntil: "load" });
@@ -1126,8 +1305,12 @@ try {
   await sleep(200);
   const panelText = await search.$eval(".mst-strip__panel", (e) => e.textContent);
   assert.ok(panelText.includes("Comisión (10%)"), panelText);
-  assert.ok(panelText.includes("$248.10"), `research profit missing: ${panelText}`); // 744.30 − 827×60%
-  pass("expanded strip: 10% commission + modo investigación est. profit $248.10");
+  assert.ok(panelText.includes("Tu costo de envío") && panelText.includes("−$50.00"), `shipping row missing: ${panelText}`);
+  const stripNet827 = await search.$eval(".mst-strip__panel", (p) =>
+    [...p.querySelectorAll(".mst-strip__row")].find((r) => r.querySelector(".mst-strip__label").textContent === "Recibes aprox.")?.querySelector(".mst-strip__value").textContent);
+  assert.equal(stripNet827, cardNet827, `strip net (${stripNet827}) must equal the card net (${cardNet827})`);
+  assert.ok(panelText.includes("$198.10"), `research profit missing: ${panelText}`); // 694.30 − 827×60%
+  pass("expanded strip: 10% commission, shipping −$50.00, net $694.30 == card net, modo investigación est. profit $198.10");
 
   assert.equal(
     await search.$eval(".mst-export__btn", (b) => b.textContent),
@@ -1155,66 +1338,63 @@ try {
   pass("CSV export (Pro): real download, header + 3 rows");
 
   // ---- Profitability Radar (Pro flagship) --------------------------------
-  // Verdicts at 60% acquisition cost, 30% target: tech-classic items ≥$299
-  // net exactly 30% margin (827 and 2,499 → green); the $120 premium item
-  // nets thinner → 25.5% (yellow). None at a loss.
+  // Verdicts at 60% acquisition cost, 30% target, WITH the card's $50
+  // shipping (r3): 827 → 198.10 (23.95 %, thin); 2,499 → 699.70 (28 %,
+  // thin); the $120 Premium item → −19.40 (loss). No winner at 30 %.
   const buckets = await search.$$eval(".mst-strip", (els) =>
     els.map((e) => e.dataset.bucket)
   );
-  assert.equal(buckets.filter((b) => b === "profit").length, 2, `buckets: ${buckets}`);
-  assert.equal(buckets.filter((b) => b === "thin").length, 1, `buckets: ${buckets}`);
-  assert.equal(buckets.filter((b) => b === "loss").length, 0, `buckets: ${buckets}`);
-  pass("radar verdicts: 2 profitable, 1 thin, 0 loss at 30% target");
+  assert.equal(buckets.filter((b) => b === "profit").length, 0, `buckets: ${buckets}`);
+  assert.equal(buckets.filter((b) => b === "thin").length, 2, `buckets: ${buckets}`);
+  assert.equal(buckets.filter((b) => b === "loss").length, 1, `buckets: ${buckets}`);
+  pass("radar verdicts: 0 profitable, 2 thin, 1 loss at 30% target (shipping included, same as the card)");
 
   const verdict = await search.$eval(".mst-strip__verdict b", (e) => e.textContent);
-  assert.ok(verdict.includes("248.10"), `verdict pill: ${verdict}`);
-  pass("radar verdict pill shows conservative est. profit $248.10");
+  assert.ok(verdict.includes("198.10"), `verdict pill: ${verdict}`);
+  pass("radar verdict pill shows conservative est. profit $198.10 (net after shipping minus the assumed cost)");
 
   const summary = await search.$eval(".mst-radar__summary", (e) => e.textContent);
   assert.ok(
     summary.includes("Analizados: 3") &&
-      summary.includes("rentables: 2") &&
-      summary.includes("en pérdida: 0"),
+      summary.includes("rentables: 0") &&
+      summary.includes("marginales: 2") &&
+      summary.includes("en pérdida: 1"),
     `summary: ${summary}`
   );
   pass(`radar summary bar: "${summary.trim()}"`);
 
-  // Lower the target → the thin item clears it → 3 profitable (reactivity).
-  await search.$eval(".mst-radar__target", (el) => {
-    el.value = "25";
-    el.dispatchEvent(new Event("input", { bubbles: true }));
-  });
-  await sleep(150);
-  const lowered = await search.$$eval(".mst-strip", (els) =>
-    els.map((e) => e.dataset.bucket)
-  );
-  assert.equal(
-    lowered.filter((b) => b === "profit").length,
-    3,
-    `after target 25%: ${lowered}`
-  );
-  pass("radar target 25% → 3 profitable (threshold reactivity)");
+  // Lower the target → 25 %: the 2,499 item clears it (28 %); 20 %: 827 too.
+  const setTarget = async (v) => {
+    await search.$eval(".mst-radar__target", (el, val) => {
+      el.value = val;
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+    }, v);
+    await sleep(150);
+    return search.$$eval(".mst-strip", (els) => els.map((e) => e.dataset.bucket));
+  };
+  const at25 = await setTarget("25");
+  assert.equal(at25.filter((b) => b === "profit").length, 1, `after target 25%: ${at25}`);
+  const at20 = await setTarget("20");
+  assert.equal(at20.filter((b) => b === "profit").length, 2, `after target 20%: ${at20}`);
+  assert.equal(at20.filter((b) => b === "loss").length, 1, `after target 20%: ${at20}`);
+  pass("radar target 25% → 1 profitable, 20% → 2 profitable (threshold reactivity)");
 
-  // Back to 30%, then "only profitable" dims the one thin result and the
+  // At 25 %, "only profitable" dims the thin and the losing result and the
   // export button becomes the ranked shortlist.
-  await search.$eval(".mst-radar__target", (el) => {
-    el.value = "30";
-    el.dispatchEvent(new Event("input", { bubbles: true }));
-  });
-  await sleep(100);
+  await setTarget("25");
   await search.click(".mst-radar__only");
   await sleep(150);
   assert.equal(
     await search.$$eval(".mst-dimmed", (els) => els.length),
-    1,
-    "only-profitable should dim the single thin result"
+    2,
+    "only-profitable should dim the thin and the losing result"
   );
   const shortlistLabel = await search.$eval(".mst-export__btn", (e) => e.textContent);
   assert.ok(
-    shortlistLabel.includes("Exportar rentables (2)"),
+    shortlistLabel.includes("Exportar rentables (1)"),
     `export label: ${shortlistLabel}`
   );
-  pass('radar "solo rentables" dims 1 loser → "Exportar rentables (2)"');
+  pass('radar "solo rentables" dims 2 → "Exportar rentables (1)"');
 
   // ---- v1.4.3: CSV keeps losses numeric; own strip text never flips flags;
   // ---- cost field keeps focus across the re-init --------------------------
@@ -1262,6 +1442,7 @@ try {
     el.dispatchEvent(new Event("change", { bubbles: true }));
   });
   await sleep(600);
+  await setTarget("30"); // back to the default target for the later phases
   // Leave the page as Phase 4 did: "only profitable" ON (Phase 6 turns it off).
   await search.click(".mst-radar__only");
   await sleep(150);

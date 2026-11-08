@@ -77,6 +77,12 @@ globalThis.MST_CARD = (() => {
 
   // Live references into the current card DOM, repopulated on each build().
   const refs = {};
+  // "Guardado" survives the rebuild the first saved cost triggers (the trial
+  // starts and the card is rebuilt as PRO on the spot): the note is shown
+  // again on the new card for what is left of its 2 s.
+  const SAVED_NOTE_MS = 2000;
+  let savedNoteUntil = 0;
+  let savedNoteItemId = null;
 
   const { fmtMoney, fmtRange, fmtCharge, fmtPctRange } = UI;
 
@@ -1121,13 +1127,16 @@ globalThis.MST_CARD = (() => {
     refs.savedNote = el("div", `${PREFIX}-saved`, T("costSaved"));
     refs.savedNote.hidden = true;
     let savedTimer = null;
-    const showSaved = () => {
+    const showSaved = (ms = SAVED_NOTE_MS) => {
       refs.savedNote.hidden = false;
       clearTimeout(savedTimer);
       savedTimer = setTimeout(() => {
         refs.savedNote.hidden = true;
-      }, 2000);
+      }, ms);
     };
+    if (savedNoteItemId !== null && savedNoteItemId === state.itemId && Date.now() < savedNoteUntil) {
+      showSaved(savedNoteUntil - Date.now());
+    }
     // One path for a typed cost and a tapped chip. A keystroke only
     // recalculates; the cost is saved when it is final (blur/Enter, or a chip
     // tap), and the FIRST saved cost carries the trial start stamp in the
@@ -1150,7 +1159,11 @@ globalThis.MST_CARD = (() => {
         TRACK.once("first_cost_entered");
         TRACK.count("cost_entries");
         if (how === "chip") GATE.track("cost:chip"); // local funnel counter only
-        if (changed && state.itemId && SAFE.alive()) showSaved();
+        if (changed && state.itemId && SAFE.alive()) {
+          savedNoteUntil = Date.now() + SAVED_NOTE_MS;
+          savedNoteItemId = state.itemId;
+          showSaved();
+        }
         if (stamp) GATE.startTrial({ stampedAt: Object.values(stamp)[0] }).catch(() => {});
       }
     };
