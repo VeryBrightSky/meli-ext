@@ -386,6 +386,16 @@
   margin: 0;
 }
 
+/* Free shipping is mandatory from $299: the row reads as a fact, not a choice */
+.mst-toggle-row--locked {
+  cursor: default;
+}
+
+.mst-toggle-row--locked input[type="checkbox"]:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 /* What-if price */
 .mst-pricewrap {
   display: inline-flex;

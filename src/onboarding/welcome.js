@@ -132,6 +132,7 @@ globalThis.MST_WELCOME_DEMO = function welcomeDemo(T, { priceMXN = 499, costMXN 
       const l = document.createElement("span");
       l.textContent = label;
       const v = document.createElement("span");
+      v.className = "demo-row__value"; // never breaks between the sign and the number at 340 px
       v.textContent = value;
       r.append(l, v);
       parent.appendChild(r);
