@@ -320,6 +320,9 @@
   "rowFreeShipping": {
     "message": "Ofrezco envío gratis"
   },
+  "rowFreeShippingMandatory": {
+    "message": "Envío gratis obligatorio desde $$299"
+  },
   "rowShippingSubsidy": {
     "message": "Descuento por reputación"
   },
@@ -544,6 +547,9 @@
   },
   "radarFreeSummary": {
     "message": "Analizados: $1 · rentables: $2 · marginales: $3 · en pérdida: $4 (costo supuesto: $5% del precio)"
+  },
+  "radarFreeSummaryMixed": {
+    "message": "Analizados: $1 · rentables: $2 · marginales: $3 · en pérdida: $4 (costo supuesto $5% salvo donde ya guardaste tu costo)"
   },
   "radarSeeAll": {
     "message": "Ver cuáles son · PRO"

@@ -600,7 +600,10 @@ globalThis.MST_QUICKVIEW = (() => {
       globalThis.MST_TRACK.once("radar_preview_seen", { n_items: globalThis.MST_TRACK.bucket(c.total) });
       globalThis.MST_TRACK.once("paywall_seen", { reason: "radar", key: "radar" });
     }
-    summaryEl.textContent = T("radarFreeSummary", [
+    // Same rule as the PRO bar: once a strip on the page uses a saved cost
+    // the line says so instead of calling every verdict "assumed".
+    const anySaved = document.querySelector(`.${STRIP_CLASS}[data-saved-cost]`) !== null;
+    summaryEl.textContent = T(anySaved ? "radarFreeSummaryMixed" : "radarFreeSummary", [
       String(c.total),
       String(c.profit),
       String(c.thin),

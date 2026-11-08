@@ -518,10 +518,18 @@ globalThis.MST_CARD = (() => {
     // What-if price: reset link only when diverging from the page price.
     refs.resetPrice.style.display =
       pro && state.priceMXN !== state.pagePriceMXN ? "" : "none";
-    refs.shipLabel.textContent =
-      state.priceMXN >= SOURCE.freeShippingThresholdMXN
-        ? T("rowShippingFree")
-        : T("rowShipping");
+    const freeMandatory = state.priceMXN >= SOURCE.freeShippingThresholdMXN;
+    refs.shipLabel.textContent = freeMandatory ? T("rowShippingFree") : T("rowShipping");
+    // From $299 free shipping is mandatory and already charged (shippingApplies):
+    // the toggle shows that state (checked, locked) instead of an unticked box
+    // that reads as "no free shipping". Below $299 it is the seller's choice.
+    if (refs.freeShippingToggle) {
+      refs.freeShippingToggle.disabled = freeMandatory;
+      refs.freeShippingToggle.checked = freeMandatory ? true : state.freeShipping;
+      refs.freeShippingToggle.setAttribute("aria-checked", refs.freeShippingToggle.checked ? "true" : "false");
+      refs.freeShippingLabel.textContent = freeMandatory ? T("rowFreeShippingMandatory") : T("rowFreeShipping");
+      refs.freeShippingToggle.closest(`.${PREFIX}-row`)?.classList.toggle(`${PREFIX}-toggle-row--locked`, freeMandatory);
+    }
 
     // Sweet spot (worst-case rate so the promised gain is conservative).
     // Pro: actionable (click applies the price). Free: the gain is shown for
@@ -1592,7 +1600,8 @@ globalThis.MST_CARD = (() => {
       save("sync", { freeShipping: state.freeShipping });
     });
     refs.freeShippingToggle = freeCheck;
-    freeRow.append(el("span", `${PREFIX}-row__label`, T("rowFreeShipping")), freeCheck);
+    refs.freeShippingLabel = el("span", `${PREFIX}-row__label`, T("rowFreeShipping"));
+    freeRow.append(refs.freeShippingLabel, freeCheck);
     body.appendChild(freeRow);
 
     // Shipping input. Label is price-dependent (what-if can cross $299).

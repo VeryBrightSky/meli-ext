@@ -1,15 +1,24 @@
 /* Options page — same Andes-like card language as the injected UI. */
 
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 body {
   margin: 0;
   padding: 32px 16px;
+  min-width: 0;
   background: #ededed;
   font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
   color: rgba(0, 0, 0, 0.9);
 }
 
 .card {
+  width: 100%;
   max-width: 480px;
+  min-width: 0;
   margin: 0 auto;
   background: #fff;
   border-radius: 6px;
@@ -44,11 +53,20 @@ body {
 
 .setting--field {
   justify-content: space-between;
+  flex-wrap: wrap;
   margin-top: 12px;
+}
+
+.setting--field > span {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .setting--field input,
 .setting--field select {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
   font-family: inherit;
   font-size: 13px;
   padding: 4px 8px;
@@ -94,6 +112,11 @@ body {
   background: rgba(242, 61, 79, 0.06);
 }
 
+.hint,
+.status {
+  overflow-wrap: anywhere;
+}
+
 .hint {
   font-size: 12px;
   color: rgba(0, 0, 0, 0.55);
@@ -116,6 +139,7 @@ body {
 }
 
 .sub-actions button {
+  max-width: 100%;
   font-family: inherit;
   font-size: 13px;
   padding: 7px 12px;
@@ -163,13 +187,15 @@ body {
 
 .owner__row {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   margin-top: 6px;
 }
 
 .owner__row input {
-  flex: 1;
+  flex: 1 1 120px;
   min-width: 0;
+  max-width: 100%;
   font-family: inherit;
   font-size: 13px;
   padding: 5px 8px;

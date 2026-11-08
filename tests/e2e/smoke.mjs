@@ -243,6 +243,24 @@ try {
   assert.equal(await welcome.$eval("#upgrade", (b) => b.hidden), true, "no pay button before the trial");
   assert.ok((await welcome.$eval("#share", (a) => a.href)).includes("wa.me/?text="), "welcome share link");
   pass("install opens the welcome tab: 'Tu prueba PRO está lista', 7 días al primer costo, step 1 links to Mis publicaciones");
+  // v1.5.5 final: in a 340 px column no demo value ("−$78.60") breaks between
+  // the sign and the number, and the page never scrolls sideways.
+  await welcome.setViewport({ width: 340, height: 740 });
+  await welcome.waitForFunction(() => document.querySelectorAll(".demo-row__value").length > 0, { timeout: 5000 });
+  const demo340 = await welcome.evaluate(() => {
+    const vals = [...document.querySelectorAll(".demo-row__value")];
+    return {
+      scrollWidth: document.documentElement.scrollWidth,
+      values: vals.map((v) => v.textContent),
+      multiLine: vals.filter((v) => v.getClientRects().length > 1).map((v) => v.textContent),
+      nowrap: vals.every((v) => getComputedStyle(v).whiteSpace === "nowrap")
+    };
+  });
+  assert.ok(demo340.values.some((v) => v.startsWith("−$")), `demo has no negative charge value: ${JSON.stringify(demo340.values)}`);
+  assert.deepEqual(demo340.multiLine, [], `demo values wrap at 340px: ${JSON.stringify(demo340)}`);
+  assert.ok(demo340.nowrap, "demo values are no-wrap spans");
+  assert.ok(demo340.scrollWidth <= 340, `welcome overflows at 340px: ${JSON.stringify(demo340)}`);
+  pass("welcome demo at 340px: every value (incl. the −$ charge) stays on one line, no horizontal scroll");
   await welcome.close();
   const seed = await browser.newPage();
   await seed.goto(`chrome-extension://${extId}/src/options/options.html`, { waitUntil: "load" });
@@ -253,6 +271,21 @@ try {
   assert.equal(await seed.$eval("#support-label", (e) => e.textContent), "Soporte: vitowebpro@gmail.com");
   assert.equal(await seed.$eval("#lbl-acquisition", (e) => e.textContent), "Radar: costo supuesto (% del precio) cuando no hay costo guardado");
   pass("fresh install: options shows 'Prueba PRO de 7 días: empieza cuando guardes tu primer costo', support line, Radar label");
+  // v1.5.5 final: the options page is fluid; at 340 px (narrow side panel)
+  // no select or input pushes the page into a horizontal scroll.
+  await seed.setViewport({ width: 340, height: 740 });
+  await sleep(150);
+  const opts340 = await seed.evaluate(() => {
+    const over = [...document.querySelectorAll("input, select, button")]
+      .filter((e) => e.offsetParent !== null && e.getBoundingClientRect().right > 340)
+      .map((e) => e.id || e.tagName);
+    return { scrollWidth: document.documentElement.scrollWidth, bodyScrollWidth: document.body.scrollWidth, over };
+  });
+  assert.ok(opts340.scrollWidth <= 340, `options overflow at 340px: ${JSON.stringify(opts340)}`);
+  assert.ok(opts340.bodyScrollWidth <= 340, `options body overflow at 340px: ${JSON.stringify(opts340)}`);
+  assert.deepEqual(opts340.over, [], `controls past the 340px edge: ${JSON.stringify(opts340)}`);
+  pass("options at 340px: no horizontal scroll, every control inside the viewport");
+  await seed.setViewport({ width: 1280, height: 900 });
   // The first saved cost starts the 7 days: the card rebuilds as PRO on the
   // spot and the options page counts down from 7.
   {
@@ -953,6 +986,24 @@ try {
   const preview = await freeSearch.$eval(".mst-radar--preview .mst-radar__summary", (e) => e.textContent);
   assert.equal(preview, "Analizados: 3 · rentables: 0 · marginales: 2 · en pérdida: 1 (costo supuesto: 60% del precio)", preview);
   pass("free search bar: real radar counts at the assumed 60% cost, shipping included (0 rentables, 2 marginales, 1 pérdida)");
+  // v1.5.5 final: with a saved cost on one result (the $827 listing, cost
+  // $400 saved on the card) the FREE bar says so like the PRO bar does,
+  // instead of calling every verdict "costo supuesto".
+  {
+    const mixed = await browser.newPage();
+    await mixed.goto(`${SEARCH_URL}?linked`, { waitUntil: "load" });
+    await mixed.waitForSelector(".mst-radar--preview .mst-radar__summary", { timeout: 20000 });
+    await mixed.waitForFunction(() => document.querySelectorAll(".mst-strip").length === 3, { timeout: 20000, polling: 100 });
+    await sleep(300);
+    const savedStrips = await mixed.$$eval(".mst-strip[data-saved-cost]", (els) => els.map((e) => e.dataset.savedCost));
+    assert.deepEqual(savedStrips, ["400"], `saved-cost strips: ${JSON.stringify(savedStrips)}`);
+    const mixedText = await mixed.$eval(".mst-radar--preview .mst-radar__summary", (e) => e.textContent);
+    assert.ok(mixedText.startsWith("Analizados: 3 ·"), mixedText);
+    assert.ok(mixedText.endsWith("(costo supuesto 60% salvo donde ya guardaste tu costo)"), `free bar ignores the saved cost: ${mixedText}`);
+    assert.ok(!mixedText.includes("del precio)"), mixedText);
+    await mixed.close();
+    pass("free search bar with one saved cost: '(costo supuesto 60% salvo donde ya guardaste tu costo)' like the PRO bar");
+  }
   const previewBuckets = await freeSearch.$$eval(".mst-strip", (els) => els.map((e) => e.dataset.preview));
   assert.deepEqual(previewBuckets.filter(Boolean).length, 3, `preview stamps: ${previewBuckets}`);
   const shownVerdicts = await freeSearch.$$eval(".mst-strip__verdict", (els) => els.length);
@@ -1160,7 +1211,18 @@ try {
   assert.equal(await page.$$eval(".mst-card input.mst-input", (i, k) => i[k].disabled, IDX.price), false);
   pass("what-if price editable when Pro");
 
+  // v1.5.5 final: at $827 free shipping is mandatory and already charged, so
+  // the toggle is checked and locked with the label that says so.
+  await openBreakdown(page);
+  const freeState = () => page.$eval(".mst-free-toggle", (c) => ({
+    checked: c.checked,
+    disabled: c.disabled,
+    label: c.closest(".mst-row").querySelector(".mst-row__label").textContent
+  }));
+  assert.deepEqual(await freeState(), { checked: true, disabled: true, label: "Envío gratis obligatorio desde $299" });
   await typeInto(page, IDX.price, "280");
+  assert.deepEqual(await freeState(), { checked: false, disabled: false, label: "Ofrezco envío gratis" });
+  pass("free-shipping toggle: locked+checked 'Envío gratis obligatorio desde $299' at $827, interactive 'Ofrezco envío gratis' at $280");
   assert.equal(await page.evaluate(rowValue("Comisión")), "−$28.00");
   assert.equal(await page.evaluate(rowValue("Costo fijo")), "−$37.00");
   assert.equal(await page.evaluate(rowValue("Recibes aprox.")), "$165.00");
@@ -1186,6 +1248,8 @@ try {
   await sleep(300);
   assert.equal(await page.$$eval(".mst-card input.mst-input", (i, k) => i[k].value, IDX.price), "299.00");
   assert.equal(await page.evaluate(rowValue("Recibes aprox.")), "$219.10");
+  // Crossing to exactly $299 locks the toggle again (free shipping charged).
+  assert.deepEqual(await freeState(), { checked: true, disabled: true, label: "Envío gratis obligatorio desde $299" });
   await page.click(".mst-reset");
   await sleep(300);
   assert.equal(await page.$$eval(".mst-card input.mst-input", (i, k) => i[k].value, IDX.price), "827.00");
@@ -1389,8 +1453,7 @@ try {
   // typed (no discount row: v1.5.2 showed −$25.00 here, half of the typed 50);
   // an autofilled estimate follows the chosen table and names its discount.
   await openBreakdown(page);
-  await page.click(".mst-free-toggle");
-  await sleep(200);
+  // ($827: free shipping is mandatory, the toggle is locked; nothing to tick.)
   await setSelect("Reputación del vendedor", "verde");
   assert.equal(await page.evaluate(rowValue("Descuento por reputación")), "", "typed shipping gets no discount row");
   assert.equal(await page.evaluate(rowValue("Recibes aprox.")), "$694.30"); // 827 − 82.70 − 50 typed, untouched by verde
@@ -1407,8 +1470,6 @@ try {
   assert.equal(await page.evaluate(rowValue("Descuento por reputación")), "Ya incluido en la tabla (40%)");
   pass("reputation picks the official table: typed $50 stays $50 (no row); 1 kg estimate verde $74.50 (50% incluido) → naranja $149.00 (no row) → sin reputación $89.40 (40% incluido)");
   await typeInto(page, IDX.ship, "50");
-  await page.click(".mst-free-toggle");
-  await sleep(200);
 
   // Listing type toggle persists per item across reloads.
   await page.$$eval(".mst-toggle__btn", (btns) => btns.find((b) => b.textContent === "Premium").click());

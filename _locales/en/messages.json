@@ -320,6 +320,9 @@
   "rowFreeShipping": {
     "message": "I offer free shipping"
   },
+  "rowFreeShippingMandatory": {
+    "message": "Free shipping is mandatory from $$299"
+  },
   "rowShippingSubsidy": {
     "message": "Reputation discount"
   },
@@ -544,6 +547,9 @@
   },
   "radarFreeSummary": {
     "message": "Checked: $1 · profitable: $2 · thin: $3 · at a loss: $4 (assumed cost: $5% of price)"
+  },
+  "radarFreeSummaryMixed": {
+    "message": "Checked: $1 · profitable: $2 · thin: $3 · at a loss: $4 (assumed cost $5% except where you already saved your cost)"
   },
   "radarSeeAll": {
     "message": "See which ones · PRO"
