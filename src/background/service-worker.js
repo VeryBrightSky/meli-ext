@@ -37,6 +37,7 @@ async function getUserCached() {
 }
 const PREFIX = globalThis.EXT_BRAND.cssPrefix;
 const INSTALLED_KEY = `${PREFIX}:installedAt`;
+const TRIAL_KEY = `${PREFIX}:trialStartedAt`;
 
 // --- Anonymous analytics (dormant unless configured; see src/telemetry) -------
 // Trial state for the daily active_day row, from LOCAL data only (cached
@@ -44,9 +45,10 @@ const INSTALLED_KEY = `${PREFIX}:installedAt`;
 async function currentTrialState() {
   const G = globalThis.MST_GATE;
   const now = Date.now();
-  const stored = await chrome.storage.local.get([INSTALLED_KEY, `${PREFIX}:proStatus`]);
+  const stored = await chrome.storage.local.get(`${PREFIX}:proStatus`);
   const cached = G.isCacheUsable(stored[`${PREFIX}:proStatus`], now) ? stored[`${PREFIX}:proStatus`] : null;
-  const s = G.mergeStatus(G.resolveStatus(null, cached), G.computeLocalTrial(stored[INSTALLED_KEY], now));
+  const { local } = await G.readLocalTrial(now);
+  const s = G.mergeStatus(G.resolveStatus(null, cached), local);
   return { state: globalThis.MST_TELEMETRY_CORE.trialStateOf(s), pro: Boolean(s.pro) };
 }
 const telemetry = globalThis.MST_TELEMETRY_SW.create({
@@ -71,7 +73,8 @@ quietly(telemetry.init().then(() => telemetry.flush()));
 chrome.runtime.onInstalled.addListener((details) => quietly(telemetry.onInstalled(details)));
 
 // Reverse trial: stamp first-run time on install, and on update for users
-// who predate it (they get the same 7 PRO days — a reason to look again).
+// who predate it. Since 1.5.5 the 7 PRO days start at the first saved cost
+// (gate.js readLocalTrial derives and migrates the start stamp).
 const WELCOME_URL = "src/onboarding/welcome.html";
 const REVERSE_TRIAL_SINCE = "1.4.0";
 
@@ -101,6 +104,9 @@ chrome.runtime.onInstalled.addListener(async (details) => {
     const stamp = a !== null && b !== null ? Math.min(a, b) : (a ?? b ?? Date.now());
     await chrome.storage.local.set({ [INSTALLED_KEY]: stamp });
     chrome.storage.sync.set({ [INSTALLED_KEY]: stamp }).catch(() => {});
+    // Migration (pre-1.5.5 install with a saved cost keeps its window) and
+    // the 30-day fallback are stamped here once, so every context agrees.
+    await globalThis.MST_GATE.readLocalTrial(Date.now());
   } catch (err) {
     console.warn("[Netio] could not stamp installedAt:", err);
   }
@@ -125,7 +131,7 @@ chrome.runtime.onInstalled.addListener(async (details) => {
 });
 chrome.runtime.onStartup.addListener(() => refreshBadge());
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === "local" && (changes[INSTALLED_KEY] || changes[`${PREFIX}:proStatus`])) refreshBadge();
+  if (area === "local" && (changes[INSTALLED_KEY] || changes[TRIAL_KEY] || changes[`${PREFIX}:proStatus`])) refreshBadge();
   if (area === "local" && (changes[globalThis.MST_OWNER.STORAGE_KEY] || changes[globalThis.MST_OWNER.HASH_OVERRIDE_KEY])) {
     // Owner mode switched: purge/restore analytics state, badge, open tabs.
     quietly(telemetry.init());
@@ -148,7 +154,7 @@ async function refreshBadge(user) {
       await chrome.action.setBadgeBackgroundColor({ color: "#00A650" });
       return;
     }
-    const stored = await chrome.storage.local.get(INSTALLED_KEY);
+    const { local } = await globalThis.MST_GATE.readLocalTrial(Date.now());
     let base = { pro: false, paid: false, trialActive: false, trialExpired: false, trialDaysLeft: 0 };
     try {
       const u = user === undefined ? await getUserCached() : user;
@@ -163,10 +169,7 @@ async function refreshBadge(user) {
         // keep free
       }
     }
-    const s = globalThis.MST_GATE.mergeStatus(
-      base,
-      globalThis.MST_GATE.computeLocalTrial(stored[INSTALLED_KEY], Date.now())
-    );
+    const s = globalThis.MST_GATE.mergeStatus(base, local);
     let text = "";
     if (s.paid) text = "PRO";
     else if (s.trialActive) text = s.trialDaysLeft <= 3 ? `${s.trialDaysLeft}d` : "PRO";
