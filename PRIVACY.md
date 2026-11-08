@@ -34,7 +34,8 @@ ExtensionPay recibe tu correo solo si pagas (detalle abajo).
   datos de tarjetas. Consulta su política: https://extensionpay.com/privacy
 - **Datos de productos:** los costos, ventas e historial de precios que
   capturas se guardan solo en tu navegador y nunca se envían a ningún
-  servidor.
+  servidor. El historial de precios se anota solo para las publicaciones que
+  abres (nunca en el carrito ni en el pago).
 - **Eliminación de datos:** usa "Borrar datos guardados" en las opciones de la
   extensión, o desinstálala: todo se borra con ella.
 
@@ -66,6 +67,7 @@ payment: ExtensionPay receives your email only if you pay (details below).
   processed by ExtensionPay via Stripe; we never see or store card data. See
   their policy: https://extensionpay.com/privacy
 - **Product data:** the costs, sales and price history you capture are stored
-  only in your browser and are never sent to any server.
+  only in your browser and are never sent to any server. Price history is
+  recorded only for the listings you open (never in the cart or at checkout).
 - **Data deletion:** use "Clear saved data" in the extension options, or
   uninstall it: everything is deleted with it.

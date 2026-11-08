@@ -1684,3 +1684,64 @@ test("welcome demo ($499, home-general, 0.3 kg, cost 250) is computed with the r
   // No fixed charge row at $499 (Clásica from $299 has none).
   assert.equal(demo.rows.some(([l]) => l.startsWith("Costo fijo")), false);
 });
+
+// v1.5.5 r3: price history is written only for listing pages (the URL shapes
+// content.js treats as a product), never for cart, checkout or payment pages.
+test("v1.5.5 r3 history.isRecordableUrl: listing URLs only, never cart/checkout", async () => {
+  const prevChrome = globalThis.chrome;
+  const prevBrand = globalThis.EXT_BRAND;
+  const prevLoc = globalThis.location;
+  globalThis.EXT_BRAND = { cssPrefix: "mst" };
+  const store = {};
+  globalThis.chrome = {
+    storage: {
+      local: {
+        get: async (keys) => {
+          const out = {};
+          for (const k of [].concat(keys)) if (k in store) out[k] = store[k];
+          return out;
+        },
+        set: async (obj) => Object.assign(store, obj),
+        remove: async (keys) => {
+          for (const k of [].concat(keys)) delete store[k];
+        }
+      }
+    }
+  };
+  try {
+    new Function(readFileSync(join(root, "src/content/history.js"), "utf8"))();
+    const H = globalThis.MST_HISTORY;
+    const yes = [
+      "https://www.mercadolibre.com.mx/celular-test-pro/p/MLM12345678",
+      "https://www.mercadolibre.com.mx/celular/p/MLM12345678?pdp_filters=x#reviews",
+      "https://www.mercadolibre.com.mx/funda/up/MLMU987654321",
+      "https://www.mercadolibre.com.mx/MLM-123456789-funda-_JM",
+      "https://articulo.mercadolibre.com.mx/MLM-123456789-funda-_JM"
+    ];
+    const no = [
+      "https://www.mercadolibre.com.mx/gz/checkout/buyingflow/MLM12345678",
+      "https://www.mercadolibre.com.mx/checkout/MLM12345678/p/MLM12345678",
+      "https://www.mercadolibre.com.mx/gz/cart",
+      "https://www.mercadolibre.com.mx/carrito",
+      "https://www.mercadolibre.com.mx/pagos/MLM12345678",
+      "https://www.mercadolibre.com.mx/",
+      "https://listado.mercadolibre.com.mx/celulares",
+      "https://www.mercadolibre.com.mx/ayuda/Comprar_123",
+      "https://evil.example/p/MLM12345678",
+      "not a url",
+      undefined
+    ];
+    for (const u of yes) assert.equal(H.isRecordableUrl(u), true, u);
+    for (const u of no) assert.equal(H.isRecordableUrl(String(u)), false, String(u));
+    // record() honors it: a checkout page writes nothing, a listing does.
+    await H.record("MLM12345678", 827, "https://www.mercadolibre.com.mx/gz/checkout/buyingflow/MLM12345678");
+    assert.deepEqual(store, {});
+    await H.record("MLM12345678", 827, "https://www.mercadolibre.com.mx/celular-test-pro/p/MLM12345678");
+    assert.equal(store["mst:hist:MLM12345678"].length, 1);
+    assert.equal(store["mst:hist:MLM12345678"][0].p, 827);
+  } finally {
+    globalThis.chrome = prevChrome;
+    globalThis.EXT_BRAND = prevBrand;
+    globalThis.location = prevLoc;
+  }
+});

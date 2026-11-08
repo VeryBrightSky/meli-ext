@@ -582,7 +582,7 @@
     "message": "Open my listings"
   },
   "welcomeNote": {
-    "message": "Your costs and products are saved in your browser; we have no servers. Only the PRO payment goes through ExtensionPay."
+    "message": "Your costs, products and the price history of the listings you open are stored in your browser; we have no servers. Only the PRO payment goes through ExtensionPay."
   },
   "badgeTrialOne": {
     "message": "PRO · last trial day"
@@ -806,6 +806,9 @@
   "stackRetentions": {
     "message": "With a registered RFC (VAT 8% + ISR 2.5%)"
   },
+  "stackRetentionsHint": {
+    "message": "With a registered RFC (VAT 8% + ISR 2.5%; without an RFC they withhold more)"
+  },
   "stackRetentionsValue": {
     "message": "−$1, you are paid $2"
   },
@@ -864,7 +867,7 @@
     "message": "This is what it looks like on a listing"
   },
   "welcomeDemoCaption": {
-    "message": "Real example: a $1 Clásica listing in $2, 0.3 kg, no reputation, $$250 cost. Official fees and shipping table."
+    "message": "Example with official rates: a $1 Clásica listing in $2, 0.3 kg, no reputation, $$250 cost. Official fees and shipping table."
   },
   "welcomeDemoPro": {
     "message": "With PRO, on the same card"

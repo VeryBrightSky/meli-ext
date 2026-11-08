@@ -582,7 +582,7 @@
     "message": "Abrir mis publicaciones"
   },
   "welcomeNote": {
-    "message": "Tus costos y productos se guardan en tu navegador; no tenemos servidores. Solo el pago de PRO pasa por ExtensionPay."
+    "message": "Tus costos, productos y el historial de precios de las publicaciones que abres se guardan en tu navegador; no tenemos servidores. Solo el pago de PRO pasa por ExtensionPay."
   },
   "badgeTrialOne": {
     "message": "PRO · último día de prueba"
@@ -806,6 +806,9 @@
   "stackRetentions": {
     "message": "Con RFC registrado (IVA 8% + ISR 2.5%)"
   },
+  "stackRetentionsHint": {
+    "message": "Con RFC registrado (IVA 8% + ISR 2.5%; sin RFC retienen más)"
+  },
   "stackRetentionsValue": {
     "message": "−$1, te depositan $2"
   },
@@ -864,7 +867,7 @@
     "message": "Así se ve en una publicación"
   },
   "welcomeDemoCaption": {
-    "message": "Ejemplo real: publicación Clásica de $1 en $2, 0.3 kg, sin reputación, costo de $$250. Tarifas y tabla de envío oficiales."
+    "message": "Ejemplo con tarifas oficiales: publicación Clásica de $1 en $2, 0.3 kg, sin reputación, costo de $$250. Tarifas y tabla de envío oficiales."
   },
   "welcomeDemoPro": {
     "message": "Con PRO, en la misma tarjeta"

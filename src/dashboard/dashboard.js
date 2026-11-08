@@ -213,12 +213,15 @@
 
   // Empty state: one clearly labeled sample row (real fee math on a made-up
   // listing) so the seller sees what the table will hold, plus the one thing
-  // to do next. No PRO pitch on an empty table.
+  // to do next. No PRO pitch on an empty table. Same example as the welcome
+  // page's demo card ($499 Clásica, "Hogar, moda, deportes y general", $250
+  // cost, 0.3 kg, no reputation) so the two never show different numbers.
   const EXAMPLE_ID = "EJEMPLO";
+  const EXAMPLE_GROUP = "home-general";
   function exampleRows() {
-    const group = SOURCE.listCategoryGroups()[0];
+    const group = SOURCE.listCategoryGroups().find((g) => g.id === EXAMPLE_GROUP) ?? SOURCE.listCategoryGroups()[0];
     const fake = {
-      [`${PREFIX}:cost:${EXAMPLE_ID}`]: 180,
+      [`${PREFIX}:cost:${EXAMPLE_ID}`]: 250,
       [`${PREFIX}:meta:${EXAMPLE_ID}`]: {
         title: T("dashExampleTitle"),
         priceMXN: 499,

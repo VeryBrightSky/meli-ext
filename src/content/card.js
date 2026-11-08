@@ -733,8 +733,9 @@ globalThis.MST_CARD = (() => {
     renderCostChips();
     // Share only once there is a real number to share (a saved cost): a
     // "recommend the app" button on first sight is noise.
+    // ...and only a profit worth showing: nobody forwards a loss (r3).
     if (refs.shareBtn) {
-      const canShare = state.productCostMXN > 0;
+      const canShare = state.productCostMXN > 0 && b.profitMinMXN !== undefined && b.marginMinPct > 0;
       refs.shareBtn.hidden = !canShare;
       if (canShare) {
         refs.shareBtn.href = buildShareUrl();
@@ -1005,11 +1006,13 @@ globalThis.MST_CARD = (() => {
     }
     rows.ads.root.style.display = b.adsCostMXN > 0 ? "" : "none";
     if (b.adsCostMXN > 0) patchRow(rows.ads, T("rowAdsCost", [String(b.adsPct)]), fmtCharge(b.adsCostMXN), false);
-    patchRow(rows.net, T("stackNet"), fmtRange(b.netMinMXN, b.netMaxMXN), false);
     const w = CALC.computeWithholdings(b.priceMXN, SOURCE.withholdings);
+    // The RFC rates shown are the registered-RFC ones; while the seller has
+    // not opened the retentions rows, say that an unregistered account is
+    // withheld more (r3), so the figure is never read as the only case.
     patchRow(
       rows.retentions,
-      T("stackRetentions"),
+      state.showWithholdings ? T("stackRetentions") : T("stackRetentionsHint"),
       T("stackRetentionsValue", [fmtMoney(w.totalMXN), fmtRange(CALC.round2(b.netMinMXN - w.totalMXN), CALC.round2(b.netMaxMXN - w.totalMXN))]),
       false
     );
@@ -1098,8 +1101,10 @@ globalThis.MST_CARD = (() => {
     refs.stack = el("div", `${PREFIX}-stack`);
     refs.stack.hidden = true;
     refs.stackRows = {};
-    for (const id of ["price", "commission", "fixed", "shipping", "ads", "net", "retentions"]) {
-      const r = buildRow("", id === "net" ? "stacktotal" : undefined);
+    // No net row here: the headline right above IS the net ("Te queda"), one
+    // number, said once (r3).
+    for (const id of ["price", "commission", "fixed", "shipping", "ads", "retentions"]) {
+      const r = buildRow("");
       r.root.classList.add(`${PREFIX}-stack__row`);
       refs.stackRows[id] = r;
       refs.stack.appendChild(r.root);
@@ -1776,27 +1781,34 @@ globalThis.MST_CARD = (() => {
     });
     refs.summary.appendChild(refs.shareBtn);
 
-    // Fee breakdown: collapsed by default so the card answers first and
-    // explains on demand. The seller's choice (open/closed) is remembered.
+    // Fee breakdown ("cargos y envío"): collapsed by default so the card
+    // answers first and explains on demand. The seller's choice (open/closed)
+    // is remembered. Order (r3): the charges, then the shipping inputs and
+    // the shipping cost, then ads (a % of the price, like shipping a cost the
+    // seller controls, never next to "Costo total de Mercado Libre"), then the
+    // net ("Recibes aprox.", said once here; the summary says "Te queda"),
+    // then the retentions.
     const details = el("details", `${PREFIX}-breakdown`);
     details.appendChild(el("summary", `${PREFIX}-breakdown__toggle`, T("breakdownToggle")));
+    const shipRowEl = refs.shippingInput.closest(`.${PREFIX}-row`);
     const moveIntoDetails = [
       refs.commission?.root,
       refs.fixed?.root,
-      refs.ads?.root,
       refs.effective?.root,
       refs.weightSelect?.closest(`.${PREFIX}-row`),
       refs.fullToggle?.closest(`.${PREFIX}-row`),
       refs.reputationSelect?.closest(`.${PREFIX}-row`),
       refs.freeShippingToggle?.closest(`.${PREFIX}-row`),
+      shipRowEl,
       refs.shippingSubsidy?.root,
+      refs.ads?.root,
+      refs.net?.root,
       refs.withholdingsToggle?.closest(`.${PREFIX}-row`),
       refs.iva?.root,
       refs.isr?.root,
       refs.netAfter?.root,
       refs.withholdingsHint
     ].filter(Boolean);
-    const shipRowEl = refs.shippingInput.closest(`.${PREFIX}-row`);
     shipRowEl.before(details);
     for (const node of moveIntoDetails) details.appendChild(node);
     refs.breakdown = details;
