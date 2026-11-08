@@ -155,6 +155,10 @@ async function openBreakdown(page) {
   await sleep(100);
 }
 
+// v1.5.5: the cost input moved up under the summary, so the money inputs
+// (.mst-input) are ordered cost, price, shipping, then (PRO) sales, margin.
+const IDX = { cost: 0, price: 1, ship: 2, sales: 3, margin: 4 };
+
 async function typeInto(page, index, text) {
   // .mst-input only — the card also contains checkbox toggles.
   const inputs = await page.$$(".mst-card input.mst-input");
@@ -175,12 +179,16 @@ async function extensionId() {
   return new URL(workerTarget.url()).host;
 }
 
+// Telemetry mock server (phase 9); closed in finally so a failed run never
+// leaves its port held.
+let mock = null;
 try {
   // ====================== PHASE 0: reverse trial ===========================
-  // A fresh install is PRO for 7 days with no email/card (reverse trial).
-  // Verify that first, then stamp the install 9 days back so the rest of the
-  // never-paid phases exercise the post-trial (locked) state.
-  console.log("\nPHASE 0 — REVERSE TRIAL (fresh install is PRO, then expires)");
+  // v1.5.5: a fresh install has a 7-day PRO trial that starts with the FIRST
+  // SAVED COST (not at install). Verify the "not started" copy first, then
+  // stamp install + trial start 9 days back so the rest of the never-paid
+  // phases exercise the post-trial (locked) state.
+  console.log("\nPHASE 0 — REVERSE TRIAL (fresh install: trial pending, then expired)");
   const extId = await extensionId();
   // onInstalled(reason: install) opens the welcome tab once.
   const welcomeTarget = await browser.waitForTarget(
@@ -189,20 +197,71 @@ try {
   );
   const welcome = await welcomeTarget.page();
   await welcome.waitForFunction(() => (document.getElementById("title")?.textContent ?? "").length > 0, { timeout: 10000 });
-  assert.equal(await welcome.$eval("#title", (e) => e.textContent), "Tu PRO está activado");
-  assert.ok((await welcome.$eval("#lead", (e) => e.textContent)).includes("7 días"), "welcome lead should show 7 días");
-  assert.equal(await welcome.$eval("#go", (a) => a.href), "https://www.mercadolibre.com.mx/");
-  assert.equal(await welcome.$eval("#upgrade", (b) => b.hidden), true, "no pay button during the trial");
+  assert.equal(await welcome.$eval("#title", (e) => e.textContent), "Tu prueba PRO está lista");
+  const welcomeLead = await welcome.$eval("#lead", (e) => e.textContent);
+  assert.ok(welcomeLead.includes("7 días") && welcomeLead.includes("primer costo"), `welcome lead: ${welcomeLead}`);
+  assert.equal(await welcome.$eval("#pill", (e) => e.textContent), "PRO · 7 días al guardar tu primer costo");
+  assert.equal(await welcome.$eval("#go", (a) => a.href), "https://www.mercadolibre.com.mx/publicaciones/listado");
+  assert.equal(await welcome.$eval("#s1t", (a) => a.href), "https://www.mercadolibre.com.mx/publicaciones/listado");
+  assert.equal(await welcome.$eval("#s1t", (a) => a.textContent), "Abre una de tus publicaciones");
+  assert.ok((await welcome.$eval("#s1b", (e) => e.textContent)).includes("empieza cuando guardes tu primer costo"), "step 1 says when the trial starts");
+  assert.equal(await welcome.$eval("#upgrade", (b) => b.hidden), true, "no pay button before the trial");
   assert.ok((await welcome.$eval("#share", (a) => a.href)).includes("wa.me/?text="), "welcome share link");
-  pass("install opens the welcome tab: 'Tu PRO está activado', 7 días, link to Mercado Libre");
+  pass("install opens the welcome tab: 'Tu prueba PRO está lista', 7 días al primer costo, step 1 links to Mis publicaciones");
   await welcome.close();
   const seed = await browser.newPage();
   await seed.goto(`chrome-extension://${extId}/src/options/options.html`, { waitUntil: "load" });
   await seed.waitForFunction(
-    () => /Prueba PRO: te quedan \d+ días/.test(document.getElementById("sub-status")?.textContent ?? ""),
+    () => (document.getElementById("sub-status")?.textContent ?? "") === "Prueba PRO de 7 días: empieza cuando guardes tu primer costo",
     { timeout: 10000 }
   );
-  pass("fresh install: options shows 'Prueba PRO: te quedan N días' (reverse trial on)");
+  assert.equal(await seed.$eval("#support-label", (e) => e.textContent), "Soporte: vitowebpro@gmail.com");
+  assert.equal(await seed.$eval("#lbl-acquisition", (e) => e.textContent), "Radar: costo supuesto (% del precio) cuando no hay costo guardado");
+  pass("fresh install: options shows 'Prueba PRO de 7 días: empieza cuando guardes tu primer costo', support line, Radar label");
+  // The first saved cost starts the 7 days: the card rebuilds as PRO on the
+  // spot and the options page counts down from 7.
+  {
+    const first = await browser.newPage();
+    await first.goto(PRODUCT_URL, { waitUntil: "load" });
+    await first.waitForSelector("#mst-card-root", { visible: true, timeout: 20000 });
+    await first.waitForFunction(() => {
+      const b = document.querySelector(".mst-trialbar");
+      return b && !b.hidden && b.offsetHeight > 0;
+    }, { timeout: 5000 });
+    assert.equal(await first.$eval(".mst-trialbar", (e) => e.dataset.tone), "pending");
+    assert.ok((await first.$eval(".mst-trialbar__text", (e) => e.textContent)).includes("empieza cuando guardes tu primer costo"), "pending banner copy");
+    assert.ok((await first.$$eval(".mst-prochip", (els) => els.length)) > 0, "free card before the first cost");
+    assert.equal(await first.$eval(".mst-share", (a) => a.hidden), true, "share hidden until a cost is saved");
+    const inputs = await first.$$(".mst-card input.mst-input");
+    await inputs[IDX.cost].focus();
+    await inputs[IDX.cost].type("400", { delay: 20 });
+    await first.waitForFunction(() => !document.querySelector(".mst-saved")?.hidden, { timeout: 3000 });
+    assert.equal(await first.$eval(".mst-saved", (e) => e.textContent), "Guardado para esta publicación");
+    await first.keyboard.press("Enter");
+    // startTrial → onChange → the content script rebuilds the card as PRO.
+    await first.waitForFunction(
+      () => document.querySelector("#mst-card-root") && document.querySelectorAll(".mst-prochip").length === 0 && (document.querySelector(".mst-trialbar")?.dataset.tone ?? "") === "active",
+      { timeout: 10000, polling: 250 }
+    );
+    assert.ok((await first.$eval(".mst-trialbar__text", (e) => e.textContent)).includes("te quedan 7 días"), "active banner after the first cost");
+    const proLine = await first.$eval(".mst-summary__pro", (e) => ({ hidden: e.hidden, text: e.textContent }));
+    assert.equal(proLine.hidden, false, "PRO line visible with a cost");
+    assert.match(proLine.text, /^PRO: a \$[\d,]+\.\d{2} ganas el 30%$/, proLine.text);
+    assert.equal(await first.$eval(".mst-share", (a) => a.hidden), false, "share shown once a cost is saved");
+    pass("first saved cost: 'Guardado para esta publicación', trial starts (7 días), card rebuilds as PRO, 'PRO: a $X ganas el 30%' line");
+    await first.close();
+    await seed.reload({ waitUntil: "load" });
+    await seed.waitForFunction(
+      () => (document.getElementById("sub-status")?.textContent ?? "") === "Prueba PRO: te quedan 7 días",
+      { timeout: 10000 }
+    );
+    pass("options after the first cost: 'Prueba PRO: te quedan 7 días'");
+    // Back to a clean slate for the never-paid phases (cost removed; the
+    // trial stamps are set explicitly below).
+    await seed.evaluate(async () => {
+      await chrome.storage.local.remove(["mst:cost:MLM12345678", "mst:meta:MLM12345678"]);
+    });
+  }
   if (process.env.E2E_SHOTS) {
     const trialPage = await browser.newPage();
     await trialPage.goto(PRODUCT_URL, { waitUntil: "load" });
@@ -212,14 +271,16 @@ try {
     await trialPage.close();
   }
   await seed.evaluate(async () => {
-    await chrome.storage.local.set({ "mst:installedAt": Date.now() - 9 * 24 * 3600 * 1000 });
+    const back = Date.now() - 9 * 24 * 3600 * 1000;
+    await chrome.storage.local.set({ "mst:installedAt": back, "mst:trialStartedAt": back });
+    await chrome.storage.sync.set({ "mst:installedAt": back, "mst:trialStartedAt": back });
   });
   await seed.reload({ waitUntil: "load" });
   await seed.waitForFunction(
     () => (document.getElementById("sub-status")?.textContent ?? "").includes("terminó"),
     { timeout: 10000 }
   );
-  pass("install stamped 9 days back → status 'tu prueba PRO terminó'");
+  pass("install + trial start stamped 9 days back → status 'tu prueba PRO terminó'");
   // v1.5.2 (E): the welcome page after an expired trial (reinstall case) must
   // not claim 7 days of PRO.
   await seed.goto(`chrome-extension://${extId}/src/onboarding/welcome.html`, { waitUntil: "load" });
@@ -253,20 +314,20 @@ try {
   // $499–998.99 band → $78.60 (v1.5.2 showed $52.40, the verde $299 column):
   // 827 − 82.70 − 78.60 = 665.70.
   await page.waitForFunction(() => (document.querySelector(".mst-summary__net")?.textContent ?? "").includes("$665.70"), { timeout: 5000 });
-  assert.equal(await page.$eval(".mst-summary__net", (e) => e.textContent), "Mercado Libre te deposita $665.70 por venta");
+  assert.equal(await page.$eval(".mst-summary__net", (e) => e.textContent), "Te queda $665.70 por venta (antes de IVA/ISR)");
   assert.equal(await page.$eval("details.mst-breakdown", (d) => d.open), false, "breakdown collapsed by default");
   assert.ok(
     await page.$eval("details.mst-breakdown", (d) => d.textContent.includes("Comisión por venta")),
     "commission row lives inside the breakdown"
   );
-  pass("summary leads with 'Mercado Libre te deposita $665.70 por venta' (0.3 kg official estimate, sin reputación, $499–998.99 band); fee breakdown collapsed by default");
+  pass("summary leads with 'Te queda $665.70 por venta (antes de IVA/ISR)' (0.3 kg official estimate, sin reputación, $499–998.99 band); fee breakdown collapsed by default");
   // The estimate sits in the shipping row, marked as an estimate, editable.
-  const shipEst = await page.$$eval(".mst-card input.mst-input", (inputs) => ({
-    value: inputs[1].value,
-    estimate: inputs[1].dataset.estimate,
-    title: inputs[1].title,
-    disabled: inputs[1].disabled
-  }));
+  const shipEst = await page.$$eval(".mst-card input.mst-input", (inputs, k) => ({
+    value: inputs[k].value,
+    estimate: inputs[k].dataset.estimate,
+    title: inputs[k].title,
+    disabled: inputs[k].disabled
+  }), IDX.ship);
   assert.deepEqual(shipEst, { value: "78.60", estimate: "1", title: "Estimado", disabled: false });
   const estTag = await page.$eval(".mst-estimate-tag", (e) => ({ hidden: e.hidden, text: e.textContent, shown: e.offsetWidth > 0 }));
   assert.deepEqual(estTag, { hidden: false, text: "est.", shown: true });
@@ -281,8 +342,8 @@ try {
   assert.equal(await page.$eval(".mst-title", (e) => e.textContent), "Calculadora de ganancias");
   pass("Spanish locale renders Spanish UI (Calculadora de ganancias)");
 
-  assert.equal(await page.$eval(".mst-card input.mst-input", (i) => i.value), "827.00");
-  assert.equal(await page.$eval(".mst-card input.mst-input", (i) => i.disabled), true);
+  assert.equal(await page.$$eval(".mst-card input.mst-input", (i, k) => i[k].value, IDX.price), "827.00");
+  assert.equal(await page.$$eval(".mst-card input.mst-input", (i, k) => i[k].disabled, IDX.price), true);
   pass("price pre-filled 827.00 and read-only (what-if locked)");
 
   assert.equal(await page.evaluate(rowValue("Comisión")), "−$82.70");
@@ -299,11 +360,46 @@ try {
   assert.equal(await page.evaluate(rowValue("ISR retenido")), "−$17.82");
   assert.equal(await page.evaluate(rowValue("Neto después")), "$590.85"); // 665.70 − 74.85
   pass("retenciones (free): IVA −$57.03, ISR −$17.82, neto después $590.85");
+  // v1.5.5: the headline is before IVA/ISR, so with the toggle on one line
+  // under it names the retentions and what lands after them.
+  assert.equal(
+    await page.$eval(".mst-summary__retentions", (e) => (e.hidden ? "" : e.textContent)),
+    "Retenciones IVA 8% + ISR 2.5%: $74.85. Después de retenciones te quedan $590.85"
+  );
+  pass("summary retentions line: 'Retenciones IVA 8% + ISR 2.5%: $74.85. Después de retenciones te quedan $590.85'");
+  // v1.5.5: the category picker lives in the breakdown while the category is
+  // known, and jumps above the fold (under the cost) with a hint when it is
+  // not, so the seller can fix the range without opening the details.
+  assert.ok(await page.$("details.mst-breakdown .mst-select"), "category select inside the breakdown when detected");
+  await page.evaluate(() => {
+    const sel = document.querySelector("details.mst-breakdown .mst-select");
+    sel.value = "";
+    sel.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await sleep(200);
+  const catAbove = await page.evaluate(() => {
+    const slot = document.querySelector(".mst-catslot");
+    return {
+      select: Boolean(slot?.querySelector(".mst-select")),
+      hint: slot?.querySelector(".mst-hint")?.textContent ?? "",
+      beforeBreakdown: Boolean(slot && document.querySelector("details.mst-breakdown") && (slot.compareDocumentPosition(document.querySelector("details.mst-breakdown")) & Node.DOCUMENT_POSITION_FOLLOWING))
+    };
+  });
+  assert.deepEqual(catAbove, { select: true, hint: "No detectamos la categoría. Elígela para ver un número exacto.", beforeBreakdown: true });
+  await page.evaluate(() => {
+    const sel = document.querySelector(".mst-catslot .mst-select");
+    sel.value = "tech";
+    sel.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await sleep(200);
+  assert.ok(await page.$("details.mst-breakdown .mst-select"), "category select back in the breakdown once picked");
+  assert.equal(await page.evaluate(rowValue("Comisión")), "−$82.70");
+  pass("no category: selector + 'No detectamos la categoría. Elígela para ver un número exacto.' above the fold; picked again → back in the breakdown");
 
   // v1.5.2 critic: with nothing configured, the dashboard applies the same
   // 0.3 kg estimate as the card, so both show the same ganancia for this
   // listing (v1.5.3 official table: 827 − 82.70 − 78.60 − 400 = 265.70).
-  await typeInto(page, 2, "400"); // product cost (persists cost + meta, not the estimate)
+  await typeInto(page, IDX.cost, "400"); // product cost (persists cost + meta, not the estimate)
   await openBreakdown(page);
   const cardProfit = await page.evaluate(rowValue("Ganancia"));
   assert.ok(cardProfit.startsWith("$265.70"), `card profit: ${cardProfit}`);
@@ -320,11 +416,11 @@ try {
   }
   pass("card and dashboard agree on the shipping estimate: ganancia $265.70 in both, dashboard note says 'estimado'");
 
-  await typeInto(page, 1, "50"); // shipping: typed, replaces the estimate
-  assert.equal(await page.$$eval(".mst-card input.mst-input", (i) => i[1].dataset.estimate), "", "typed shipping is no longer marked as an estimate");
+  await typeInto(page, IDX.ship, "50"); // shipping: typed, replaces the estimate
+  assert.equal(await page.$$eval(".mst-card input.mst-input", (i, k) => i[k].dataset.estimate, IDX.ship), "", "typed shipping is no longer marked as an estimate");
   assert.equal(await page.$eval(".mst-estimate-tag", (e) => e.hidden), true, "'est.' tag hides once the seller types");
   assert.equal(await page.evaluate(rowValue("Recibes aprox.")), "$694.30");
-  await typeInto(page, 2, "400"); // product cost
+  await typeInto(page, IDX.cost, "400"); // product cost
   assert.equal(await page.evaluate(rowValue("Precio mínimo")), "$500.00");
   pass("typed shipping 50 replaces the estimate (net $694.30); breakeven stays FREE: cost 400 + ship 50 → $500.00");
 
@@ -362,12 +458,12 @@ try {
   // (what-if is locked; simulate via product cost 900 instead: 744.30−50−900 = −205.70)
   const alertVisible = () => page.$eval(".mst-alert", (e) => !e.hidden && e.offsetHeight > 0);
   assert.equal(await alertVisible(), false);
-  await typeInto(page, 2, "900");
+  await typeInto(page, IDX.cost, "900");
   assert.equal(await alertVisible(), true);
   const alertText = await page.$eval(".mst-alert__text", (e) => e.textContent);
   assert.ok(alertText.includes("Pierdes $205.70 por venta"), `alert text: ${alertText}`);
   pass("red-number moment: alert strip names the real loss ($205.70) and offers the fix");
-  await typeInto(page, 2, "400");
+  await typeInto(page, IDX.cost, "400");
   assert.equal(await alertVisible(), false, "alert must actually disappear (display) once profitable again");
   pass("alert strip hides again when the listing is profitable");
 
@@ -432,7 +528,8 @@ try {
   assert.equal(await page.$eval(".mst-share", (a) => a.target), "_blank");
   pass("share button: WhatsApp link with store URL + this listing's price and real profit");
 
-  // Review ask: hidden until 3 listings have a saved cost, then shown once.
+  // Review ask (v1.5.5): never for an expired-trial user, even with 3+ used
+  // listings. The positive path is asserted in the PRO phase.
   assert.equal(await page.$(".mst-review"), null, "no review ask after 1 listing");
   // Seed from an extension page (the page's main world has no chrome.storage).
   const seedPage = async (fn) => {
@@ -445,14 +542,9 @@ try {
   await seedPage(() => chrome.storage.local.set({ "mst:cost:MLM1": 10, "mst:cost:MLM2": 20 }));
   await page.reload({ waitUntil: "load" });
   await page.waitForSelector("#mst-card-root", { visible: true, timeout: 20000 });
-  await page.waitForSelector(".mst-review", { timeout: 5000 });
-  assert.ok((await page.$eval(".mst-review__link", (a) => a.href)).endsWith("/reviews"));
-  await page.click(".mst-review__close");
-  await page.reload({ waitUntil: "load" });
-  await page.waitForSelector("#mst-card-root", { visible: true, timeout: 20000 });
-  await sleep(500);
-  assert.equal(await page.$(".mst-review"), null, "dismissed review ask stays gone");
-  pass("review ask appears after 3 used listings, links to reviews, dismiss is permanent");
+  await sleep(600);
+  assert.equal(await page.$(".mst-review"), null, "expired trial: never asked for a review");
+  pass("review ask never shown to an expired-trial user (3 used listings)");
   await seedPage(() => chrome.storage.local.remove(["mst:cost:MLM1", "mst:cost:MLM2"]));
 
   if (process.env.E2E_SHOTS) {
@@ -598,8 +690,21 @@ try {
     () => !document.getElementById("empty-note")?.hidden,
     { timeout: 10000 }
   );
-  assert.equal(await dash.$eval("#table", (e) => e.hidden), true);
-  pass("dashboard empty-state shows when no products saved");
+  const emptyState = await dash.evaluate(() => ({
+    note: document.getElementById("empty-note").textContent,
+    open: (() => { const a = document.getElementById("empty-open"); return { hidden: a.hidden, href: a.href, text: a.textContent }; })(),
+    rows: document.querySelectorAll("#rows tr").length,
+    example: document.querySelector("#rows tr.example td")?.textContent ?? "",
+    upsellHidden: document.getElementById("upsell").hidden,
+    exportHidden: document.getElementById("export-btn").hidden
+  }));
+  assert.equal(emptyState.note, "Guarda el costo en cualquier publicación y aparecerá aquí");
+  assert.deepEqual(emptyState.open, { hidden: false, href: "https://www.mercadolibre.com.mx/", text: "Abrir Mercado Libre" });
+  assert.equal(emptyState.rows, 1, "one sample row");
+  assert.ok(emptyState.example.startsWith("Ejemplo"), `sample row: ${emptyState.example}`);
+  assert.equal(emptyState.upsellHidden, true, "no PRO pitch on an empty table");
+  assert.equal(emptyState.exportHidden, true);
+  pass("dashboard empty-state: one 'Ejemplo' row, 'Abrir Mercado Libre', 'Guarda el costo en cualquier publicación y aparecerá aquí', no PRO pitch");
   await dash.evaluate(async (snap) => chrome.storage.local.set(snap), saved);
 
   // ====================== PHASE 3: product page, Pro ========================
@@ -615,7 +720,7 @@ try {
     await Promise.all(tabs.map((t) => chrome.tabs.sendMessage(t.id, { type: "proChanged" }).catch(() => null)));
   });
   await page.waitForFunction(
-    () => document.querySelector("#mst-card-root") && document.querySelectorAll(".mst-prochip").length === 0 && !document.querySelector(".mst-card input.mst-input")?.disabled,
+    () => document.querySelector("#mst-card-root") && document.querySelectorAll(".mst-prochip").length === 0 && !document.querySelectorAll(".mst-card input.mst-input")[1]?.disabled,
     { timeout: 10000 }
   );
   pass("after payment broadcast the open listing rebuilds as PRO (no chips, what-if unlocked) without reload");
@@ -640,10 +745,10 @@ try {
     console.log("  phase-3 diagnostics:", JSON.stringify(diag));
     throw err;
   }
-  assert.equal(await page.$eval(".mst-card input", (i) => i.disabled), false);
+  assert.equal(await page.$$eval(".mst-card input.mst-input", (i, k) => i[k].disabled, IDX.price), false);
   pass("what-if price editable when Pro");
 
-  await typeInto(page, 0, "280");
+  await typeInto(page, IDX.price, "280");
   assert.equal(await page.evaluate(rowValue("Comisión")), "−$28.00");
   assert.equal(await page.evaluate(rowValue("Costo fijo")), "−$37.00");
   assert.equal(await page.evaluate(rowValue("Recibes aprox.")), "$165.00");
@@ -667,11 +772,11 @@ try {
 
   await page.click(".mst-sweetspot");
   await sleep(300);
-  assert.equal(await page.$eval(".mst-card input", (i) => i.value), "299.00");
+  assert.equal(await page.$$eval(".mst-card input.mst-input", (i, k) => i[k].value, IDX.price), "299.00");
   assert.equal(await page.evaluate(rowValue("Recibes aprox.")), "$219.10");
   await page.click(".mst-reset");
   await sleep(300);
-  assert.equal(await page.$eval(".mst-card input", (i) => i.value), "827.00");
+  assert.equal(await page.$$eval(".mst-card input.mst-input", (i, k) => i[k].value, IDX.price), "827.00");
   pass("nudge applies $299 (net $219.10), reset restores $827");
 
   await page.click(".mst-compare-toggle");
@@ -684,11 +789,38 @@ try {
 
   // PRO shows the target price by default at 30% as soon as a cost exists.
   assert.equal(await page.evaluate(rowValue("Precio para ganar 30%")), "$750.00");
-  pass("PRO target price visible by default at 30% margin ($750.00)");
-  // inputs (pro): 0 price, 1 shipping, 2 cost, 3 ventas, 4 margin
-  await typeInto(page, 4, "20");
+  assert.equal(await page.$eval(".mst-summary__pro", (e) => (e.hidden ? "" : e.textContent)), "PRO: a $750.00 ganas el 30%");
+  pass("PRO target price visible by default at 30% margin ($750.00) + 'PRO: a $750.00 ganas el 30%' under the summary");
+  // Review ask (v1.5.5): paid PRO with 3+ used listings → shown once,
+  // links to the store reviews, dismiss is permanent.
+  {
+    const seedExt = async (fn) => {
+      const ext = await browser.newPage();
+      await ext.goto(`chrome-extension://${extId}/src/options/options.html`, { waitUntil: "load" });
+      await ext.evaluate(fn);
+      await ext.close();
+      await page.bringToFront();
+    };
+    await seedExt(() => chrome.storage.local.set({ "mst:cost:MLM1": 10, "mst:cost:MLM2": 20 }));
+    await page.reload({ waitUntil: "load" });
+    await page.waitForSelector("#mst-card-root", { visible: true, timeout: 20000 });
+    await page.waitForSelector(".mst-review", { timeout: 5000 });
+    assert.ok((await page.$eval(".mst-review__link", (a) => a.href)).endsWith("/reviews"));
+    await page.click(".mst-review__close");
+    await page.reload({ waitUntil: "load" });
+    await page.waitForSelector("#mst-card-root", { visible: true, timeout: 20000 });
+    await sleep(500);
+    assert.equal(await page.$(".mst-review"), null, "dismissed review ask stays gone");
+    pass("review ask (paid PRO) appears after 3 used listings, links to reviews, dismiss is permanent");
+    await seedExt(() => chrome.storage.local.remove(["mst:cost:MLM1", "mst:cost:MLM2"]));
+    await page.reload({ waitUntil: "load" });
+    await page.waitForSelector("#mst-card-root", { visible: true, timeout: 20000 });
+    await page.waitForFunction(() => document.querySelectorAll(".mst-card input.mst-input").length >= 5, { timeout: 10000 });
+  }
+  // inputs (pro): 0 cost, 1 price, 2 shipping, 3 ventas, 4 margin
+  await typeInto(page, IDX.margin, "20");
   assert.equal(await page.evaluate(rowValue("Precio para ganar 20%")), "$642.86");
-  await typeInto(page, 3, "10");
+  await typeInto(page, IDX.sales, "10");
   assert.equal(await page.evaluate(rowValue("Ganancia mensual")), "$2,943.00");
   pass("Pro solver $642.86 + ventas 10 → ganancia mensual $2,943.00");
 
@@ -700,7 +832,7 @@ try {
   pass("margin-health dot is green at 35.59% margin");
 
   // Negative profit → clear "Pierdes" framing + red health (feature 5/7).
-  await typeInto(page, 2, "900"); // cost above net → loss
+  await typeInto(page, IDX.cost, "900"); // cost above net → loss
   const lossText = await page.evaluate(rowValue("Ganancia"));
   assert.ok(lossText.startsWith("Pierdes"), `expected loss framing, got: ${lossText}`);
   assert.equal(await page.$eval(".mst-row--profit", (e) => e.dataset.health), "red");
@@ -709,7 +841,7 @@ try {
     true
   );
   pass('negative profit shows red "Pierdes …" framing');
-  await typeInto(page, 2, "400"); // restore
+  await typeInto(page, IDX.cost, "400"); // restore
 
   // ====================== PHASE 4: search page, Pro =========================
   if (process.env.E2E_SHOTS) {
@@ -756,20 +888,20 @@ try {
   await sleep(200);
 
   // Weight select never overwrites a typed shipping value; fills it when empty.
-  assert.equal(await page.$$eval(".mst-card input.mst-input", (i) => i[1].value), "50.00");
+  assert.equal(await page.$$eval(".mst-card input.mst-input", (i, k) => i[k].value, IDX.ship), "50.00");
   await setSelect("Peso (para estimar el envío)", "1");
-  assert.equal(await page.$$eval(".mst-card input.mst-input", (i) => i[1].value), "50.00");
+  assert.equal(await page.$$eval(".mst-card input.mst-input", (i, k) => i[k].value, IDX.ship), "50.00");
   pass("weight select keeps the seller's typed shipping ($50.00)");
   // v1.5.3: the autofill reads the official amarilla / sin reputación table at
   // the $499–998.99 band of this $827 listing (v1.5.2: verde $299 column
   // 56.00 / 59.60).
-  await typeInto(page, 1, "0");
+  await typeInto(page, IDX.ship, "0");
   await setSelect("Peso (para estimar el envío)", "0.5");
-  assert.equal(await page.$$eval(".mst-card input.mst-input", (i) => i[1].value), "84.00");
+  assert.equal(await page.$$eval(".mst-card input.mst-input", (i, k) => i[k].value, IDX.ship), "84.00");
   await setSelect("Peso (para estimar el envío)", "1");
-  assert.equal(await page.$$eval(".mst-card input.mst-input", (i) => i[1].value), "89.40");
+  assert.equal(await page.$$eval(".mst-card input.mst-input", (i, k) => i[k].value, IDX.ship), "89.40");
   pass("weight select autofills shipping when empty and keeps tracking weight until the seller types (0.5 kg $84.00 → 1 kg $89.40, sin reputación, $499 band)");
-  await typeInto(page, 1, "50");
+  await typeInto(page, IDX.ship, "50");
 
   // Category select changes the commission.
   assert.equal(await page.evaluate(rowValue("Comisión")), "−$82.70");
@@ -790,19 +922,19 @@ try {
   await setSelect("Reputación del vendedor", "verde");
   assert.equal(await page.evaluate(rowValue("Descuento por reputación")), "", "typed shipping gets no discount row");
   assert.equal(await page.evaluate(rowValue("Recibes aprox.")), "$694.30"); // 827 − 82.70 − 50 typed, untouched by verde
-  await typeInto(page, 1, "0"); // clear the typed cost: the 1 kg estimate refills from the verde table
+  await typeInto(page, IDX.ship, "0"); // clear the typed cost: the 1 kg estimate refills from the verde table
   await setSelect("Peso (para estimar el envío)", "1");
-  assert.equal(await page.$$eval(".mst-card input.mst-input", (i) => i[1].value), "74.50"); // verde, 1 kg, $499–998.99
+  assert.equal(await page.$$eval(".mst-card input.mst-input", (i, k) => i[k].value, IDX.ship), "74.50"); // verde, 1 kg, $499–998.99
   assert.equal(await page.evaluate(rowValue("Descuento por reputación")), "Ya incluido en la tabla (50%)");
   await setSelect("Reputación del vendedor", "naranja");
-  assert.equal(await page.$$eval(".mst-card input.mst-input", (i) => i[1].value), "149.00"); // naranja, 1 kg, $499–998.99
+  assert.equal(await page.$$eval(".mst-card input.mst-input", (i, k) => i[k].value, IDX.ship), "149.00"); // naranja, 1 kg, $499–998.99
   assert.equal(await page.evaluate(rowValue("Descuento por reputación")), "", "no discount in the naranja table");
   assert.equal(await page.evaluate(rowValue("Recibes aprox.")), "$595.30"); // 827 − 82.70 − 149
   await setSelect("Reputación del vendedor", "none");
-  assert.equal(await page.$$eval(".mst-card input.mst-input", (i) => i[1].value), "89.40"); // amarilla / sin reputación
+  assert.equal(await page.$$eval(".mst-card input.mst-input", (i, k) => i[k].value, IDX.ship), "89.40"); // amarilla / sin reputación
   assert.equal(await page.evaluate(rowValue("Descuento por reputación")), "Ya incluido en la tabla (40%)");
   pass("reputation picks the official table: typed $50 stays $50 (no row); 1 kg estimate verde $74.50 (50% incluido) → naranja $149.00 (no row) → sin reputación $89.40 (40% incluido)");
-  await typeInto(page, 1, "50");
+  await typeInto(page, IDX.ship, "50");
   await page.click(".mst-free-toggle");
   await sleep(200);
 
@@ -866,8 +998,8 @@ try {
   await page.goto(PRODUCT_URL, { waitUntil: "load" });
   await page.waitForSelector("#mst-card-root", { visible: true, timeout: 20000 });
   await sleep(500);
-  await typeInto(page, 1, "50");
-  await typeInto(page, 2, "400");
+  await typeInto(page, IDX.ship, "50");
+  await typeInto(page, IDX.cost, "400");
 
   // Dashboard: header sort + editable sales persist.
   const dash2 = await browser.newPage();
@@ -1070,7 +1202,7 @@ try {
   await spaNavigate("1,499", "00", "1499", "/otro-celular/p/MLM99999999");
   // URL poll (≤1s) + teardown + settle (~650ms) + re-route.
   await page.waitForFunction(
-    () => document.querySelector(".mst-card input.mst-input")?.value === "1499.00",
+    () => document.querySelectorAll(".mst-card input.mst-input")[1]?.value === "1499.00",
     { timeout: 15000, polling: 250 }
   );
   assert.equal(await page.$$eval(".mst-card", (els) => els.length), 1);
@@ -1081,8 +1213,8 @@ try {
   const bInputs = await page.$$eval(".mst-card input.mst-input", (els) =>
     els.map((i) => i.value)
   );
-  assert.equal(bInputs[2], "", `cost leaked across SPA nav: ${bInputs}`);
-  assert.equal(bInputs[3], "", `ventas leaked across SPA nav: ${bInputs}`);
+  assert.equal(bInputs[IDX.cost], "", `cost leaked across SPA nav: ${bInputs}`);
+  assert.equal(bInputs[IDX.sales], "", `ventas leaked across SPA nav: ${bInputs}`);
   const bStored = await dash.evaluate(() =>
     chrome.storage.local.get(["mst:cost:MLM99999999", "mst:sales:MLM99999999"])
   );
@@ -1092,7 +1224,7 @@ try {
   // Page re-render wipes the card → persistence watcher re-injects it.
   await page.evaluate(() => document.getElementById("mst-card-root").remove());
   await page.waitForFunction(
-    () => document.querySelector(".mst-card input.mst-input")?.value === "1499.00",
+    () => document.querySelectorAll(".mst-card input.mst-input")[1]?.value === "1499.00",
     { timeout: 5000, polling: 200 }
   );
   pass("card wiped by page re-render → re-injected with the same product's data");
@@ -1102,7 +1234,7 @@ try {
   await page.waitForFunction(
     () => {
       const inputs = document.querySelectorAll(".mst-card input.mst-input");
-      return inputs[0]?.value === "827.00" && inputs[2]?.value === "400.00";
+      return inputs[1]?.value === "827.00" && inputs[0]?.value === "400.00"; // price, cost
     },
     { timeout: 15000, polling: 250 }
   );
@@ -1195,7 +1327,7 @@ try {
   const nometa = tap(await browser.newPage(), "nometa");
   await nometa.goto(`${PRODUCT_URL}?e2e=nometa`, { waitUntil: "load" });
   await nometa.waitForSelector("#mst-card-root", { visible: true, timeout: 20000 });
-  assert.equal(await nometa.$eval(".mst-card input.mst-input", (i) => i.value), "827.00");
+  assert.equal(await nometa.$$eval(".mst-card input.mst-input", (i, k) => i[k].value, IDX.price), "827.00");
   assert.equal(await nometa.evaluate(rowValue("Comisión")), "−$82.70");
   pass("promo listing without meta: reads $827.00, skips hidden dup + crossed-out $1,199");
   await nometa.close();
@@ -1245,7 +1377,7 @@ try {
     frac.textContent = "799";
   });
   await upPage.waitForFunction(
-    () => document.querySelectorAll(".mst-card input.mst-input")[0]?.value === "799.00",
+    () => document.querySelectorAll(".mst-card input.mst-input")[1]?.value === "799.00",
     { timeout: 6000, polling: 200 }
   );
   assert.equal(await upPage.evaluate(rowValue("Comisión")), "−$79.90");
@@ -1293,7 +1425,7 @@ try {
   console.log("\nPHASE 10 — ANALYTICS (dormant by default, mock backend, allowlist, opt-out)");
   // Mock Supabase REST endpoint with CORS (what the service worker will meet).
   const received = [];
-  const mock = createHttpServer((req, res) => {
+  mock = createHttpServer((req, res) => {
     const cors = {
       "access-control-allow-origin": "*",
       "access-control-allow-headers": "apikey, authorization, content-type, prefer",
@@ -1322,14 +1454,15 @@ try {
   // Known state: never-paid, trial long over, no analytics leftovers.
   await ext.evaluate(async () => {
     await chrome.storage.local.remove(["mst:proOverride", "mst:proStatus", "mst:telemetryOverride", "mst:telemetry", "mst:tq", "mst:tlast", "mst:tflags", "mst:tday", "mst:tcounts", "mst:iid", "mst:telemetryNoticeSeen", "mst:metrics"]);
-    await chrome.storage.local.set({ "mst:installedAt": Date.now() - 9 * 24 * 3600 * 1000 });
+    const back = Date.now() - 9 * 24 * 3600 * 1000;
+    await chrome.storage.local.set({ "mst:installedAt": back, "mst:trialStartedAt": back });
   });
 
   // -- dormant: no override, no build config -> not one request, no analytics UI
   const dormantPage = tap(await browser.newPage(), "dormant");
   await dormantPage.goto(PRODUCT_URL, { waitUntil: "load" });
   await dormantPage.waitForSelector("#mst-card-root", { visible: true, timeout: 20000 });
-  await typeInto(dormantPage, 2, "400");
+  await typeInto(dormantPage, IDX.cost, "400");
   await sendMsg({ type: "telemetryFlush" });
   await sleep(500);
   assert.equal(received.length, 0, "dormant build must not contact any analytics endpoint");
@@ -1373,7 +1506,7 @@ try {
   const fp = tap(await browser.newPage(), "funnel");
   await fp.goto(PRODUCT_URL, { waitUntil: "load" });
   await fp.waitForSelector("#mst-card-root", { visible: true, timeout: 20000 });
-  await typeInto(fp, 2, "400");
+  await typeInto(fp, IDX.cost, "400");
   await fp.waitForSelector(".mst-row--teaser", { visible: true });
   await fp.click(".mst-row--teaser");
   await sleep(300);
@@ -1400,7 +1533,11 @@ try {
     for (const v of Object.values(r.props)) assert.match(String(v), /^[a-z0-9._:+-]{1,24}$/);
   }
   assert.equal(new Set(all.map((r) => r.install_id)).size, 1, "one random install id");
-  const blob = received.map((r) => r.body).join("\n");
+  // Strip the random install id (a UUID can contain "400", "744"...) and the
+  // Chrome major before scanning for forbidden substrings.
+  const blob = received
+    .map((r) => JSON.stringify(JSON.parse(r.body).map(({ install_id, chrome_major, ...rest }) => rest)))
+    .join("\n");
   for (const bad of ["mercadolibre", "mercadopago", "827", "744", "750", "400", fixtureTitle, "Celular", "MLM", "http", "$"]) {
     assert.ok(!blob.toLowerCase().includes(bad.toLowerCase()), `payload must not contain "${bad}"`);
   }
@@ -1433,7 +1570,7 @@ try {
 
   // -- opt out via the UI: queue cleared, nothing more is sent
   await fp.bringToFront();
-  await typeInto(fp, 2, "401");
+  await typeInto(fp, IDX.cost, "401");
   await ext.bringToFront();
   const sentBefore = received.length;
   await ext.click("#telemetry-enabled");
@@ -1442,7 +1579,7 @@ try {
   assert.equal(st.data.enabled, false);
   assert.equal(st.data.queue, 0, "opt-out clears the queue");
   await fp.bringToFront();
-  await typeInto(fp, 2, "402");
+  await typeInto(fp, IDX.cost, "402");
   await fp.reload({ waitUntil: "load" });
   await fp.waitForSelector("#mst-card-root", { visible: true, timeout: 20000 });
   await sendMsg({ type: "telemetryFlush" });
@@ -1472,7 +1609,8 @@ try {
     await o.goto(`chrome-extension://${extId}/src/options/options.html`, { waitUntil: "load" });
     await o.evaluate(async (hash) => {
       await chrome.storage.local.remove(["mst:proOverride", "mst:proStatus", "mst:ownerKey", "mst:tq", "mst:tday", "mst:tcounts", "mst:iid", "mst:tflags"]);
-      await chrome.storage.local.set({ "mst:installedAt": Date.now() - 9 * 24 * 3600 * 1000, "mst:ownerHashOverride": hash });
+      const back = Date.now() - 9 * 24 * 3600 * 1000;
+      await chrome.storage.local.set({ "mst:installedAt": back, "mst:trialStartedAt": back, "mst:ownerHashOverride": hash });
     }, ownerHash);
 
     // Normal user, trial over: not owner, free status line.
@@ -1536,7 +1674,7 @@ try {
     const op = tap(await browser.newPage(), "owner");
     await op.goto(PRODUCT_URL, { waitUntil: "load" });
     await op.waitForSelector("#mst-card-root", { visible: true, timeout: 20000 });
-    await typeInto(op, 2, "400");
+    await typeInto(op, IDX.cost, "400");
     await sleep(500);
     const ui = await op.evaluate(() => ({
       teaser: document.querySelectorAll(".mst-row--teaser").length,
@@ -1639,5 +1777,6 @@ try {
 } finally {
   await browser.close();
   server.close();
+  mock?.close();
   rmSync(certDir, { recursive: true, force: true });
 }
