@@ -371,6 +371,21 @@
   "csvProfit": {
     "message": "Est. profit (MXN)"
   },
+  "csvCost": {
+    "message": "Cost (MXN)"
+  },
+  "csvCostBasis": {
+    "message": "Cost basis"
+  },
+  "csvAssumedBasis": {
+    "message": "assumed $1%"
+  },
+  "researchAssumedMixed": {
+    "message": "Assumed cost $1% except where you already saved your cost"
+  },
+  "researchActiveMixed": {
+    "message": "Research: cost $1% except where you already saved your cost"
+  },
   "csvMargin": {
     "message": "Est. margin (%)"
   },

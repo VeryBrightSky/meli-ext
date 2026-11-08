@@ -456,6 +456,105 @@ try {
       await linked.close();
       pass("search strips use the saved cost: $827 result shows $252.20 · 30.5% 'tu costo' like the card; no-id result keeps the assumption");
     }
+    // r5 (minor 2): the card's per-listing picks (Premium, 1 kg, a manual
+    // category) are saved per item like the cost; the strip for the same id
+    // must read them too, so its net, profit and margin are the card's:
+    // Premium herramientas 18 % = $148.86, 1 kg at $827 = $89.40 →
+    // net $588.74, profit $175.24, margin 21.19 % (thin).
+    {
+      await first.$$eval(".mst-toggle__btn", (btns) => btns.find((b) => b.textContent === "Premium").click());
+      await first.evaluate(() => {
+        const w = document.querySelector('select[aria-label="Peso (para estimar el envío)"]');
+        w.value = "1";
+        w.dispatchEvent(new Event("change", { bubbles: true }));
+        const c = document.querySelector('select[aria-label="Categoría"]');
+        c.value = "tools";
+        c.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+      await first.waitForFunction(() => (document.querySelector(".mst-summary__profit")?.textContent ?? "").includes("$175.24"), { timeout: 3000, polling: 50 });
+      const cardNet = await first.evaluate(rowValue("Recibes aprox."));
+      const cardProfit = await first.$eval(".mst-summary__profit", (e) => e.textContent);
+      assert.equal(cardNet, "$588.74", cardNet);
+      assert.equal(cardProfit, "Ganancia $175.24 · 21.19%", cardProfit);
+      // The picks are persisted per item (read from an extension page: the
+      // product page's main world has no chrome.storage).
+      await seed.waitForFunction(
+        async () => {
+          const s = await chrome.storage.local.get(["mst:type:MLM12345678", "mst:weight:MLM12345678", "mst:catpick:MLM12345678"]);
+          return s["mst:type:MLM12345678"] === "premium" && s["mst:weight:MLM12345678"] === 1 && s["mst:catpick:MLM12345678"] === "tools";
+        },
+        { timeout: 3000, polling: 100 }
+      );
+      const linked = await browser.newPage();
+      await linked.goto(`${SEARCH_URL}?linked`, { waitUntil: "load" });
+      await linked.waitForFunction(() => document.querySelectorAll(".mst-strip").length === 3, { timeout: 20000, polling: 100 });
+      const strip = await linked.$eval(".mst-strip", (e) => ({
+        id: e.dataset.itemId ?? null,
+        saved: e.dataset.savedCost ?? null,
+        bucket: e.dataset.bucket,
+        profit: e.querySelector(".mst-strip__verdict b")?.textContent ?? null,
+        margin: e.querySelector(".mst-strip__margin")?.textContent ?? null,
+        basis: e.querySelector(".mst-strip__assumed")?.textContent ?? null
+      }));
+      assert.deepEqual(strip, { id: "MLM12345678", saved: "413.5", bucket: "thin", profit: "$175.24", margin: "21.19%", basis: "tu costo" }, JSON.stringify(strip));
+      assert.equal(`Ganancia ${strip.profit} · ${strip.margin}`, cardProfit, "strip profit/margin = card profit/margin");
+      await linked.click(".mst-strip__bar");
+      await linked.waitForFunction(() => !document.querySelector(".mst-strip__panel").hidden, { timeout: 2000 });
+      const rows = await linked.$eval(".mst-strip__panel", (p) =>
+        Object.fromEntries([...p.querySelectorAll(".mst-strip__row")].map((r) => [r.querySelector(".mst-strip__label").textContent, r.querySelector(".mst-strip__value").textContent]))
+      );
+      assert.equal(rows["Tipo (estimado)"], "Premium", JSON.stringify(rows));
+      assert.equal(rows["Categoría"], "Herramientas", JSON.stringify(rows));
+      assert.equal(rows["Comisión (18%)"], "−$148.86", JSON.stringify(rows));
+      assert.equal(rows["Envío estimado (hasta 1 kg)"], "−$89.40", JSON.stringify(rows));
+      assert.equal(rows["Recibes aprox."], cardNet, JSON.stringify(rows));
+      assert.equal(rows["Ganancia (tu costo: $413.50)"], "$175.24", JSON.stringify(rows));
+      // The second result has no picks saved: still the page guess, the
+      // breadcrumb category and the 0.3 kg bracket.
+      const second = await linked.$$eval(".mst-strip", (els) => {
+        const e = els[1];
+        e.querySelector(".mst-strip__bar").click();
+        return Object.fromEntries([...e.querySelectorAll(".mst-strip__row")].map((r) => [r.querySelector(".mst-strip__label").textContent, r.querySelector(".mst-strip__value").textContent]));
+      });
+      assert.equal(second["Categoría"], "Tecnología y electrónica", JSON.stringify(second));
+      assert.equal(Object.keys(second).some((k) => k.includes("hasta 1 kg")), false, JSON.stringify(second));
+      // r5 (minor 3): the bar names the mixed basis once a strip uses a saved
+      // cost, and the CSV carries the cost each profit came from and whether
+      // it is the seller's own or the assumption.
+      assert.equal(
+        await linked.$eval(".mst-export__research", (e) => e.textContent),
+        "Costo supuesto 60% salvo donde ya guardaste tu costo"
+      );
+      const dlDirR5 = mkdtempSync(join(tmpdir(), "meli-e2e-dl-"));
+      const cdpR5 = await linked.createCDPSession();
+      await cdpR5.send("Browser.setDownloadBehavior", { behavior: "allow", downloadPath: dlDirR5 });
+      await linked.click(".mst-export__btn");
+      let csvR5 = null;
+      for (let i = 0; i < 50 && !csvR5; i++) {
+        await sleep(100);
+        csvR5 = readdirSync(dlDirR5).find((f) => f.endsWith(".csv"));
+      }
+      assert.ok(csvR5, "CSV download with a saved cost");
+      const csvLines = readFileSync(join(dlDirR5, csvR5), "utf8").replace(/^\ufeff/, "").split("\r\n");
+      rmSync(dlDirR5, { recursive: true, force: true });
+      assert.ok(csvLines[0].endsWith(",Neto mín. (MXN),Neto máx. (MXN),Costo (MXN),Base del costo,Ganancia est. (MXN),Margen est. (%)"), csvLines[0]);
+      assert.ok(csvLines[1].includes(",Premium,Herramientas,") && csvLines[1].endsWith(",588.74,588.74,413.50,tu costo,175.24,21.2"), csvLines[1]);
+      assert.match(csvLines[2], /,72\.00,supuesto 60%,-?\d+\.\d{2},-?\d+\.\d$/, csvLines[2]); // $120 result: 60 % = $72
+      await linked.close();
+      // Back to the card's defaults so the phases below see the r4 numbers.
+      await first.$$eval(".mst-toggle__btn", (btns) => btns.find((b) => b.textContent === "Clásica").click());
+      await first.evaluate(() => {
+        const w = document.querySelector('select[aria-label="Peso (para estimar el envío)"]');
+        w.value = "";
+        w.dispatchEvent(new Event("change", { bubbles: true }));
+        const c = document.querySelector('select[aria-label="Categoría"]');
+        c.value = "tech";
+        c.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+      await first.waitForFunction(() => (document.querySelector(".mst-summary__profit")?.textContent ?? "").includes("$252.20"), { timeout: 3000, polling: 50 });
+      await seed.evaluate(async () => chrome.storage.local.remove(["mst:type:MLM12345678", "mst:weight:MLM12345678", "mst:catpick:MLM12345678"]));
+      pass("per-item picks reach the strip: Premium + 1 kg + Herramientas on the card → the same result's strip shows $588.74 net, $175.24 · 21.19% like the card");
+    }
     // r3 (major 7): the banner button opens the plan panel (yearly first,
     // "ahorras $369"; monthly "$89 al mes (menos de $3 al día)"), never a
     // bare "$89/mes" checkout.
@@ -1433,7 +1532,7 @@ try {
     "Exportar a CSV (3)"
   );
   const research = await search.$eval(".mst-export__research", (e) => e.textContent);
-  assert.ok(research.includes("60"), research);
+  assert.equal(research, "Modo investigación: costo 60% del precio", research);
   const dlDir = mkdtempSync(join(tmpdir(), "meli-e2e-dl-"));
   const cdp = await search.createCDPSession();
   await cdp.send("Browser.setDownloadBehavior", { behavior: "allow", downloadPath: dlDir });
@@ -1449,7 +1548,8 @@ try {
   const lines = csv.replace(/^﻿/, "").split("\r\n");
   assert.equal(lines.length, 4);
   assert.ok(lines[0].startsWith("Título,"), lines[0]);
-  assert.ok(lines[1].includes("827.00") && lines[1].includes("Clásica"), lines[1]);
+  assert.ok(lines[0].includes(",Costo (MXN),Base del costo,Ganancia est. (MXN),Margen est. (%)"), lines[0]);
+  assert.ok(lines[1].includes("827.00") && lines[1].includes("Clásica") && lines[1].includes(",496.20,supuesto 60%,"), lines[1]);
   assert.ok(lines[2].includes("120.00") && lines[2].includes("Premium"), lines[2]);
   pass("CSV export (Pro): real download, header + 3 rows");
 

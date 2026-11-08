@@ -6,7 +6,7 @@ Texto para "Novedades" de la Chrome Web Store (primer bloque) y registro interno
 
 - Envío con tablas oficiales. El costo de envío estimado sale de las tablas publicadas por Mercado Libre según tu reputación (verde/MercadoLíder, amarilla o sin reputación, naranja/roja), con las bandas de precio $299, $499 y $999. La bonificación por reputación ya viene incluida en la tabla; no se descuenta nada encima.
 - La prueba PRO de 7 días empieza cuando guardas tu primer costo, no al instalar. Así los 7 días se usan calculando ganancias reales.
-- El Radar de rentabilidad en las búsquedas ahora descuenta el envío igual que la calculadora y usa tu costo guardado cuando ya lo tienes para esa publicación (etiqueta "tu costo"). Sin costo guardado sigue usando el costo supuesto que configures (60% por defecto).
+- El Radar de rentabilidad en las búsquedas ahora descuenta el envío igual que la calculadora y, para las publicaciones donde ya guardaste datos en la tarjeta, usa tu costo (etiqueta "tu costo"), tu tipo de publicación, tu categoría y tu peso. Para el resto sigue usando el costo supuesto que configures (60% por defecto), el tipo que se detecta en el resultado, la categoría de la búsqueda y el peso mínimo (0.3 kg); la barra lo dice cuando hay mezcla de ambos. El CSV incluye el costo usado en cada fila y si fue tu costo o el supuesto.
 - Publicidad: escribe tu % de Mercado Ads por producto y se descuenta de la ganancia, del margen y de todos los precios calculados (PRO).
 - Costo máximo: cuánto puedes pagar por una unidad para ganar tu margen al precio actual de la publicación (PRO).
 - Idioma: español por defecto; inglés disponible desde las opciones.
@@ -29,8 +29,10 @@ Texto para "Novedades" de la Chrome Web Store (primer bloque) y registro interno
 ### Radar en búsquedas
 
 - Cada tira paga el mismo envío que la tarjeta para esa publicación.
-- Los costos guardados (`mst:cost:<id>`) y el % de publicidad (`mst:ads:<id>`, solo PRO) de todos los resultados nuevos se leen en una sola lectura de `storage.local` por pasada. El id del resultado se normaliza igual que en la tarjeta (`/p/MLM…`, `/up/MLMU…`, `/MLM-…`), así una página de catálogo y su resultado comparten la misma clave.
-- Con costo guardado, la ganancia y el margen de la tira son los de la tarjeta y la tira dice "tu costo". Sin id en el enlace, la tira usa el costo supuesto con su etiqueta de siempre.
+- Los valores guardados por publicación (`mst:cost:<id>`, `mst:ads:<id>` solo PRO, `mst:type:<id>`, `mst:catpick:<id>`, `mst:weight:<id>`) de todos los resultados nuevos se leen en una sola lectura de `storage.local` por pasada. El id del resultado se normaliza igual que en la tarjeta y solo con formas de publicación (`/p/MLM…`, `/up/MLMU…`, `/MLM-123-…` al inicio de la ruta, `pdp_filters=item_id:`); un enlace de categoría (`/c/MLM1648`) no produce id.
+- Con datos guardados, la tira calcula con el tipo, la categoría y el peso de la tarjeta, y con costo guardado su ganancia y margen son los de la tarjeta ("tu costo"). Sin ellos usa el tipo detectado en el resultado, la categoría de la búsqueda, 0.3 kg y el costo supuesto. Lo que la tira NO toma: el tipo de publicación predeterminado de opciones (solo el guardado por publicación o el detectado en el resultado); ahí la tira y la tarjeta pueden diferir.
+- La barra PRO dice "Costo supuesto X% salvo donde ya guardaste tu costo" cuando al menos una tira de la página usa un costo guardado; si ninguna lo usa, el texto de siempre.
+- El CSV (PRO) agrega las columnas "Costo (MXN)" y "Base del costo" ("tu costo" o "supuesto X%") antes de la ganancia y el margen, así cada fila dice de qué costo salió su ganancia.
 
 ### Tarjeta
 

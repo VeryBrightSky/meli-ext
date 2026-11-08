@@ -35,25 +35,37 @@ globalThis.MST_QUICKVIEW = (() => {
   // the reputation's table wherever shipping applies (from $299 it is
   // mandatory; below it only when the seller offers free shipping). This is
   // card.js shipAt() for a listing with no weight chosen.
-  function shippingFor(priceMXN) {
+  function shippingFor(priceMXN, weightKg = STRIP_WEIGHT_KG) {
     if (shipSettings.configured) return shipSettings.value;
     const applies = shipSettings.freeShipping || priceMXN >= SOURCE.freeShippingThresholdMXN;
     if (!applies) return 0;
     const DASH = globalThis.MST_DASH;
-    const cost = DASH ? DASH.estimatedShipping(STRIP_WEIGHT_KG, priceMXN, shipSettings.reputationId) : 0;
+    const cost = DASH ? DASH.estimatedShipping(weightKg, priceMXN, shipSettings.reputationId) : 0;
     return cost > 0 ? cost : 0;
   }
 
-  // Saved per-listing values (r4): the cost the seller typed on the card for
-  // this very listing (`<prefix>:cost:<id>`) and, for PRO, its ads % — read
-  // in ONE storage.local.get per scan pass for every new result on the page.
-  //   itemId → { costMXN, adsPct }  saved cost
-  //   itemId → null                 looked up, nothing saved
+  // Saved per-listing values (r4, r5): what the seller set on the card for
+  // this very listing, read in ONE storage.local.get per scan pass for every
+  // new result on the page:
+  //   `<prefix>:cost:<id>`     product cost (the Radar's own-cost basis)
+  //   `<prefix>:ads:<id>`      ads % (PRO only, like the card)
+  //   `<prefix>:type:<id>`     Clásica/Premium toggle (beats the page guess)
+  //   `<prefix>:catpick:<id>`  manual category pick (beats the breadcrumb)
+  //   `<prefix>:weight:<id>`   weight bracket (shipping estimate, Full fees)
+  //   itemId → { costMXN, adsPct, listingTypeId, categoryGroupId, weightKg }
+  //   itemId → null            looked up, nothing saved
   // Cleared by destroy(); a fresh page re-reads storage.
   let savedByItem = new Map();
   let lookupInFlight = false;
+  const SAVED_KINDS = ["cost", "ads", "type", "catpick", "weight"];
 
-  const savedFor = (data) => (data.itemId ? savedByItem.get(data.itemId) ?? null : null);
+  const recordFor = (data) => (data.itemId ? savedByItem.get(data.itemId) ?? null : null);
+  // The record only when it carries a saved COST: that is what turns the
+  // strip's profit into the card's own ("tu costo") instead of the assumption.
+  const savedFor = (data) => {
+    const rec = recordFor(data);
+    return rec && rec.costMXN > 0 ? rec : null;
+  };
 
   // Ads only count where the card counts them: on the PRO card (the free card
   // hides the input and ignores a saved value).
@@ -61,7 +73,7 @@ globalThis.MST_QUICKVIEW = (() => {
 
   async function lookupSaved(ids, token) {
     const keys = [];
-    for (const id of ids) keys.push(`${PREFIX}:cost:${id}`, `${PREFIX}:ads:${id}`);
+    for (const id of ids) for (const kind of SAVED_KINDS) keys.push(`${PREFIX}:${kind}:${id}`);
     let stored = {};
     try {
       stored = (await chrome.storage.local.get(keys)) ?? {};
@@ -70,24 +82,37 @@ globalThis.MST_QUICKVIEW = (() => {
       // the assumed cost
     }
     if (token !== initToken) return;
+    const groups = SOURCE.listCategoryGroups();
     for (const id of ids) {
       const costMXN = CALC.parseMoney(stored[`${PREFIX}:cost:${id}`] ?? 0);
       const adsPct = Math.min(CALC.parseMoney(stored[`${PREFIX}:ads:${id}`] ?? 0), 99);
-      savedByItem.set(id, costMXN > 0 ? { costMXN, adsPct } : null);
+      const type = stored[`${PREFIX}:type:${id}`];
+      const listingTypeId = type === "premium" || type === "classic" ? type : null;
+      const pick = stored[`${PREFIX}:catpick:${id}`];
+      const categoryGroupId = typeof pick === "string" && groups.some((g) => g.id === pick) ? pick : null;
+      const weightKg = CALC.parseMoney(stored[`${PREFIX}:weight:${id}`] ?? 0);
+      const any = costMXN > 0 || listingTypeId || categoryGroupId || weightKg > 0;
+      savedByItem.set(id, any ? { costMXN, adsPct, listingTypeId, categoryGroupId, weightKg } : null);
     }
   }
 
-  // Quote + breakdown for one result, with the same inputs the card uses:
-  // its saved cost and ads % when the seller has them, so the strip's net,
-  // profit and margin are the card's for the same listing.
+  // Quote + breakdown for one result, with the same inputs the card uses for
+  // the same listing: its saved listing type, category pick and weight when
+  // the seller set them (else the page guess, the breadcrumb category and the
+  // smallest bracket), plus its saved cost and ads %, so the strip's net,
+  // profit and margin are the card's.
   function breakdownFor(data) {
+    const rec = recordFor(data);
+    const listingTypeId = rec?.listingTypeId ?? data.listingTypeGuess;
+    const categoryGroupId = rec?.categoryGroupId ?? pageCategoryGroupId;
+    const weightKg = rec && rec.weightKg > 0 ? rec.weightKg : STRIP_WEIGHT_KG;
     const quote = SOURCE.getQuote({
       priceMXN: data.priceMXN,
-      listingTypeId: data.listingTypeGuess,
-      categoryGroupId: pageCategoryGroupId,
-      fullWeightKg: shipSettings.usesFull ? STRIP_WEIGHT_KG : null
+      listingTypeId,
+      categoryGroupId,
+      fullWeightKg: shipSettings.usesFull ? weightKg : null
     });
-    const shipping = shippingFor(data.priceMXN);
+    const shipping = shippingFor(data.priceMXN, weightKg);
     const saved = savedFor(data);
     const b = CALC.computeBreakdown(quote, {
       priceMXN: data.priceMXN,
@@ -95,7 +120,7 @@ globalThis.MST_QUICKVIEW = (() => {
       productCostMXN: saved ? saved.costMXN : 0,
       adsPct: adsPctFor(saved)
     });
-    return { quote, b, shipping, saved };
+    return { quote, b, shipping, saved, listingTypeId, categoryGroupId, weightKg };
   }
 
   // Per-init lifecycle state (torn down by destroy() on SPA navigation).
@@ -288,7 +313,7 @@ globalThis.MST_QUICKVIEW = (() => {
     // Net INCLUDES the seller's shipping (r3): the same estimate the card
     // shows for this listing, so the strip, the Radar verdict and the card
     // never disagree about one product.
-    const { quote, b, shipping, saved } = breakdownFor(data);
+    const { quote, b, shipping, saved, listingTypeId, weightKg } = breakdownFor(data);
 
     const strip = el("div", STRIP_CLASS);
     if (data.itemId) strip.dataset.itemId = data.itemId;
@@ -350,7 +375,7 @@ globalThis.MST_QUICKVIEW = (() => {
     panel.appendChild(
       panelRow(
         T("stripListingType"),
-        data.listingTypeGuess === "premium" ? T("typePremium") : T("typeClassic")
+        listingTypeId === "premium" ? T("typePremium") : T("typeClassic")
       )
     );
     panel.appendChild(
@@ -375,7 +400,7 @@ globalThis.MST_QUICKVIEW = (() => {
     if (shipping > 0) {
       panel.appendChild(
         panelRow(
-          shipSettings.configured ? T("rowShipping") : T("stackShippingEstimate", [String(STRIP_WEIGHT_KG)]),
+          shipSettings.configured ? T("rowShipping") : T("stackShippingEstimate", [String(weightKg)]),
           UI.fmtCharge(shipping)
         )
       );
@@ -432,9 +457,12 @@ globalThis.MST_QUICKVIEW = (() => {
       T("csvNetMin"),
       T("csvNetMax")
     ];
-    if (active) header.push(T("csvProfit"), T("csvMargin"));
-    const groupLabel =
-      SOURCE.listCategoryGroups().find((g) => g.id === pageCategoryGroupId)?.label ?? "";
+    // Radar columns: the cost each profit was computed from and its basis
+    // (the seller's own saved cost, or the assumed % of price), then the
+    // profit and margin. A reader can tell an estimate from a real figure.
+    if (active) header.push(T("csvCost"), T("csvCostBasis"), T("csvProfit"), T("csvMargin"));
+    const groups = SOURCE.listCategoryGroups();
+    const groupLabelOf = (id) => groups.find((g) => g.id === id)?.label ?? "";
 
     // Collect rows as objects so the profitable shortlist can be ranked.
     const rows = [];
@@ -443,14 +471,14 @@ globalThis.MST_QUICKVIEW = (() => {
       if (!item.querySelector(`.${STRIP_CLASS}`)) continue; // export what's shown
       const data = extractItemData(item);
       if (!data.priceMXN) continue;
-      const { b } = breakdownFor(data);
+      const { b, saved, listingTypeId, categoryGroupId } = breakdownFor(data);
       const title =
         item.querySelector("h2, .poly-component__title")?.textContent.trim() ?? "";
       const cells = [
         title,
         UI.csvFixed(b.priceMXN),
-        data.listingTypeGuess === "premium" ? T("typePremium") : T("typeClassic"),
-        groupLabel,
+        listingTypeId === "premium" ? T("typePremium") : T("typeClassic"),
+        groupLabelOf(categoryGroupId),
         data.freeShipping ? T("yes") : T("no"),
         UI.csvFixed(b.commissionMinMXN),
         UI.csvFixed(b.commissionMaxMXN),
@@ -460,9 +488,14 @@ globalThis.MST_QUICKVIEW = (() => {
       ];
       let marginPct = 0;
       if (active) {
-        const evaln = evaluateStrip(data, b);
+        const evaln = evaluateStrip(data, b, saved);
         if (onlyProfitable && evaln.bucket !== "profit") continue; // shortlist
-        cells.push(UI.csvFixed(evaln.profitMXN), UI.csvFixed(evaln.marginPct, 1));
+        cells.push(
+          UI.csvFixed(evaln.acquisitionCostMXN),
+          saved ? T("stripOwnCost") : T("csvAssumedBasis", [String(costPct())]),
+          UI.csvFixed(evaln.profitMXN),
+          UI.csvFixed(evaln.marginPct, 1)
+        );
         marginPct = evaln.marginPct;
       }
       rows.push({ cells, marginPct });
@@ -700,15 +733,7 @@ globalThis.MST_QUICKVIEW = (() => {
       wrap.append(logo, btn);
       if (GATE.isPro()) {
         btn.addEventListener("click", downloadCsv);
-        wrap.appendChild(
-          el(
-            "span",
-            `${PREFIX}-export__research`,
-            acquisitionPct > 0
-              ? T("researchActive", [String(acquisitionPct)])
-              : T("researchAssumed", [String(DEFAULT_ASSUMED_COST_PCT)])
-          )
-        );
+        wrap.appendChild(el("span", `${PREFIX}-export__research`, ""));
       } else {
         const upsell = globalThis.MST_UPSELL.attach(bar);
         upsellOpen = (reason, vars) => upsell.open(reason, vars);
@@ -736,6 +761,22 @@ globalThis.MST_QUICKVIEW = (() => {
     if (radarActive()) reapplyRadar();
     if (radarPreview()) refreshPreviewSummary();
     refreshExportBtn();
+    refreshResearchLabel();
+  }
+
+  // The cost basis line on the PRO bar. The assumption (the seller's % or
+  // the 60 % default) is the page-wide rule; once at least one strip on the
+  // page uses a saved cost the line says so, so the page is never read as
+  // "all assumed" while some verdicts are the seller's own figures.
+  function refreshResearchLabel() {
+    const label = document.querySelector(`.${PREFIX}-export__research`);
+    if (!label) return;
+    const anySaved = document.querySelector(`.${STRIP_CLASS}[data-saved-cost]`) !== null;
+    const pct = String(costPct());
+    let text;
+    if (acquisitionPct > 0) text = T(anySaved ? "researchActiveMixed" : "researchActive", [pct]);
+    else text = T(anySaved ? "researchAssumedMixed" : "researchAssumed", [pct]);
+    if (label.textContent !== text) label.textContent = text;
   }
 
   // The upsell panel (free bar) must stay last so the preview row sits above it.

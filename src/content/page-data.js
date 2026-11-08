@@ -19,7 +19,10 @@ globalThis.MST_PAGE = (() => {
     // Unified product pages: /up/MLMU123…
     const up = pathname.match(/\/up\/(MLMU\d+)/);
     if (up) return up[1];
-    const item = pathname.match(/MLM-?(\d+)/);
+    // Item pages: the path STARTS with /MLM-123-{slug} (articulo. or www.).
+    // Anchored so a category link (/c/MLM1648) or any other path that merely
+    // contains an MLM token never passes for an item id.
+    const item = pathname.match(/^\/MLM-(\d+)(?:[-/]|$)/);
     if (item) return `MLM${item[1]}`;
     const q = new URLSearchParams(search).get("pdp_filters")?.match(/item_id[:%3A]+(MLM\d+)/i);
     if (q) return q[1];
@@ -223,5 +226,5 @@ globalThis.MST_PAGE = (() => {
     return data;
   }
 
-  return Object.freeze({ collect, itemIdFromUrl });
+  return Object.freeze({ collect, itemIdFromUrl, itemIdFromParts });
 })();

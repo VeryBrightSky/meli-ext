@@ -371,6 +371,21 @@
   "csvProfit": {
     "message": "Ganancia est. (MXN)"
   },
+  "csvCost": {
+    "message": "Costo (MXN)"
+  },
+  "csvCostBasis": {
+    "message": "Base del costo"
+  },
+  "csvAssumedBasis": {
+    "message": "supuesto $1%"
+  },
+  "researchAssumedMixed": {
+    "message": "Costo supuesto $1% salvo donde ya guardaste tu costo"
+  },
+  "researchActiveMixed": {
+    "message": "Modo investigación: costo $1% del precio salvo donde ya guardaste tu costo"
+  },
   "csvMargin": {
     "message": "Margen est. (%)"
   },
