@@ -30,7 +30,8 @@ closed in 2024, so live rates require OAuth (planned V2 via the
 ```bash
 npm test            # syntax checks + unit tests (fees, solver, locales)
 npm run build       # stamp manifest from branding.js, refresh dist/
-npm run build:release  # release name (no "(dev)"), CWS zip
+npm run build:release  # release name (no "(dev)"), CWS zip only
+npm run release     # zip + store listing in one folder (see Release)
 npm run icons       # regenerate icon artwork (reproducible, pure stdlib)
 ```
 
@@ -51,15 +52,48 @@ src/content/             content.js (detect/inject/persist), page-data.js,
                          format.js (shared es-MX formatting), content.css
 src/options/             settings page
 src/background/          service worker (V2 API proxy stub)
-scripts/                 build.mjs, gen-icons.py
+scripts/                 build.mjs, release.mjs, cws-publish.mjs, cws-auth.mjs
+store/                   templates/ (listing, privacy tab, upload steps),
+                         assets/ (screenshots, promo tile), SETUP-CWS-API.md
+docs/                    RELEASE-<version>.md (what's new, read by the release)
 tests/                   node --test suite
 ```
+
+## Release
+
+One command produces one folder with everything the Chrome Web Store needs,
+always in sync with the build:
+
+```bash
+npm run release            # build + render release/netio-<version>/
+npm run release:publish    # same, then upload the zip and submit for review
+git checkout manifest.json # the build stamps the store name into it
+```
+
+`release/netio-<version>/` contains `netio-<version>.zip`, `listing-es.md`,
+`listing-en.md`, `privacy-tab.md`, `UPLOAD-STEPS.md`, `assets/` and a Spanish
+`README.txt` that says what to paste where. Version, store name, short
+description and PRO prices come from `src/config/branding.js`; the what's new
+text comes from `docs/RELEASE-<version>.md` (sections "Novedades (Chrome Web
+Store)" and "What's new (Chrome Web Store, English)"); the release fails if
+that file or either section is missing, if a description exceeds the store
+limits, or if any text contains an em dash.
+
+Before releasing: bump `version` in `src/config/branding.js`, `package.json`
+and `manifest.json`, write `docs/RELEASE-<version>.md`, run `npm test`,
+`npm run test:e2e` and `npm run test:site`.
+
+Automatic upload (`release:publish`) uses the Chrome Web Store Publish API
+with credentials from a git-ignored `.cws.env`. One-time setup:
+`store/SETUP-CWS-API.md`, then `node scripts/cws-auth.mjs`. The listing text,
+images and the Privacy tab are still pasted by hand (3 pastes: ES description,
+EN description, Privacy tab).
 
 ## Updating the fee table
 
 1. Check MELI's published rates (source URLs in `fee-table.js` meta).
 2. Update values, bump `meta.version` and `meta.retrievedAt`.
-3. `npm test` (tier boundary tests will catch slips), then release.
+3. `npm test` (tier boundary tests will catch slips), then `npm run release`.
 
 ## Compliance notes
 

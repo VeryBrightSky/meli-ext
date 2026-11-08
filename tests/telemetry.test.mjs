@@ -416,8 +416,9 @@ test("v1.5.2 store name is the seller-facing one, within 75 chars, with the disc
   assert.equal(name, "Netio: Calculadora de comisiones para vendedores de Mercado Libre");
   assert.ok(name.length <= 75, `${name.length} chars`);
   assert.equal(name.length, 65);
-  const listing = readFileSync(join(root, "docs/store-listing-1.4.md"), "utf8");
-  assert.ok(listing.includes(name));
+  // The listing template takes the name from branding at release time.
+  const listing = readFileSync(join(root, "store/templates/listing-es.md"), "utf8");
+  assert.ok(listing.includes("{{storeName}}"));
   assert.ok(!listing.includes("Comisiones y Ganancias Mercado Libre México"));
   assert.ok(listing.includes("no está afiliada a Mercado Libre"));
   const build = readFileSync(join(root, "scripts/build.mjs"), "utf8");
