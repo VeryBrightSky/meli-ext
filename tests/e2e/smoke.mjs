@@ -150,6 +150,26 @@ function tap(page, label) {
   return page;
 }
 
+// Poll storage (from an extension page) until `key` is absent from BOTH the
+// local and the sync area, re-removing it if a mirror wrote it back; fails
+// after 10 s. Replaces fixed sleeps around stamp removal (r4, minor c).
+async function waitForStorageGone(extPage, key, maxMs = 10000) {
+  const deadline = Date.now() + maxMs;
+  for (;;) {
+    const left = await extPage.evaluate(async (k) => ({
+      local: (await chrome.storage.local.get(k))[k] ?? null,
+      sync: (await chrome.storage.sync.get(k))[k] ?? null
+    }), key);
+    if (left.local === null && left.sync === null) return;
+    assert.ok(Date.now() < deadline, `${key} still in storage after ${maxMs} ms: ${JSON.stringify(left)}`);
+    await extPage.evaluate(async (k) => {
+      await chrome.storage.sync.remove(k);
+      await chrome.storage.local.remove(k);
+    }, key);
+    await sleep(100);
+  }
+}
+
 const rowValue = (label) => `
   (() => {
     // r2: the zero-cost fee stack repeats breakdown labels; once a cost is
@@ -291,15 +311,22 @@ try {
     assert.equal(raced.local["mst:trialSchema"], 2, "worker stamped the trial schema on install");
     assert.equal(raced.sync["mst:trialStartedAt"], raced.local["mst:trialStartedAt"], "stamp mirrored to sync");
     pass("chip tap + navigation within 500 ms: next page shows 'te quedan 7 días', cost and stamp saved together");
+    // r4 (minor c): the trial stamp is mirrored local <-> sync and the
+    // service worker re-derives it on every storage change, so removing the
+    // local copy while the sync copy still exists could restore it (the old
+    // fixed 5 s wait for "pending" then flaked). Remove sync first, then
+    // local, and wait until BOTH areas report it gone (max 10 s) before the
+    // page that must come up "pending" is loaded.
     await seed.evaluate(async () => {
-      await chrome.storage.local.remove(["mst:cost:MLM12345678", "mst:meta:MLM12345678", "mst:trialStartedAt", "mst:hist:MLM99999999"]);
       await chrome.storage.sync.remove("mst:trialStartedAt");
+      await chrome.storage.local.remove(["mst:cost:MLM12345678", "mst:meta:MLM12345678", "mst:trialStartedAt", "mst:hist:MLM99999999"]);
     });
+    await waitForStorageGone(seed, "mst:trialStartedAt");
     // Schema 2: a cost key alone never migrates (the cost is gone here too,
     // but a stale cost would not start anything either).
     await first.goto(PRODUCT_URL, { waitUntil: "load" });
     await first.waitForSelector("#mst-card-root", { visible: true, timeout: 20000 });
-    await first.waitForFunction(() => (document.querySelector(".mst-trialbar")?.dataset.tone ?? "") === "pending", { timeout: 5000 });
+    await first.waitForFunction(() => (document.querySelector(".mst-trialbar")?.dataset.tone ?? "") === "pending", { timeout: 10000, polling: 100 });
     assert.equal(await first.$eval(".mst-chips", (e) => e.hidden), false, "chips back (no cost)");
     // r3 (minor 15): no automatic start at day 30. An install 31 days old with
     // no cost is still pending and the banner reminds what starts the trial.
