@@ -131,7 +131,7 @@ function renderHomeEs(page, pages) {
             ${installButton("landing")}
             <a class="btn btn-line" href="#ejemplo">Ver la cuenta completa</a>
           </div>
-          <p class="fine">Sin cuenta y sin servidores: tus costos se quedan en tu navegador. Al instalar tienes PRO 7 días, sin tarjeta.</p>
+          <p class="fine">Sin cuenta y sin servidores: tus costos se quedan en tu navegador. La prueba PRO de 7 días empieza cuando guardas tu primer costo, sin tarjeta.</p>
         </div>
         ${ticket({
           title: "Funda para celular", subtitle: "Clásica, Tecnología",
@@ -238,7 +238,7 @@ function renderHomeEs(page, pages) {
           </tbody>
         </table>
         <div class="plan-note">
-          <p><b>Prueba PRO 7 días sin tarjeta.</b> Empieza sola al instalar. Si no pagas, te quedas con el plan gratis y con tus costos guardados. Cancela cuando quieras desde las opciones de Netio.</p>
+          <p><b>Prueba PRO 7 días sin tarjeta.</b> Empieza cuando guardas tu primer costo en una publicación. Si no pagas, te quedas con el plan gratis y con tus costos guardados. Cancela cuando quieras desde las opciones de Netio.</p>
         </div>
         <p style="margin-top:22px">${installButton("landing", "Probar PRO gratis")}</p>
       </div>
@@ -293,7 +293,7 @@ function renderHomeEn(page, pages) {
             ${installButton("landing", "Add to Chrome, it's free")}
             <a class="btn btn-line" href="#ejemplo">See the full math</a>
           </div>
-          <p class="fine">No account, no servers: your costs stay in your browser. You get PRO for 7 days on install, no card.</p>
+          <p class="fine">No account, no servers: your costs stay in your browser. Your 7-day PRO trial starts when you save your first cost, no card.</p>
         </div>
         ${ticket({
           title: "Phone case", subtitle: "Clásica, Technology",
@@ -399,7 +399,7 @@ function renderHomeEn(page, pages) {
           </tbody>
         </table>
         <div class="plan-note">
-          <p><b>Try PRO for 7 days, no card.</b> It starts on install. If you do not pay, you keep the free plan and your saved costs. Cancel any time from Netio's options.</p>
+          <p><b>Try PRO for 7 days, no card.</b> It starts when you save your first cost on a listing. If you do not pay, you keep the free plan and your saved costs. Cancel any time from Netio's options.</p>
         </div>
         <p style="margin-top:22px">${installButton("landing", "Try PRO free")}</p>
       </div>

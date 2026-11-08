@@ -131,7 +131,7 @@ export function relatedHtml(page, pages) {
     `<li><a href="${p.path}">${esc(p.h1)}</a><span>${esc(p.description)}</span></li>`).join("")}</ul></section>`;
 }
 
-export function ctaHtml(source, { title = "Ve esto en cada venta y publicación, directo en Mercado Libre", body = "Netio es una extensión gratis de Chrome. Muestra comisión, costo fijo, envío, retenciones y ganancia neta debajo del precio de cada publicación y en cada resultado de búsqueda. Al instalar tienes PRO 7 días, sin tarjeta." } = {}) {
+export function ctaHtml(source, { title = "Ve esto en cada venta y publicación, directo en Mercado Libre", body = "Netio es una extensión gratis de Chrome. Muestra comisión, costo fijo, envío, retenciones y ganancia neta debajo del precio de cada publicación y en cada resultado de búsqueda. La prueba PRO de 7 días empieza cuando guardas tu primer costo, sin tarjeta." } = {}) {
   return `<section class="cta-box"><h2>${esc(title)}</h2><p>${esc(body)}</p>${installButton(source)}<p class="small">${esc(SITE.notAffiliated)}</p></section>`;
 }
 
