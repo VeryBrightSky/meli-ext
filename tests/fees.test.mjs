@@ -1775,3 +1775,35 @@ test("v1.5.5 r4 page-data itemIdFromUrl: result links normalize to the card's st
     globalThis.MST_UI = prevUI;
   }
 });
+
+test("v1.5.5 r5 page-data itemIdFromParts: only item path shapes resolve, category links do not", () => {
+  const prevBrand = globalThis.EXT_BRAND;
+  const prevUI = globalThis.MST_UI;
+  globalThis.EXT_BRAND = { name: "Netio" };
+  globalThis.MST_UI = globalThis.MST_UI ?? { isMsiText: () => false };
+  try {
+    new Function(readFileSync(join(root, "src/content/page-data.js"), "utf8"))();
+    const parts = globalThis.MST_PAGE.itemIdFromParts;
+    const url = globalThis.MST_PAGE.itemIdFromUrl;
+    // Category and other non-item paths that contain an MLM token.
+    assert.equal(parts("/c/MLM1648", ""), null);
+    assert.equal(url("https://www.mercadolibre.com.mx/c/MLM1648"), null);
+    assert.equal(url("https://listado.mercadolibre.com.mx/c/MLM1648#menu=categories"), null);
+    assert.equal(parts("/categorias/MLM1648", ""), null);
+    assert.equal(parts("/gz/checkout/buyingflow/MLM12345678", ""), null);
+    assert.equal(parts("/pagos/MLM12345678", ""), null);
+    assert.equal(parts("/vendedor/MLM-tienda", ""), null);
+    assert.equal(parts("/MLM1648", ""), null);
+    // Item shapes still resolve.
+    assert.equal(parts("/celular-test-pro/p/MLM12345678", ""), "MLM12345678");
+    assert.equal(parts("/funda/up/MLMU987654321", ""), "MLMU987654321");
+    assert.equal(parts("/MLM-123456789-funda-_JM", ""), "MLM123456789");
+    assert.equal(parts("/MLM-55", ""), "MLM55");
+    assert.equal(url("https://articulo.mercadolibre.com.mx/MLM-123456789-funda-_JM"), "MLM123456789");
+    assert.equal(parts("/noindex/catalog", "?pdp_filters=item_id:MLM777"), "MLM777");
+    assert.equal(parts("/noindex/catalog", "?pdp_filters=item_id%3AMLM778"), "MLM778");
+  } finally {
+    globalThis.EXT_BRAND = prevBrand;
+    globalThis.MST_UI = prevUI;
+  }
+});
