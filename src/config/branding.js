@@ -35,6 +35,10 @@ globalThis.EXT_BRAND = Object.freeze({
   // The seller's own listings on Mercado Libre (welcome page step 1).
   listingsUrl: "https://www.mercadolibre.com.mx/publicaciones/listado",
   plans: Object.freeze({ monthly: "pro-monthly", yearly: "pro-yearly" }),
+  // Public PRO prices in MXN as configured at extensionpay.com. Used by the
+  // store-listing templates (scripts/release.mjs); the in-extension copy
+  // lives in _locales. Keep the three in sync when the price changes.
+  prices: Object.freeze({ monthly: 89, yearly: 699, currency: "MXN" }),
   // Path relative to the extension root; resolve with chrome.runtime.getURL().
   logoPath: "src/assets/icons/icon16.png",
   // Brand palette for the LOGO and store assets ONLY (scripts/gen-icons.py,

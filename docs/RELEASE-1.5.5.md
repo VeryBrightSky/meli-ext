@@ -1,6 +1,6 @@
 # Netio 1.5.5: notas de la versión
 
-Texto para "Novedades" de la Chrome Web Store (primer bloque) y registro interno de lo que cambió (segundo bloque).
+Texto de "Novedades" en español e inglés (los dos primeros bloques; `scripts/release.mjs` los lee para la carpeta de release) y registro interno de lo que cambió (último bloque).
 
 ## Novedades (Chrome Web Store)
 
@@ -11,6 +11,16 @@ Texto para "Novedades" de la Chrome Web Store (primer bloque) y registro interno
 - Costo máximo: cuánto puedes pagar por una unidad para ganar tu margen al precio actual de la publicación (PRO).
 - Idioma: español por defecto; inglés disponible desde las opciones.
 - Privacidad: el historial de precios de las publicaciones que abres se guarda solo en tu navegador, nunca en un servidor, y solo en páginas de publicaciones (nunca en el carrito ni en el pago). Puedes borrarlo desde "Borrar datos guardados".
+
+## What's new (Chrome Web Store, English)
+
+- Shipping from the official tables. The estimated shipping cost comes from the tables Mercado Libre publishes for your reputation (green/MercadoLíder, yellow or no reputation, orange/red), with the $299, $499 and $999 price bands. The reputation discount is already built into the table; nothing else is deducted on top.
+- The 7-day PRO trial starts when you save your first cost, not at install. That way the 7 days are spent calculating real profits.
+- The Profitability Radar on search results now deducts shipping the same way the calculator does and, for listings where you already saved data on the card, uses your cost ("tu costo" label), your listing type, your category and your weight. For the rest it keeps using the assumed cost you set (60% by default), the type detected in the result, the search category and the minimum weight (0.3 kg); the bar says so when both are mixed. The CSV includes the cost used on every row and whether it was your cost or the assumed one.
+- Advertising: type your Mercado Ads % per product and it is deducted from profit, margin and every calculated price (PRO).
+- Max cost: how much you can pay per unit and still earn your margin at the listing's current price (PRO).
+- Language: Spanish by default; English available from the options page.
+- Privacy: the price history of the listings you open is stored only in your browser, never on a server, and only on listing pages (never in the cart or at checkout). You can delete it with "Clear saved data".
 
 ## Detalle interno
 

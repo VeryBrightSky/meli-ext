@@ -5,3 +5,4 @@ dist/
 shot-raw.png
 *-screenshot-*.png
 release/
+.cws.env
