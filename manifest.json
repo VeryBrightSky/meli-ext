@@ -50,6 +50,7 @@
         "src/config/owner.js",
         "src/pro/gate.js",
         "src/content/format.js",
+        "src/dashboard/dashboard-model.js",
         "src/content/upsell.js",
         "src/content/history.js",
         "src/content/page-data.js",

@@ -197,6 +197,25 @@ globalThis.MST_UPSELL = (() => {
     };
   }
 
+  // The saved product with the lowest worst-case profit per sale, computed
+  // the way the dashboard does (MST_DASH), so the banner and the table agree.
+  // Resolves null when nothing is saved or the model is unavailable.
+  async function worstSavedProduct() {
+    const DASH = globalThis.MST_DASH;
+    if (!DASH) return null;
+    const all = await chrome.storage.local.get(null);
+    const sync = await chrome.storage.sync.get({
+      defaultShippingMXN: null, usesFull: false, reputationId: "none", freeShipping: false
+    });
+    const ship = DASH.resolveShipping(sync, all[`${PREFIX}:defaults`]);
+    const rows = DASH.computeRows(all, PREFIX, ship.value, { ...sync, shippingUnset: ship.unset });
+    if (!rows.length) return null;
+    rows.sort((a, b) => a.b.profitMinMXN - b.b.profitMinMXN);
+    const w = rows[0];
+    const title = String(w.meta.title || w.itemId).slice(0, 60);
+    return { title, profitMinMXN: w.b.profitMinMXN };
+  }
+
   // Trial banner (top of card): countdown while active, win-back after expiry.
   // Dismissal is remembered per state for a day so it never nags.
   const DISMISS_KEY = `${PREFIX}:bannerDismissed`;
@@ -217,7 +236,14 @@ globalThis.MST_UPSELL = (() => {
     };
 
     let stateKey = null;
-    if (status.trialActive && status.localTrial) {
+    if (status.trialPending && !status.paid) {
+      // 1.5.5: the 7 days have not started; say what starts them. No button:
+      // the cost input right below is the action.
+      stateKey = "pending";
+      root.dataset.tone = "pending";
+      text.textContent = T("trialPendingBanner");
+      btn.hidden = true;
+    } else if (status.trialActive && status.localTrial) {
       stateKey = status.trialDaysLeft <= 3 ? "ending" : "active";
       root.dataset.tone = status.trialDaysLeft <= 3 ? "ending" : "active";
       const n = status.trialDaysLeft;
@@ -225,9 +251,21 @@ globalThis.MST_UPSELL = (() => {
         n <= 3
           ? (n === 1 ? T("trialEndingOne") : T("trialEnding", [String(n)]))
           : T("trialActiveBanner", [String(n)]);
-      // In the last days, make the loss concrete: the seller's own products.
+      // In the last days, make the loss concrete: the seller's own worst
+      // product by title (same fee math as the dashboard), else the count.
       if (n <= 3) {
-        chrome.storage.local.get(null).then((all) => {
+        worstSavedProduct().then(async (w) => {
+          if (w) {
+            const loss = w.profitMinMXN < 0;
+            const vars = [w.title, globalThis.MST_UI.fmtMoney(Math.abs(w.profitMinMXN)), String(n)];
+            text.textContent = loss
+              ? (n === 1 ? T("trialEndingWorstLossOne", vars) : T("trialEndingWorstLoss", vars))
+              : (n === 1 ? T("trialEndingWorstThinOne", vars) : T("trialEndingWorstThin", vars));
+            return;
+          }
+          // No listing snapshot to price (cost saved before meta existed):
+          // fall back to the count of saved products.
+          const all = await chrome.storage.local.get(null);
           const saved = Object.keys(all).filter((k) => k.startsWith(`${PREFIX}:cost:`) && Number(all[k]) > 0).length;
           if (saved > 0) {
             text.textContent = n === 1
