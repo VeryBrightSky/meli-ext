@@ -609,7 +609,7 @@
     "message": "You lose $1 per sale"
   },
   "summaryNoCost": {
-    "message": "Enter your product cost to see your profit."
+    "message": "Tap a cost below, or type your own, to see your profit."
   },
   "breakdownToggle": {
     "message": "See fees and shipping breakdown"
@@ -754,5 +754,65 @@
   },
   "welcomeStep1Trial": {
     "message": "Your 7-day PRO trial starts when you save your first product cost."
+  },
+  "summaryNetWorst": {
+    "message": "You keep at least $1 per sale"
+  },
+  "summaryUpto": {
+    "message": "up to $1 depending on the category"
+  },
+  "summaryProfitWorst": {
+    "message": "Profit of at least $1 ($2%)"
+  },
+  "summaryLossWorst": {
+    "message": "You lose at least $1 per sale"
+  },
+  "summaryLossUpto": {
+    "message": "up to $1 depending on the category"
+  },
+  "summaryMixedWorst": {
+    "message": "You can lose up to $1 per sale"
+  },
+  "summaryMixedUpto": {
+    "message": "or make up to $1 depending on the category"
+  },
+  "stackFixed": {
+    "message": "Fixed charge per unit"
+  },
+  "stackShippingEstimate": {
+    "message": "Estimated shipping (up to $1 kg)"
+  },
+  "stackNet": {
+    "message": "You keep"
+  },
+  "stackRetentions": {
+    "message": "With a registered RFC (VAT 8% + ISR 2.5%)"
+  },
+  "stackRetentionsValue": {
+    "message": "−$1, you are paid $2"
+  },
+  "costAsk": {
+    "message": "What does it cost you?"
+  },
+  "costChip": {
+    "message": "$1% · $2"
+  },
+  "costChipAria": {
+    "message": "Use $1 as the product cost"
+  },
+  "rowAds": {
+    "message": "Ads (% of price)"
+  },
+  "rowAdsCost": {
+    "message": "Ads ($1%)"
+  },
+  "inputAdsAria": {
+    "message": "Mercado Ads spend as a percentage of the price"
+  },
+  "rowMaxCostFor": {
+    "message": "Max cost to make $1%"
+  },
+  "maxCostNone": {
+    "message": "That margin is out of reach at this price"
   }
 }

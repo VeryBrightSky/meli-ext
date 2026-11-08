@@ -1318,3 +1318,98 @@
   width: 100%;
   margin-top: 4px;
 }
+
+/* --- v1.5.5 r2: zero-typing value --------------------------------------- */
+
+/* Best case under a worst-case headline (unknown category). */
+.mst-summary__upto {
+  margin-top: 1px;
+  font-size: 12.5px;
+  color: rgba(0, 0, 0, 0.55);
+  font-variant-numeric: tabular-nums;
+}
+
+.mst-summary__upto[hidden],
+.mst-stack[hidden],
+.mst-chips[hidden] {
+  display: none;
+}
+
+/* Fee stack at the page price while no cost is saved. */
+.mst-stack {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px dashed rgba(0, 0, 0, 0.12);
+}
+
+.mst-stack__row {
+  padding: 2px 0;
+  font-size: 12.5px;
+  border: none;
+  min-height: 0;
+}
+
+.mst-stack__row .mst-row__label {
+  color: rgba(0, 0, 0, 0.65);
+}
+
+.mst-row--stacktotal .mst-row__label,
+.mst-row--stacktotal .mst-row__value {
+  font-weight: 700;
+  color: rgba(0, 0, 0, 0.9);
+}
+
+.mst-row--stacktotal {
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  margin-top: 2px;
+  padding-top: 4px;
+}
+
+/* Cost chips: the first cost in one tap. */
+.mst-chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-right: 8px;
+}
+
+.mst-chip {
+  font-family: inherit;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  padding: 4px 10px;
+  border: 1px solid #3483fa;
+  border-radius: 999px;
+  background: #fff;
+  color: #3483fa;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.mst-chip:hover,
+.mst-chip:focus-visible {
+  background: #3483fa;
+  color: #fff;
+  outline: none;
+}
+
+.mst-row--cost {
+  flex-wrap: wrap;
+  row-gap: 6px;
+}
+
+/* A locked what-if price reads as a value, not a dead field. */
+.mst-input:disabled {
+  border-color: transparent;
+  background: transparent;
+  color: rgba(0, 0, 0, 0.75);
+  cursor: default;
+}
+
+.mst-row--maxcost .mst-row__value {
+  color: #00a650;
+}
+
+.mst-row--maxcost.mst-row--loss .mst-row__value {
+  color: #d63b2f;
+}

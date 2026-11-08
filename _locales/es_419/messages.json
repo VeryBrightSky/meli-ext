@@ -609,7 +609,7 @@
     "message": "Pierdes $1 por venta"
   },
   "summaryNoCost": {
-    "message": "Escribe el costo de tu producto para ver tu ganancia."
+    "message": "Toca un costo abajo, o escribe el tuyo, para ver tu ganancia."
   },
   "breakdownToggle": {
     "message": "Ver desglose de cargos y envío"
@@ -754,5 +754,65 @@
   },
   "welcomeStep1Trial": {
     "message": "Tu prueba PRO de 7 días empieza cuando guardes tu primer costo."
+  },
+  "summaryNetWorst": {
+    "message": "Te quedan al menos $1 por venta"
+  },
+  "summaryUpto": {
+    "message": "hasta $1 según la categoría"
+  },
+  "summaryProfitWorst": {
+    "message": "Ganancia de al menos $1 ($2%)"
+  },
+  "summaryLossWorst": {
+    "message": "Pierdes al menos $1 por venta"
+  },
+  "summaryLossUpto": {
+    "message": "hasta $1 según la categoría"
+  },
+  "summaryMixedWorst": {
+    "message": "Puedes perder hasta $1 por venta"
+  },
+  "summaryMixedUpto": {
+    "message": "o ganar hasta $1 según la categoría"
+  },
+  "stackFixed": {
+    "message": "Costo fijo por unidad"
+  },
+  "stackShippingEstimate": {
+    "message": "Envío estimado (hasta $1 kg)"
+  },
+  "stackNet": {
+    "message": "Te queda"
+  },
+  "stackRetentions": {
+    "message": "Con RFC registrado (IVA 8% + ISR 2.5%)"
+  },
+  "stackRetentionsValue": {
+    "message": "−$1, te depositan $2"
+  },
+  "costAsk": {
+    "message": "¿Cuánto te cuesta?"
+  },
+  "costChip": {
+    "message": "$1% · $2"
+  },
+  "costChipAria": {
+    "message": "Usar $1 como costo del producto"
+  },
+  "rowAds": {
+    "message": "Publicidad (% del precio)"
+  },
+  "rowAdsCost": {
+    "message": "Publicidad ($1%)"
+  },
+  "inputAdsAria": {
+    "message": "Gasto en publicidad de Mercado Ads como porcentaje del precio"
+  },
+  "rowMaxCostFor": {
+    "message": "Costo máximo para ganar $1%"
+  },
+  "maxCostNone": {
+    "message": "A este precio no se alcanza ese margen"
   }
 }
