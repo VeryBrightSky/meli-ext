@@ -52,7 +52,7 @@ test("i18n substitutes $1/$2 and unescapes $$", () => {
   assert.equal(es.applySubs("a $1 b $2", ["X", "Y"]), "a X b Y");
   assert.equal(es.applySubs("precio < $$299", []), "precio < $299");
   assert.equal(es.t("rowCommission", ["10%"]), "Comisión por venta (10%)");
-  assert.equal(es.t("upsellMonthly"), "Activar PRO · $89 al mes"); // $$89 → $89
+  assert.equal(es.t("upsellMonthly"), "$89 al mes (menos de $3 al día)"); // $$89 → $89
   assert.equal(es.applySubs("$1 missing", []), " missing"); // absent sub → empty
 });
 
@@ -65,7 +65,7 @@ test("es_419 values are real Spanish, not English copies", () => {
   const es = JSON.parse(read("_locales/es_419/messages.json"));
   const en = JSON.parse(read("_locales/en/messages.json"));
   // Keys that are legitimately identical across locales (brand/loanwords).
-  const SAME_OK = new Set(["typeClassic", "typePremium", "no", "proTag", "upsellTitle", "shippingEstimateTag"]);
+  const SAME_OK = new Set(["typeClassic", "typePremium", "no", "proTag", "upsellTitle", "shippingEstimateTag", "costChip"]);
   const copies = Object.keys(es).filter(
     (k) => !SAME_OK.has(k) && es[k].message === en[k].message
   );
@@ -76,7 +76,7 @@ test("es_419 has no empty, untranslated, or English-leaking values", () => {
   const es = JSON.parse(read("_locales/es_419/messages.json"));
   const en = JSON.parse(read("_locales/en/messages.json"));
   // Brand names / loanwords intentionally identical across locales.
-  const SAME_OK = new Set(["typeClassic", "typePremium", "no", "proTag", "upsellTitle", "shippingEstimateTag"]);
+  const SAME_OK = new Set(["typeClassic", "typePremium", "no", "proTag", "upsellTitle", "shippingEstimateTag", "costChip"]);
   // Common English words that must never appear in Mexican-Spanish copy.
   // Word-boundary, case-insensitive. Deliberately excludes words spelled the
   // same in Spanish ("total") and Spanish homographs ("sale"), and matches as
@@ -117,7 +117,7 @@ test("en has no empty, untranslated, or Spanish-leaking values", () => {
   const en = JSON.parse(read("_locales/en/messages.json"));
   const es = JSON.parse(read("_locales/es_419/messages.json"));
   // Brand names / loanwords intentionally identical across locales.
-  const SAME_OK = new Set(["typeClassic", "typePremium", "no", "proTag", "upsellTitle", "shippingEstimateTag"]);
+  const SAME_OK = new Set(["typeClassic", "typePremium", "no", "proTag", "upsellTitle", "shippingEstimateTag", "costChip"]);
   // Proper nouns that legitimately appear verbatim in English copy — stripped
   // before scanning so "Mercado Envíos", "Clásica" etc. don't read as leaks.
   const PROPER = /Mercado Libre|Mercado Env[íi]os(?: Full)?|Cl[áa]sica|Premium|Netio/gi;

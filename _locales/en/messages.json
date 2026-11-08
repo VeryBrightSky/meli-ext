@@ -186,7 +186,7 @@
     "message": "PRO tells you the price to sell at for the margin you want, what each interest-free installment term costs you, and paints every search result green or red. No account needed to use Netio; your costs never leave your browser."
   },
   "upsellPricing": {
-    "message": "$$89 MXN/mo (under $$3 a day) or $$699 MXN/yr (save 35%). No lock-in."
+    "message": "$$699 a year is $$369 less than 12 months at $$89. Monthly comes to under $$3 a day. Cancel anytime."
   },
   "rowSales": {
     "message": "Sales per month"
@@ -315,10 +315,10 @@
     "message": "Already in the table ($1%)"
   },
   "upsellMonthly": {
-    "message": "Activate PRO · $$89 a month"
+    "message": "$$89 a month (under $$3 a day)"
   },
   "upsellYearly": {
-    "message": "$$699 a year (works out to $$58 a month)"
+    "message": "Get PRO · $$699 a year (save $$369)"
   },
   "dashTotalsLabel": {
     "message": "Totals · products: $1"
@@ -555,10 +555,10 @@
     "message": "The calculator appears under the price with your commission, fixed charge, shipping and profit."
   },
   "welcomeStep2": {
-    "message": "Type your product cost"
+    "message": "Tap or type your product cost"
   },
   "welcomeStep2Body": {
-    "message": "Netio then gives you the break-even price and the price for the margin you want."
+    "message": "One tap on 40, 50 or 60% of the price is enough. With that Netio gives you the break-even price and the price for the margin you want."
   },
   "welcomeStep3": {
     "message": "Search for products and watch the Radar"
@@ -609,7 +609,7 @@
     "message": "You lose $1 per sale"
   },
   "summaryNoCost": {
-    "message": "Enter your product cost to see your profit."
+    "message": "Tap a cost below, or type your own, to see your profit."
   },
   "breakdownToggle": {
     "message": "See fees and shipping breakdown"
@@ -754,5 +754,125 @@
   },
   "welcomeStep1Trial": {
     "message": "Your 7-day PRO trial starts when you save your first product cost."
+  },
+  "summaryNetWorst": {
+    "message": "You keep at least $1 per sale"
+  },
+  "summaryUpto": {
+    "message": "up to $1 depending on the category"
+  },
+  "summaryProfitWorst": {
+    "message": "Profit of at least $1 ($2%)"
+  },
+  "summaryLossWorst": {
+    "message": "You lose at least $1 per sale"
+  },
+  "summaryLossUpto": {
+    "message": "up to $1 depending on the category"
+  },
+  "summaryMixedWorst": {
+    "message": "You can lose up to $1 per sale"
+  },
+  "summaryMixedUpto": {
+    "message": "or make up to $1 depending on the category"
+  },
+  "stackFixed": {
+    "message": "Fixed charge per unit"
+  },
+  "stackShippingEstimate": {
+    "message": "Estimated shipping (up to $1 kg)"
+  },
+  "stackNet": {
+    "message": "You keep"
+  },
+  "stackRetentions": {
+    "message": "With a registered RFC (VAT 8% + ISR 2.5%)"
+  },
+  "stackRetentionsValue": {
+    "message": "−$1, you are paid $2"
+  },
+  "costAsk": {
+    "message": "What does it cost you?"
+  },
+  "costChip": {
+    "message": "$1% · $2"
+  },
+  "costChipAria": {
+    "message": "Use $1 as the product cost"
+  },
+  "rowAds": {
+    "message": "Ads (% of price)"
+  },
+  "rowAdsCost": {
+    "message": "Ads ($1%)"
+  },
+  "inputAdsAria": {
+    "message": "Mercado Ads spend as a percentage of the price"
+  },
+  "rowMaxCostFor": {
+    "message": "Max cost to make $1%"
+  },
+  "maxCostNone": {
+    "message": "That margin is out of reach at this price"
+  },
+  "upsellLead_expiredOwn": {
+    "message": "Your PRO trial ended: your saved products ($1) lost their target price"
+  },
+  "upsellLead_expiredOwnOne": {
+    "message": "Your PRO trial ended: your saved product lost its target price"
+  },
+  "upsellBody_expiredLoss": {
+    "message": "Your worst product, $1, loses $2 per sale. PRO gives you back the price for 30% and the max cost on every listing."
+  },
+  "upsellBody_expiredThin": {
+    "message": "Your worst product, $1, leaves only $2 per sale. PRO gives you back the price for 30% and the max cost on every listing."
+  },
+  "upsellBody_expiredCount": {
+    "message": "Your costs are still saved. PRO gives you back the target price, the max cost, the Radar and the Dashboard."
+  },
+  "trialExpiredWorstLoss": {
+    "message": "Your PRO trial ended. Of your saved products ($1), the worst, $2, loses $3 per sale."
+  },
+  "trialExpiredWorstThin": {
+    "message": "Your PRO trial ended. Of your saved products ($1), the worst, $2, leaves only $3 per sale."
+  },
+  "trialExpiredProducts": {
+    "message": "Your PRO trial ended. Your saved products ($1) are still here, now without a target price."
+  },
+  "trialExpiredProductsOne": {
+    "message": "Your PRO trial ended. Your saved product is still here, now without a target price."
+  },
+  "welcomeDemoTitle": {
+    "message": "This is what it looks like on a listing"
+  },
+  "welcomeDemoCaption": {
+    "message": "Real example: a $1 Clásica listing in $2, 0.3 kg, no reputation, $$250 cost. Official fees and shipping table."
+  },
+  "welcomeDemoPro": {
+    "message": "With PRO, on the same card"
+  },
+  "upsellBody_expiredOk": {
+    "message": "Your lowest-margin product, $1, leaves $2 per sale. PRO gives you back the price for 30% and the max cost on every listing."
+  },
+  "upsellBody_expiredLossOne": {
+    "message": "Your saved product, $1, loses $2 per sale. PRO gives you back the price for 30% and the max cost on every listing."
+  },
+  "upsellBody_expiredThinOne": {
+    "message": "Your saved product, $1, leaves only $2 per sale. PRO gives you back the price for 30% and the max cost on every listing."
+  },
+  "upsellBody_expiredOkOne": {
+    "message": "Your saved product, $1, leaves $2 per sale. PRO gives you back the price for 30% and the max cost on every listing."
+  },
+  "trialExpiredWorstOk": {
+    "message": "Your PRO trial ended. Of your saved products ($1), the lowest margin, $2, leaves $3 per sale."
+  },
+  "trialExpiredWorstLossOne": {
+    "message": "Your PRO trial ended. Your saved product, $2, loses $3 per sale."
+  },
+  "trialExpiredWorstThinOne": {
+    "message": "Your PRO trial ended. Your saved product, $2, leaves only $3 per sale."
+  },
+  "trialExpiredWorstOkOne": {
+    "message": "Your PRO trial ended. Your saved product, $2, leaves $3 per sale."
   }
 }

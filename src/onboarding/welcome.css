@@ -51,3 +51,20 @@ h1 { font-size: 34px; line-height: 1.12; letter-spacing: -0.6px; margin: 0 0 12p
 .tnotice[hidden] { display: none; }
 .tnotice a { color: #9affc9; font-weight: 700; }
 .btn-sm { font-size: 13px; padding: 7px 12px; }
+
+/* r2: live demo card ($499 example, real fee logic) */
+.demo { margin: 0 0 26px; }
+.demo[hidden] { display: none; }
+.demo h2 { font-size: 18px; margin: 0 0 4px; }
+.demo-caption { font-size: 13px; color: #9a9ec9; margin: 0 0 10px; }
+.demo-card {
+  background: #fff; color: rgba(0, 0, 0, 0.9); border-radius: 12px; padding: 12px 14px;
+  font-variant-numeric: tabular-nums; font-size: 14px;
+}
+.demo-row { display: flex; justify-content: space-between; gap: 12px; padding: 3px 0; }
+.demo-row span:first-child { color: rgba(0, 0, 0, 0.6); }
+.demo-row--total { border-top: 1px solid rgba(0, 0, 0, 0.1); margin-top: 3px; padding-top: 6px; font-weight: 700; }
+.demo-row--total span:first-child { color: rgba(0, 0, 0, 0.9); }
+.demo-pro { margin-top: 8px; padding: 8px 10px; border-radius: 8px; background: #f0faf4; border: 1px solid rgba(0, 166, 80, 0.3); }
+.demo-pro-title { font-size: 11px; font-weight: 800; letter-spacing: 0.4px; color: #00a650; margin-bottom: 2px; }
+.demo-row--pro span:last-child { color: #00a650; font-weight: 700; }

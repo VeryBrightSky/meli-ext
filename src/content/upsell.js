@@ -47,13 +47,15 @@ globalThis.MST_UPSELL = (() => {
         note.classList.remove(`${PREFIX}-upsell__note--active`);
       }
     };
-    const monthlyBtn = el("button", `${PREFIX}-upsell__cta`, T("upsellMonthly"));
-    monthlyBtn.type = "button";
-    monthlyBtn.addEventListener("click", () => opened(BRAND.plans.monthly));
-    const yearlyBtn = el("button", `${PREFIX}-upsell__alt`, T("upsellYearly"));
+    // Yearly first: $699 against 12 × $89 = $1,068 saves $369 a year.
+    // Monthly second, with the honest per-day figure ($89 / 30 = $2.97).
+    const yearlyBtn = el("button", `${PREFIX}-upsell__cta`, T("upsellYearly"));
     yearlyBtn.type = "button";
     yearlyBtn.addEventListener("click", () => opened(BRAND.plans.yearly));
-    actions.append(monthlyBtn, yearlyBtn);
+    const monthlyBtn = el("button", `${PREFIX}-upsell__alt`, T("upsellMonthly"));
+    monthlyBtn.type = "button";
+    monthlyBtn.addEventListener("click", () => opened(BRAND.plans.monthly));
+    actions.append(yearlyBtn, monthlyBtn);
     // Already paid (new browser, reinstalled, other device): sign in with the
     // email used at checkout instead of paying twice.
     const login = el("button", `${PREFIX}-upsell__close ${PREFIX}-upsell__login`, T("optLogin"));
@@ -70,7 +72,7 @@ globalThis.MST_UPSELL = (() => {
     close.addEventListener("click", () => {
       panel.hidden = true;
     });
-    panel.append(title, lead, body, actions, note, login, close);
+    panel.append(title, lead, body, price, actions, note, login, close);
     return { panel, lead, body };
   }
 
@@ -109,9 +111,21 @@ globalThis.MST_UPSELL = (() => {
       panel.dataset.reason = key;
       return key;
     };
+    // Trial over: the headline names what THIS seller loses, with their own
+    // numbers (saved products, worst product and its margin). Resolves to
+    // the generic expired copy when nothing was saved.
+    const expiredText = async () => {
+      const own = await expiredOwnVars().catch(() => null);
+      if (!own || panel.hidden || panel.dataset.reason !== "expired") return;
+      lead.textContent = own.one ? T("upsellLead_expiredOwnOne") : T("upsellLead_expiredOwn", [String(own.count)]);
+      body.textContent = own.worst
+        ? T(`upsellBody_expired${own.worst.tone}${own.one}`, [own.worst.title, own.worst.amount])
+        : T("upsellBody_expiredCount");
+    };
     const open = (reason = "generic", vars = []) => {
       placeNear();
       const key = setText(reason, vars);
+      if (key === "expired") expiredText();
       panel.hidden = false;
       GATE.track(`open:${key}`);
       globalThis.MST_TRACK.event("paywall_seen", { reason: "upsell", key });
@@ -213,7 +227,19 @@ globalThis.MST_UPSELL = (() => {
     rows.sort((a, b) => a.b.profitMinMXN - b.b.profitMinMXN);
     const w = rows[0];
     const title = String(w.meta.title || w.itemId).slice(0, 60);
-    return { title, profitMinMXN: w.b.profitMinMXN };
+    return { title, profitMinMXN: w.b.profitMinMXN, marginMinPct: w.b.marginMinPct };
+  }
+
+  // Saved products and the worst one, for the expired-trial copy.
+  async function expiredOwnVars() {
+    const all = await chrome.storage.local.get(null);
+    const count = Object.keys(all ?? {}).filter((k) => k.startsWith(`${PREFIX}:cost:`) && Number(all[k]) > 0).length;
+    if (!count) return null;
+    const w = await worstSavedProduct();
+    // tone: Loss (red), Thin (under 10% margin) or Ok, for the copy key.
+    const tone = !w ? null : w.profitMinMXN < 0 ? "Loss" : w.marginMinPct < 10 ? "Thin" : "Ok";
+    const worst = w ? { title: w.title, amount: globalThis.MST_UI.fmtMoney(Math.abs(w.profitMinMXN)), tone } : null;
+    return { count, worst, one: count === 1 ? "One" : "" };
   }
 
   // Trial banner (top of card): countdown while active, win-back after expiry.
@@ -281,8 +307,18 @@ globalThis.MST_UPSELL = (() => {
       root.dataset.tone = "expired";
       text.textContent = T("trialExpiredBanner");
       btn.textContent = T("trialReactivate");
-      // Straight to the plan picker; no detour through a panel at the bottom.
-      btn.addEventListener("click", () => GATE.openUpgrade(undefined, "expired-banner").then(failNote));
+      // The panel opens right under this banner with the seller's own
+      // numbers and both plans (yearly first); no bare plan picker.
+      btn.addEventListener("click", () => onOpen("expired"));
+      // The banner itself names what was lost, with their numbers.
+      expiredOwnVars().then((own) => {
+        if (!own) return;
+        if (own.worst) {
+          text.textContent = T(`trialExpiredWorst${own.worst.tone}${own.one}`, [String(own.count), own.worst.title, own.worst.amount]);
+        } else {
+          text.textContent = own.count === 1 ? T("trialExpiredProductsOne") : T("trialExpiredProducts", [String(own.count)]);
+        }
+      }).catch(() => {});
     }
     if (!stateKey) return root;
 

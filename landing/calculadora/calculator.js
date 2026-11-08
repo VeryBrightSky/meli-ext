@@ -59,7 +59,10 @@ globalThis.MST_CALC = (() => {
   }
 
   // quote: { pctMin, pctMax, fixedCostMXN } (from fee source)
-  // inputs: { priceMXN, shippingCostMXN, productCostMXN }
+  // inputs: { priceMXN, shippingCostMXN, productCostMXN, adsPct }
+  // adsPct (optional, PRO what-if): Mercado Ads spend as a % of the sale
+  // price (the seller's own ACOS). Charged like a commission, so it lowers
+  // the net, the profit and the margin, and raises every solved price.
   // Returns min/max bounds; min === max when the rate is exact.
   function computeBreakdown(quote, inputs) {
     const price = inputs.priceMXN;
@@ -74,6 +77,8 @@ globalThis.MST_CALC = (() => {
         commissionMaxMXN: 0,
         fixedCostMXN: 0,
         shippingCostMXN: 0,
+        adsPct: 0,
+        adsCostMXN: 0,
         netMinMXN: 0,
         netMaxMXN: 0,
         effectiveRateMinPct: 0,
@@ -82,12 +87,14 @@ globalThis.MST_CALC = (() => {
     }
     const shipping = Number.isFinite(inputs.shippingCostMXN) && inputs.shippingCostMXN > 0 ? inputs.shippingCostMXN : 0;
     const fixedCost = Number.isFinite(quote.fixedCostMXN) ? quote.fixedCostMXN || 0 : 0;
+    const adsPct = Number.isFinite(inputs.adsPct) && inputs.adsPct > 0 ? Math.min(inputs.adsPct, 99) : 0;
+    const adsCost = round2((price * adsPct) / 100);
 
     const commissionMin = round2((price * quote.pctMin) / 100);
     const commissionMax = round2((price * quote.pctMax) / 100);
     // Higher commission → lower payout: net bounds swap the commission bounds.
-    const netMin = round2(price - commissionMax - fixedCost - shipping);
-    const netMax = round2(price - commissionMin - fixedCost - shipping);
+    const netMin = round2(price - commissionMax - fixedCost - shipping - adsCost);
+    const netMax = round2(price - commissionMin - fixedCost - shipping - adsCost);
 
     const breakdown = {
       priceMXN: price,
@@ -98,6 +105,8 @@ globalThis.MST_CALC = (() => {
       commissionMaxMXN: commissionMax,
       fixedCostMXN: fixedCost,
       shippingCostMXN: shipping,
+      adsPct,
+      adsCostMXN: adsCost,
       netMinMXN: netMin,
       netMaxMXN: netMax,
       // Total MELI fees (commission + fixed charge, NOT shipping) as % of
@@ -215,6 +224,21 @@ globalThis.MST_CALC = (() => {
     return out;
   }
 
+  // Inverse of solveTargetPrice at a FIXED price: the most a unit may cost
+  // (landed, before shipping) so that selling at priceMXN still leaves
+  // marginPct of the price:  cost = P·(1 − rate − ads − margin) − fixed − shipping
+  // Rounded DOWN to the cent so the displayed cost always reaches the margin.
+  // Returns null for bad input or when nothing is left (the price cannot
+  // carry that margin even at a $0 cost).
+  const floor2 = (n) => Math.floor(n * 100 + 1e-6) / 100;
+  function solveMaxCost({ priceMXN, marginPct, ratePct, adsPct = 0, fixedCostMXN = 0, shippingMXN = 0 }) {
+    const nums = [priceMXN, marginPct, ratePct, adsPct, fixedCostMXN, shippingMXN];
+    if (!nums.every(Number.isFinite) || !(priceMXN > 0)) return null;
+    const keep = 1 - ratePct / 100 - Math.max(0, adsPct) / 100 - marginPct / 100;
+    const cost = floor2(priceMXN * keep - Math.max(0, fixedCostMXN) - Math.max(0, shippingMXN));
+    return cost > 0 ? cost : null;
+  }
+
   // Sweet-spot detector: fees are discontinuous (fixed-charge tiers at
   // $99/$150, charge disappears at $299), so a small price INCREASE can raise
   // the net payout. Scan thresholds within `maxIncreaseRatio` above the
@@ -274,6 +298,7 @@ globalThis.MST_CALC = (() => {
   return Object.freeze({
     computeBreakdown,
     solveTargetPrice,
+    solveMaxCost,
     findSweetSpot,
     computeWithholdings,
     msiCost,

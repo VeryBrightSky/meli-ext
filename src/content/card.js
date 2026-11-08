@@ -32,6 +32,8 @@ globalThis.MST_CARD = (() => {
     productCostMXN: 0,
     targetMarginPct: 0,
     salesPerMonth: 0,
+    // Mercado Ads spend as % of the price (PRO what-if, saved per product).
+    adsPct: 0,
     compareOpen: false,
     usesFull: false,
     showWithholdings: false,
@@ -241,7 +243,8 @@ globalThis.MST_CARD = (() => {
       for (const [name, value] of [
         ["cost", state.productCostMXN],
         ["sales", state.salesPerMonth],
-        ["weight", state.weightKg]
+        ["weight", state.weightKg],
+        ["ads", state.adsPct]
       ]) {
         const key = `${PREFIX}:${name}:${state.itemId}`;
         if (value > 0 || persistedKeys.has(key)) {
@@ -281,7 +284,8 @@ globalThis.MST_CARD = (() => {
         `${PREFIX}:catpick:${state.itemId}`,
         `${PREFIX}:sales:${state.itemId}`,
         `${PREFIX}:weight:${state.itemId}`,
-        `${PREFIX}:type:${state.itemId}`
+        `${PREFIX}:type:${state.itemId}`,
+        `${PREFIX}:ads:${state.itemId}`
       );
     }
     const [stored, settings] = await Promise.all([
@@ -323,6 +327,7 @@ globalThis.MST_CARD = (() => {
     state.targetMarginPct = CALC.parseMoney(defaults?.targetMarginPct ?? 0);
     state.productCostMXN = CALC.parseMoney(stored[`${PREFIX}:cost:${state.itemId}`] ?? 0);
     state.salesPerMonth = CALC.parseMoney(stored[`${PREFIX}:sales:${state.itemId}`] ?? 0);
+    state.adsPct = Math.min(CALC.parseMoney(stored[`${PREFIX}:ads:${state.itemId}`] ?? 0), 99);
     if (settings.defaultListingType !== "auto") {
       state.listingTypeId = settings.defaultListingType === "premium" ? "premium" : "classic";
     }
@@ -412,10 +417,16 @@ globalThis.MST_CARD = (() => {
     const b = CALC.computeBreakdown(quote, {
       priceMXN: state.priceMXN,
       shippingCostMXN: effectiveShipping,
-      productCostMXN: state.productCostMXN
+      productCostMXN: state.productCostMXN,
+      adsPct: effectiveAdsPct()
     });
     return { quote, b, effectiveShipping };
   }
+
+  // Ads only count while the input that sets them is on the card (PRO): a
+  // percentage saved during the trial must not keep lowering the free net
+  // from a field the seller can no longer see.
+  const effectiveAdsPct = () => (state.pro && state.adsPct > 0 ? state.adsPct : 0);
 
   function update(flash = true) {
     if (!refs.card) return;
@@ -438,10 +449,13 @@ globalThis.MST_CARD = (() => {
     refs.summaryNet.textContent = `${T("rowNet")} ${na}`;
     refs.summaryProfit.hidden = true;
     refs.summaryRetentions.hidden = true;
+    refs.summaryUpto.hidden = true;
     refs.proLine.hidden = true;
+    refs.stack.hidden = true;
     for (const node of [
       refs.profit?.root, refs.breakeven?.root, refs.target?.root, refs.targetTeaser?.root,
-      refs.msiTeaser?.root, refs.monthly?.root, refs.sweetspot, refs.compareBox, refs.msiBox
+      refs.msiTeaser?.root, refs.monthly?.root, refs.sweetspot, refs.compareBox, refs.msiBox,
+      refs.maxCost?.root, refs.ads?.root
     ]) {
       if (node) node.style.display = "none";
     }
@@ -691,8 +705,24 @@ globalThis.MST_CARD = (() => {
       refs.shippingSubsidy.value.textContent = ""; // never leave a stale percentage behind
     }
 
+    // Ads row (PRO what-if): only when a percentage is in effect.
+    refs.ads.root.style.display = b.adsCostMXN > 0 ? "" : "none";
+    if (b.adsCostMXN > 0) {
+      patchRow(refs.ads, T("rowAdsCost", [String(b.adsPct)]), fmtCharge(b.adsCostMXN), flash);
+    }
+
     patchRow(refs.net, null, fmtRange(b.netMinMXN, b.netMaxMXN), flash);
-    refs.summaryNet.textContent = T("summaryNet", [fmtRange(b.netMinMXN, b.netMaxMXN)]);
+    // Headline: one number. With an exact rate it is the number; with an
+    // unknown category it is the WORST case ("al menos"), and the best case
+    // goes on a small line under it. The range itself stays in the breakdown.
+    const ranged = b.netMinMXN !== b.netMaxMXN;
+    refs.summaryNet.textContent = ranged
+      ? T("summaryNetWorst", [fmtMoney(b.netMinMXN)])
+      : T("summaryNet", [fmtMoney(b.netMinMXN)]);
+    refs.summaryUpto.hidden = !ranged;
+    if (ranged) refs.summaryUpto.textContent = T("summaryUpto", [fmtMoney(b.netMaxMXN)]);
+    renderStack(quote, b, effectiveShipping);
+    renderCostChips();
     // Share only once there is a real number to share (a saved cost): a
     // "recommend the app" button on first sight is noise.
     if (refs.shareBtn) {
@@ -706,10 +736,23 @@ globalThis.MST_CARD = (() => {
     if (b.profitMinMXN !== undefined) {
       const losing = b.profitMaxMXN < 0;
       refs.summaryProfit.hidden = false;
-      refs.summaryProfit.textContent = losing
-        ? T("summaryLoss", [fmtRange(-b.profitMaxMXN, -b.profitMinMXN)])
-        : T("summaryProfit", [fmtRange(b.profitMinMXN, b.profitMaxMXN), fmtPctRange(b.marginMinPct, b.marginMaxPct)]);
-      refs.summaryProfit.dataset.tone = losing ? "loss" : "profit";
+      if (!ranged) {
+        refs.summaryProfit.textContent = losing
+          ? T("summaryLoss", [fmtMoney(-b.profitMinMXN)])
+          : T("summaryProfit", [fmtMoney(b.profitMinMXN), fmtPctRange(b.marginMinPct, b.marginMinPct)]);
+      } else if (losing) {
+        // Both bounds lose: the sure loss leads, the worst case follows.
+        refs.summaryProfit.textContent = T("summaryLossWorst", [fmtMoney(-b.profitMaxMXN)]);
+        refs.summaryUpto.textContent = T("summaryLossUpto", [fmtMoney(-b.profitMinMXN)]);
+      } else if (b.profitMinMXN < 0) {
+        // Worst case loses, best case gains: say the possible loss first.
+        refs.summaryProfit.textContent = T("summaryMixedWorst", [fmtMoney(-b.profitMinMXN)]);
+        refs.summaryUpto.textContent = T("summaryMixedUpto", [fmtMoney(b.profitMaxMXN)]);
+      } else {
+        refs.summaryProfit.textContent = T("summaryProfitWorst", [fmtMoney(b.profitMinMXN), String(b.marginMinPct)]);
+        refs.summaryUpto.textContent = T("summaryUpto", [fmtMoney(b.profitMaxMXN)]);
+      }
+      refs.summaryProfit.dataset.tone = losing || b.profitMinMXN < 0 ? "loss" : "profit";
     } else {
       refs.summaryProfit.hidden = false;
       refs.summaryProfit.textContent = T("summaryNoCost");
@@ -744,12 +787,13 @@ globalThis.MST_CARD = (() => {
       ...new Set([...SOURCE.getFixedCostThresholds(fullWeightKg()), ...SOURCE.getShippingThresholds()])
     ].sort((a, c) => a - c);
     const solveShipping = (p) => shipAt(p, { fallbackKg: state.weightKg > 0 ? state.weightKg : 0.3 });
+    // Ads are a % of the price, so they add to the rate the solver keeps.
     const solve = (ratePct, marginPct) =>
       CALC.solveTargetPrice({
         costMXN: state.productCostMXN,
         shippingMXN: 0,
         marginPct,
-        ratePct,
+        ratePct: ratePct + effectiveAdsPct(),
         fixedCostFn: (p) => fixedCostFn(p) + solveShipping(p),
         thresholds: solveThresholds,
         minPriceMXN: SOURCE.minPriceMXN ?? 0
@@ -803,10 +847,27 @@ globalThis.MST_CARD = (() => {
       // The target price is the feature the trial sells: it shows by default
       // at 30% (or the seller's own margin) as soon as a cost is entered.
       const margin = effectiveMargin();
-      refs.targetMarginRow.style.display = hasCost ? "" : "none";
+      // The margin and the max cost need no product cost: they are the PRO
+      // answer a seller gets before typing anything ("how much may I pay
+      // for this to make 30% at this price").
+      refs.targetMarginRow.style.display = "";
       const hasTarget = hasCost && margin > 0;
       refs.target.root.style.display = hasTarget ? "" : "none";
       refs.proLine.hidden = true;
+      refs.maxCost.root.style.display = margin > 0 ? "" : "none";
+      if (margin > 0) {
+        const maxCost = CALC.solveMaxCost({
+          priceMXN: state.priceMXN,
+          marginPct: margin,
+          ratePct: quote.pctMax,
+          adsPct: effectiveAdsPct(),
+          fixedCostMXN: b.fixedCostMXN,
+          shippingMXN: effectiveShipping
+        });
+        refs.maxCost.label.textContent = T("rowMaxCostFor", [String(margin)]);
+        patchRow(refs.maxCost, null, maxCost !== null ? fmtMoney(maxCost) : T("maxCostNone"), flash);
+        refs.maxCost.root.classList.toggle(`${PREFIX}-row--loss`, maxCost === null);
+      }
       if (hasTarget) {
         refs.target.label.textContent = T("rowTargetPriceFor", [String(margin)]);
         const lo = solve(quote.pctMin, margin);
@@ -884,6 +945,58 @@ globalThis.MST_CARD = (() => {
     }
   }
 
+  // The zero-cost fee stack under the headline: every charge at the page
+  // price as a hard number, and what an RFC seller is actually paid after
+  // the 2026 retentions. Hidden as soon as a cost is saved.
+  function renderStack(quote, b, effectiveShipping) {
+    const show = !(state.productCostMXN > 0);
+    refs.stack.hidden = !show;
+    if (!show) return;
+    const rows = refs.stackRows;
+    patchRow(rows.price, T("rowPrice"), fmtMoney(b.priceMXN), false);
+    patchRow(rows.commission, T("rowCommission", [fmtPctRange(b.pctMin, b.pctMax)]), fmtCharge(b.commissionMinMXN, b.commissionMaxMXN), false);
+    rows.fixed.root.style.display = b.fixedCostMXN > 0 ? "" : "none";
+    if (b.fixedCostMXN > 0) {
+      patchRow(rows.fixed, quote.isFullServiceCost ? T("rowServiceCost") : T("stackFixed"), fmtCharge(b.fixedCostMXN), false);
+    }
+    rows.shipping.root.style.display = effectiveShipping > 0 ? "" : "none";
+    if (effectiveShipping > 0) {
+      const kg = state.weightKg > 0 ? state.weightKg : 0.3;
+      patchRow(
+        rows.shipping,
+        state.shippingAutofilled ? T("stackShippingEstimate", [String(kg)]) : T("rowShipping"),
+        fmtCharge(effectiveShipping),
+        false
+      );
+    }
+    rows.ads.root.style.display = b.adsCostMXN > 0 ? "" : "none";
+    if (b.adsCostMXN > 0) patchRow(rows.ads, T("rowAdsCost", [String(b.adsPct)]), fmtCharge(b.adsCostMXN), false);
+    patchRow(rows.net, T("stackNet"), fmtRange(b.netMinMXN, b.netMaxMXN), false);
+    const w = CALC.computeWithholdings(b.priceMXN, SOURCE.withholdings);
+    patchRow(
+      rows.retentions,
+      T("stackRetentions"),
+      T("stackRetentionsValue", [fmtMoney(w.totalMXN), fmtRange(CALC.round2(b.netMinMXN - w.totalMXN), CALC.round2(b.netMaxMXN - w.totalMXN))]),
+      false
+    );
+  }
+
+  // Cost chips (40/50/60 % of the page price) show until a cost is saved.
+  function renderCostChips() {
+    if (!refs.chips) return;
+    const show = !(state.productCostMXN > 0) && state.pagePriceMXN > 0;
+    refs.chips.hidden = !show;
+    refs.costLabel.textContent = show ? T("costAsk") : T("rowProductCost");
+    if (!show) return;
+    for (const chip of refs.chipButtons) {
+      const pct = Number(chip.dataset.pct);
+      const v = CALC.round2((state.pagePriceMXN * pct) / 100);
+      const text = T("costChip", [String(pct), fmtMoney(v)]);
+      if (chip.textContent !== text) chip.textContent = text;
+      chip.setAttribute("aria-label", T("costChipAria", [fmtMoney(v)]));
+    }
+  }
+
   // --- Build (once per injection) -----------------------------------------------
 
   // Category picker + hint: above the fold (right under the cost) while the
@@ -934,20 +1047,38 @@ globalThis.MST_CARD = (() => {
     // Answer first: what the seller keeps, before any breakdown.
     refs.summary = el("div", `${PREFIX}-summary`);
     refs.summaryNet = el("div", `${PREFIX}-summary__net`, "");
+    // Best case on a small line when the headline is a worst case (unknown
+    // category), or the best-case profit once a cost is set.
+    refs.summaryUpto = el("div", `${PREFIX}-summary__upto`, "");
+    refs.summaryUpto.hidden = true;
     refs.summaryRetentions = el("div", `${PREFIX}-summary__retentions`, "");
     refs.summaryRetentions.hidden = true;
     refs.summaryProfit = el("div", `${PREFIX}-summary__profit`, "");
     refs.summaryProfit.hidden = true;
     refs.proLine = el("div", `${PREFIX}-summary__pro`, "");
     refs.proLine.hidden = true;
-    refs.summary.append(refs.summaryNet, refs.summaryRetentions, refs.summaryProfit, refs.proLine);
+    // Zero-typing value: while no cost is saved, the whole fee stack at the
+    // page price (commission, fixed charge, shipping, retentions) sits under
+    // the headline as hard numbers. Once a cost exists the profit lines take
+    // its place; the breakdown keeps every row.
+    refs.stack = el("div", `${PREFIX}-stack`);
+    refs.stack.hidden = true;
+    refs.stackRows = {};
+    for (const id of ["price", "commission", "fixed", "shipping", "ads", "net", "retentions"]) {
+      const r = buildRow("", id === "net" ? "stacktotal" : undefined);
+      r.root.classList.add(`${PREFIX}-stack__row`);
+      refs.stackRows[id] = r;
+      refs.stack.appendChild(r.root);
+    }
+    refs.summary.append(refs.summaryNet, refs.summaryUpto, refs.summaryRetentions, refs.summaryProfit, refs.proLine, refs.stack);
     body.appendChild(refs.summary);
 
     // Product cost: the one input that turns fees into profit, so it sits
     // right under the answer. Saving is confirmed for 2 s; the first saved
     // cost also starts the 7 PRO days (gate.startTrial).
     const costRow = el("div", `${PREFIX}-row ${PREFIX}-row--cost`);
-    costRow.appendChild(el("span", `${PREFIX}-row__label`, T("rowProductCost")));
+    refs.costLabel = el("span", `${PREFIX}-row__label`, T("rowProductCost"));
+    costRow.appendChild(refs.costLabel);
     refs.savedNote = el("div", `${PREFIX}-saved`, T("costSaved"));
     refs.savedNote.hidden = true;
     let savedTimer = null;
@@ -963,24 +1094,46 @@ globalThis.MST_CARD = (() => {
         globalThis.MST_GATE.startTrial().catch(() => {});
       }
     }, 1500);
+    // One path for a typed cost and a tapped chip: both save, confirm and
+    // start the trial the same way.
+    const applyCost = (v, { how }) => {
+      const changed = v !== state.productCostMXN;
+      state.productCostMXN = v;
+      update();
+      persistInputs();
+      if (v > 0) {
+        TRACK.once("first_cost_entered");
+        TRACK.count("cost_entries");
+        if (how === "chip") globalThis.MST_GATE.track("cost:chip"); // local funnel counter only
+        if (changed && state.itemId && SAFE.alive()) showSaved();
+        startTrialSoon();
+      }
+    };
     refs.costInput = moneyInput(
       () => state.productCostMXN,
-      (v) => {
-        const changed = v !== state.productCostMXN;
-        state.productCostMXN = v;
-        update();
-        persistInputs();
-        if (v > 0) {
-          TRACK.once("first_cost_entered");
-          TRACK.count("cost_entries");
-          if (changed && state.itemId && SAFE.alive()) showSaved();
-          startTrialSoon();
-        }
-      }
+      (v) => applyCost(v, { how: "typed" })
     );
     refs.costInput.addEventListener("blur", () => startTrialSoon.flush());
     refs.costInput.setAttribute("aria-label", T("inputProductCostAria"));
-    costRow.appendChild(refs.costInput);
+    // Cost chips: the first cost is one tap. 40 / 50 / 60 % of the page
+    // price, each showing the peso amount it stands for; hidden once a cost
+    // is saved (the input stays for a correction).
+    refs.chips = el("span", `${PREFIX}-chips`);
+    refs.chipButtons = [];
+    for (const pct of [40, 50, 60]) {
+      const chip = el("button", `${PREFIX}-chip`, "");
+      chip.type = "button";
+      chip.dataset.pct = String(pct);
+      chip.addEventListener("click", () => {
+        const v = CALC.round2((state.pagePriceMXN * pct) / 100);
+        if (!(v > 0)) return;
+        applyCost(v, { how: "chip" });
+        refs.costInput.syncFromState();
+      });
+      refs.chipButtons.push(chip);
+      refs.chips.appendChild(chip);
+    }
+    costRow.append(refs.chips, refs.costInput);
     body.appendChild(costRow);
     body.appendChild(refs.savedNote);
     // Category picker lands here when the category is unknown (see
@@ -1245,6 +1398,11 @@ globalThis.MST_CARD = (() => {
     refs.fixed = buildRow(T("rowFixedCost"));
     body.appendChild(refs.fixed.root);
 
+    // Mercado Ads (PRO what-if): shown only while a percentage is in effect.
+    refs.ads = buildRow(T("rowAdsCost", ["0"]));
+    refs.ads.root.style.display = "none";
+    body.appendChild(refs.ads.root);
+
     refs.effective = buildRow(T("rowEffectiveRate"));
     body.appendChild(refs.effective.root);
 
@@ -1473,6 +1631,29 @@ globalThis.MST_CARD = (() => {
       refs.target = buildRow(T("rowTargetPrice"), "total");
       body.appendChild(refs.target.root);
 
+      // Inverse of the target price: the most this unit may cost to make the
+      // margin AT THE PAGE PRICE. Needs no product cost.
+      refs.maxCost = buildRow(T("rowMaxCostFor", [String(DEFAULT_TEASER_MARGIN_PCT)]), "total");
+      refs.maxCost.root.classList.add(`${PREFIX}-row--maxcost`);
+      body.appendChild(refs.maxCost.root);
+
+      // Mercado Ads as % of the price (the seller's ACOS), saved per product
+      // and folded into net, profit, margin and every solved price.
+      const adsRow = el("div", `${PREFIX}-row`);
+      adsRow.appendChild(el("span", `${PREFIX}-row__label`, T("rowAds")));
+      refs.adsInput = moneyInput(
+        () => state.adsPct,
+        (v) => {
+          state.adsPct = Math.min(v, 99);
+          update();
+          persistInputs();
+        }
+      );
+      refs.adsInput.placeholder = "0";
+      refs.adsInput.setAttribute("aria-label", T("inputAdsAria"));
+      adsRow.appendChild(refs.adsInput);
+      body.appendChild(adsRow);
+
       // Local price history sparkline (only from this user's own visits).
       const histRow = el("div", `${PREFIX}-row ${PREFIX}-history`);
       histRow.style.display = "none";
@@ -1562,6 +1743,7 @@ globalThis.MST_CARD = (() => {
     const moveIntoDetails = [
       refs.commission?.root,
       refs.fixed?.root,
+      refs.ads?.root,
       refs.effective?.root,
       refs.weightSelect?.closest(`.${PREFIX}-row`),
       refs.fullToggle?.closest(`.${PREFIX}-row`),
@@ -1630,6 +1812,9 @@ globalThis.MST_CARD = (() => {
     if (b.fixedCostMXN > 0) {
       lines.push(`${T("rowFixedCost")}: ${fmtCharge(b.fixedCostMXN)}`);
     }
+    if (b.adsCostMXN > 0) {
+      lines.push(`${T("rowAdsCost", [String(b.adsPct)])}: ${fmtCharge(b.adsCostMXN)}`);
+    }
     lines.push(
       `${T("rowEffectiveRate")}: ${fmtPctRange(b.effectiveRateMinPct, b.effectiveRateMaxPct)}`
     );
@@ -1695,6 +1880,7 @@ globalThis.MST_CARD = (() => {
     state.categoryAutoDetected = false;
     state.productCostMXN = 0;
     state.salesPerMonth = 0;
+    state.adsPct = 0;
     state.compareOpen = false;
     state.weightKg = 0;
     state.msiOpen = false;
@@ -1761,6 +1947,7 @@ globalThis.MST_CARD = (() => {
       refs.costInput.syncFromState();
       refs.marginInput?.syncFromState();
       refs.salesInput?.syncFromState();
+      refs.adsInput?.syncFromState();
       refs.categorySelect.value = state.categoryGroupId ?? "";
       refs.weightSelect.value = state.weightKg > 0 ? String(state.weightKg) : "";
       refs.fullToggle.checked = state.usesFull;

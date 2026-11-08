@@ -186,7 +186,7 @@
     "message": "PRO te dice a qué precio vender para ganar el margen que quieres, cuánto te cuesta cada plazo de meses sin intereses y pinta en verde o rojo cada resultado de búsqueda. No necesitas cuenta para usar Netio; tus costos nunca salen de tu navegador."
   },
   "upsellPricing": {
-    "message": "$$89 MXN/mes (menos de $$3 al día) o $$699 MXN/año (ahorra 35%). Sin permanencia."
+    "message": "$$699 al año son $$369 menos que 12 meses a $$89. El mes sale en menos de $$3 al día. Sin permanencia."
   },
   "rowSales": {
     "message": "Ventas al mes"
@@ -315,10 +315,10 @@
     "message": "Ya incluido en la tabla ($1%)"
   },
   "upsellMonthly": {
-    "message": "Activar PRO · $$89 al mes"
+    "message": "$$89 al mes (menos de $$3 al día)"
   },
   "upsellYearly": {
-    "message": "$$699 al año (≈ $$58 al mes)"
+    "message": "Activar PRO · $$699 al año (ahorras $$369)"
   },
   "dashTotalsLabel": {
     "message": "Totales · productos: $1"
@@ -555,10 +555,10 @@
     "message": "La calculadora aparece debajo del precio con tu comisión, costo fijo, envío y ganancia."
   },
   "welcomeStep2": {
-    "message": "Escribe el costo de tu producto"
+    "message": "Toca o escribe el costo de tu producto"
   },
   "welcomeStep2Body": {
-    "message": "Con eso Netio te da el precio mínimo para no perder y el precio para ganar el margen que quieras."
+    "message": "Un toque en 40, 50 o 60% del precio basta. Con eso Netio te da el precio mínimo para no perder y el precio para ganar el margen que quieras."
   },
   "welcomeStep3": {
     "message": "Busca productos y mira el Radar"
@@ -609,7 +609,7 @@
     "message": "Pierdes $1 por venta"
   },
   "summaryNoCost": {
-    "message": "Escribe el costo de tu producto para ver tu ganancia."
+    "message": "Toca un costo abajo, o escribe el tuyo, para ver tu ganancia."
   },
   "breakdownToggle": {
     "message": "Ver desglose de cargos y envío"
@@ -754,5 +754,125 @@
   },
   "welcomeStep1Trial": {
     "message": "Tu prueba PRO de 7 días empieza cuando guardes tu primer costo."
+  },
+  "summaryNetWorst": {
+    "message": "Te quedan al menos $1 por venta"
+  },
+  "summaryUpto": {
+    "message": "hasta $1 según la categoría"
+  },
+  "summaryProfitWorst": {
+    "message": "Ganancia de al menos $1 ($2%)"
+  },
+  "summaryLossWorst": {
+    "message": "Pierdes al menos $1 por venta"
+  },
+  "summaryLossUpto": {
+    "message": "hasta $1 según la categoría"
+  },
+  "summaryMixedWorst": {
+    "message": "Puedes perder hasta $1 por venta"
+  },
+  "summaryMixedUpto": {
+    "message": "o ganar hasta $1 según la categoría"
+  },
+  "stackFixed": {
+    "message": "Costo fijo por unidad"
+  },
+  "stackShippingEstimate": {
+    "message": "Envío estimado (hasta $1 kg)"
+  },
+  "stackNet": {
+    "message": "Te queda"
+  },
+  "stackRetentions": {
+    "message": "Con RFC registrado (IVA 8% + ISR 2.5%)"
+  },
+  "stackRetentionsValue": {
+    "message": "−$1, te depositan $2"
+  },
+  "costAsk": {
+    "message": "¿Cuánto te cuesta?"
+  },
+  "costChip": {
+    "message": "$1% · $2"
+  },
+  "costChipAria": {
+    "message": "Usar $1 como costo del producto"
+  },
+  "rowAds": {
+    "message": "Publicidad (% del precio)"
+  },
+  "rowAdsCost": {
+    "message": "Publicidad ($1%)"
+  },
+  "inputAdsAria": {
+    "message": "Gasto en publicidad de Mercado Ads como porcentaje del precio"
+  },
+  "rowMaxCostFor": {
+    "message": "Costo máximo para ganar $1%"
+  },
+  "maxCostNone": {
+    "message": "A este precio no se alcanza ese margen"
+  },
+  "upsellLead_expiredOwn": {
+    "message": "Tu prueba PRO terminó: tus productos guardados ($1) se quedaron sin precio objetivo"
+  },
+  "upsellLead_expiredOwnOne": {
+    "message": "Tu prueba PRO terminó: tu producto guardado se quedó sin precio objetivo"
+  },
+  "upsellBody_expiredLoss": {
+    "message": "Tu peor producto, $1, pierde $2 por venta. PRO te vuelve a dar el precio para ganar 30% y el costo máximo en cada publicación."
+  },
+  "upsellBody_expiredThin": {
+    "message": "Tu peor producto, $1, deja solo $2 por venta. PRO te vuelve a dar el precio para ganar 30% y el costo máximo en cada publicación."
+  },
+  "upsellBody_expiredCount": {
+    "message": "Tus costos siguen guardados. PRO te vuelve a dar el precio objetivo, el costo máximo, el Radar y el Tablero."
+  },
+  "trialExpiredWorstLoss": {
+    "message": "Tu prueba PRO terminó. De tus productos guardados ($1), el peor, $2, pierde $3 por venta."
+  },
+  "trialExpiredWorstThin": {
+    "message": "Tu prueba PRO terminó. De tus productos guardados ($1), el peor, $2, deja solo $3 por venta."
+  },
+  "trialExpiredProducts": {
+    "message": "Tu prueba PRO terminó. Tus productos guardados ($1) siguen aquí, ya sin precio objetivo."
+  },
+  "trialExpiredProductsOne": {
+    "message": "Tu prueba PRO terminó. Tu producto guardado sigue aquí, ya sin precio objetivo."
+  },
+  "welcomeDemoTitle": {
+    "message": "Así se ve en una publicación"
+  },
+  "welcomeDemoCaption": {
+    "message": "Ejemplo real: publicación Clásica de $1 en $2, 0.3 kg, sin reputación, costo de $$250. Tarifas y tabla de envío oficiales."
+  },
+  "welcomeDemoPro": {
+    "message": "Con PRO, en la misma tarjeta"
+  },
+  "upsellBody_expiredOk": {
+    "message": "Tu producto con menos margen, $1, deja $2 por venta. PRO te vuelve a dar el precio para ganar 30% y el costo máximo en cada publicación."
+  },
+  "upsellBody_expiredLossOne": {
+    "message": "Tu producto guardado, $1, pierde $2 por venta. PRO te vuelve a dar el precio para ganar 30% y el costo máximo en cada publicación."
+  },
+  "upsellBody_expiredThinOne": {
+    "message": "Tu producto guardado, $1, deja solo $2 por venta. PRO te vuelve a dar el precio para ganar 30% y el costo máximo en cada publicación."
+  },
+  "upsellBody_expiredOkOne": {
+    "message": "Tu producto guardado, $1, deja $2 por venta. PRO te vuelve a dar el precio para ganar 30% y el costo máximo en cada publicación."
+  },
+  "trialExpiredWorstOk": {
+    "message": "Tu prueba PRO terminó. De tus productos guardados ($1), el de menos margen, $2, deja $3 por venta."
+  },
+  "trialExpiredWorstLossOne": {
+    "message": "Tu prueba PRO terminó. Tu producto guardado, $2, pierde $3 por venta."
+  },
+  "trialExpiredWorstThinOne": {
+    "message": "Tu prueba PRO terminó. Tu producto guardado, $2, deja solo $3 por venta."
+  },
+  "trialExpiredWorstOkOne": {
+    "message": "Tu prueba PRO terminó. Tu producto guardado, $2, deja $3 por venta."
   }
 }
