@@ -456,6 +456,83 @@ try {
       await linked.close();
       pass("search strips use the saved cost: $827 result shows $252.20 · 30.5% 'tu costo' like the card; no-id result keeps the assumption");
     }
+    // r5 (minor 2): the card's per-listing picks (Premium, 1 kg, a manual
+    // category) are saved per item like the cost; the strip for the same id
+    // must read them too, so its net, profit and margin are the card's:
+    // Premium herramientas 18 % = $148.86, 1 kg at $827 = $89.40 →
+    // net $588.74, profit $175.24, margin 21.19 % (thin).
+    {
+      await first.$$eval(".mst-toggle__btn", (btns) => btns.find((b) => b.textContent === "Premium").click());
+      await first.evaluate(() => {
+        const w = document.querySelector('select[aria-label="Peso (para estimar el envío)"]');
+        w.value = "1";
+        w.dispatchEvent(new Event("change", { bubbles: true }));
+        const c = document.querySelector('select[aria-label="Categoría"]');
+        c.value = "tools";
+        c.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+      await first.waitForFunction(() => (document.querySelector(".mst-summary__profit")?.textContent ?? "").includes("$175.24"), { timeout: 3000, polling: 50 });
+      const cardNet = await first.evaluate(rowValue("Recibes aprox."));
+      const cardProfit = await first.$eval(".mst-summary__profit", (e) => e.textContent);
+      assert.equal(cardNet, "$588.74", cardNet);
+      assert.equal(cardProfit, "Ganancia $175.24 · 21.19%", cardProfit);
+      // The picks are persisted per item (read from an extension page: the
+      // product page's main world has no chrome.storage).
+      await seed.waitForFunction(
+        async () => {
+          const s = await chrome.storage.local.get(["mst:type:MLM12345678", "mst:weight:MLM12345678", "mst:catpick:MLM12345678"]);
+          return s["mst:type:MLM12345678"] === "premium" && s["mst:weight:MLM12345678"] === 1 && s["mst:catpick:MLM12345678"] === "tools";
+        },
+        { timeout: 3000, polling: 100 }
+      );
+      const linked = await browser.newPage();
+      await linked.goto(`${SEARCH_URL}?linked`, { waitUntil: "load" });
+      await linked.waitForFunction(() => document.querySelectorAll(".mst-strip").length === 3, { timeout: 20000, polling: 100 });
+      const strip = await linked.$eval(".mst-strip", (e) => ({
+        id: e.dataset.itemId ?? null,
+        saved: e.dataset.savedCost ?? null,
+        bucket: e.dataset.bucket,
+        profit: e.querySelector(".mst-strip__verdict b")?.textContent ?? null,
+        margin: e.querySelector(".mst-strip__margin")?.textContent ?? null,
+        basis: e.querySelector(".mst-strip__assumed")?.textContent ?? null
+      }));
+      assert.deepEqual(strip, { id: "MLM12345678", saved: "413.5", bucket: "thin", profit: "$175.24", margin: "21.19%", basis: "tu costo" }, JSON.stringify(strip));
+      assert.equal(`Ganancia ${strip.profit} · ${strip.margin}`, cardProfit, "strip profit/margin = card profit/margin");
+      await linked.click(".mst-strip__bar");
+      await linked.waitForFunction(() => !document.querySelector(".mst-strip__panel").hidden, { timeout: 2000 });
+      const rows = await linked.$eval(".mst-strip__panel", (p) =>
+        Object.fromEntries([...p.querySelectorAll(".mst-strip__row")].map((r) => [r.querySelector(".mst-strip__label").textContent, r.querySelector(".mst-strip__value").textContent]))
+      );
+      assert.equal(rows["Tipo (estimado)"], "Premium", JSON.stringify(rows));
+      assert.equal(rows["Categoría"], "Herramientas", JSON.stringify(rows));
+      assert.equal(rows["Comisión (18%)"], "−$148.86", JSON.stringify(rows));
+      assert.equal(rows["Envío estimado (hasta 1 kg)"], "−$89.40", JSON.stringify(rows));
+      assert.equal(rows["Recibes aprox."], cardNet, JSON.stringify(rows));
+      assert.equal(rows["Ganancia (tu costo: $413.50)"], "$175.24", JSON.stringify(rows));
+      // The second result has no picks saved: still the page guess, the
+      // breadcrumb category and the 0.3 kg bracket.
+      const second = await linked.$$eval(".mst-strip", (els) => {
+        const e = els[1];
+        e.querySelector(".mst-strip__bar").click();
+        return Object.fromEntries([...e.querySelectorAll(".mst-strip__row")].map((r) => [r.querySelector(".mst-strip__label").textContent, r.querySelector(".mst-strip__value").textContent]));
+      });
+      assert.equal(second["Categoría"], "Tecnología y electrónica", JSON.stringify(second));
+      assert.equal(Object.keys(second).some((k) => k.includes("hasta 1 kg")), false, JSON.stringify(second));
+      await linked.close();
+      // Back to the card's defaults so the phases below see the r4 numbers.
+      await first.$$eval(".mst-toggle__btn", (btns) => btns.find((b) => b.textContent === "Clásica").click());
+      await first.evaluate(() => {
+        const w = document.querySelector('select[aria-label="Peso (para estimar el envío)"]');
+        w.value = "";
+        w.dispatchEvent(new Event("change", { bubbles: true }));
+        const c = document.querySelector('select[aria-label="Categoría"]');
+        c.value = "tech";
+        c.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+      await first.waitForFunction(() => (document.querySelector(".mst-summary__profit")?.textContent ?? "").includes("$252.20"), { timeout: 3000, polling: 50 });
+      await seed.evaluate(async () => chrome.storage.local.remove(["mst:type:MLM12345678", "mst:weight:MLM12345678", "mst:catpick:MLM12345678"]));
+      pass("per-item picks reach the strip: Premium + 1 kg + Herramientas on the card → the same result's strip shows $588.74 net, $175.24 · 21.19% like the card");
+    }
     // r3 (major 7): the banner button opens the plan panel (yearly first,
     // "ahorras $369"; monthly "$89 al mes (menos de $3 al día)"), never a
     // bare "$89/mes" checkout.
