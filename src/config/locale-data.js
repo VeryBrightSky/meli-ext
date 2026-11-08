@@ -285,7 +285,15 @@ globalThis.MST_MESSAGES = Object.freeze({
     "trialExpiredProductsOne": "Tu prueba PRO terminó. Tu producto guardado sigue aquí, ya sin precio objetivo.",
     "welcomeDemoTitle": "Así se ve en una publicación",
     "welcomeDemoCaption": "Ejemplo real: publicación Clásica de $1 en $2, 0.3 kg, sin reputación, costo de $$250. Tarifas y tabla de envío oficiales.",
-    "welcomeDemoPro": "Con PRO, en la misma tarjeta"
+    "welcomeDemoPro": "Con PRO, en la misma tarjeta",
+    "upsellBody_expiredOk": "Tu producto con menos margen, $1, deja $2 por venta. PRO te vuelve a dar el precio para ganar 30% y el costo máximo en cada publicación.",
+    "upsellBody_expiredLossOne": "Tu producto guardado, $1, pierde $2 por venta. PRO te vuelve a dar el precio para ganar 30% y el costo máximo en cada publicación.",
+    "upsellBody_expiredThinOne": "Tu producto guardado, $1, deja solo $2 por venta. PRO te vuelve a dar el precio para ganar 30% y el costo máximo en cada publicación.",
+    "upsellBody_expiredOkOne": "Tu producto guardado, $1, deja $2 por venta. PRO te vuelve a dar el precio para ganar 30% y el costo máximo en cada publicación.",
+    "trialExpiredWorstOk": "Tu prueba PRO terminó. De tus productos guardados ($1), el de menos margen, $2, deja $3 por venta.",
+    "trialExpiredWorstLossOne": "Tu prueba PRO terminó. Tu producto guardado, $2, pierde $3 por venta.",
+    "trialExpiredWorstThinOne": "Tu prueba PRO terminó. Tu producto guardado, $2, deja solo $3 por venta.",
+    "trialExpiredWorstOkOne": "Tu prueba PRO terminó. Tu producto guardado, $2, deja $3 por venta."
   },
   "en": {
     "cardTitle": "Profit calculator",
@@ -571,6 +579,14 @@ globalThis.MST_MESSAGES = Object.freeze({
     "trialExpiredProductsOne": "Your PRO trial ended. Your saved product is still here, now without a target price.",
     "welcomeDemoTitle": "This is what it looks like on a listing",
     "welcomeDemoCaption": "Real example: a $1 Clásica listing in $2, 0.3 kg, no reputation, $$250 cost. Official fees and shipping table.",
-    "welcomeDemoPro": "With PRO, on the same card"
+    "welcomeDemoPro": "With PRO, on the same card",
+    "upsellBody_expiredOk": "Your lowest-margin product, $1, leaves $2 per sale. PRO gives you back the price for 30% and the max cost on every listing.",
+    "upsellBody_expiredLossOne": "Your saved product, $1, loses $2 per sale. PRO gives you back the price for 30% and the max cost on every listing.",
+    "upsellBody_expiredThinOne": "Your saved product, $1, leaves only $2 per sale. PRO gives you back the price for 30% and the max cost on every listing.",
+    "upsellBody_expiredOkOne": "Your saved product, $1, leaves $2 per sale. PRO gives you back the price for 30% and the max cost on every listing.",
+    "trialExpiredWorstOk": "Your PRO trial ended. Of your saved products ($1), the lowest margin, $2, leaves $3 per sale.",
+    "trialExpiredWorstLossOne": "Your PRO trial ended. Your saved product, $2, loses $3 per sale.",
+    "trialExpiredWorstThinOne": "Your PRO trial ended. Your saved product, $2, leaves only $3 per sale.",
+    "trialExpiredWorstOkOne": "Your PRO trial ended. Your saved product, $2, leaves $3 per sale."
   }
 });

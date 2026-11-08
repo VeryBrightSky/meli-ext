@@ -1129,7 +1129,6 @@ globalThis.MST_CARD = (() => {
         if (!(v > 0)) return;
         applyCost(v, { how: "chip" });
         refs.costInput.syncFromState();
-        startTrialSoon.flush();
       });
       refs.chipButtons.push(chip);
       refs.chips.appendChild(chip);

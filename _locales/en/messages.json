@@ -850,5 +850,29 @@
   },
   "welcomeDemoPro": {
     "message": "With PRO, on the same card"
+  },
+  "upsellBody_expiredOk": {
+    "message": "Your lowest-margin product, $1, leaves $2 per sale. PRO gives you back the price for 30% and the max cost on every listing."
+  },
+  "upsellBody_expiredLossOne": {
+    "message": "Your saved product, $1, loses $2 per sale. PRO gives you back the price for 30% and the max cost on every listing."
+  },
+  "upsellBody_expiredThinOne": {
+    "message": "Your saved product, $1, leaves only $2 per sale. PRO gives you back the price for 30% and the max cost on every listing."
+  },
+  "upsellBody_expiredOkOne": {
+    "message": "Your saved product, $1, leaves $2 per sale. PRO gives you back the price for 30% and the max cost on every listing."
+  },
+  "trialExpiredWorstOk": {
+    "message": "Your PRO trial ended. Of your saved products ($1), the lowest margin, $2, leaves $3 per sale."
+  },
+  "trialExpiredWorstLossOne": {
+    "message": "Your PRO trial ended. Your saved product, $2, loses $3 per sale."
+  },
+  "trialExpiredWorstThinOne": {
+    "message": "Your PRO trial ended. Your saved product, $2, leaves only $3 per sale."
+  },
+  "trialExpiredWorstOkOne": {
+    "message": "Your PRO trial ended. Your saved product, $2, leaves $3 per sale."
   }
 }

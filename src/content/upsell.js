@@ -117,9 +117,9 @@ globalThis.MST_UPSELL = (() => {
     const expiredText = async () => {
       const own = await expiredOwnVars().catch(() => null);
       if (!own || panel.hidden || panel.dataset.reason !== "expired") return;
-      lead.textContent = own.count === 1 ? T("upsellLead_expiredOwnOne") : T("upsellLead_expiredOwn", [String(own.count)]);
+      lead.textContent = own.one ? T("upsellLead_expiredOwnOne") : T("upsellLead_expiredOwn", [String(own.count)]);
       body.textContent = own.worst
-        ? T(own.worst.loss ? "upsellBody_expiredLoss" : "upsellBody_expiredThin", [own.worst.title, own.worst.amount])
+        ? T(`upsellBody_expired${own.worst.tone}${own.one}`, [own.worst.title, own.worst.amount])
         : T("upsellBody_expiredCount");
     };
     const open = (reason = "generic", vars = []) => {
@@ -227,7 +227,7 @@ globalThis.MST_UPSELL = (() => {
     rows.sort((a, b) => a.b.profitMinMXN - b.b.profitMinMXN);
     const w = rows[0];
     const title = String(w.meta.title || w.itemId).slice(0, 60);
-    return { title, profitMinMXN: w.b.profitMinMXN };
+    return { title, profitMinMXN: w.b.profitMinMXN, marginMinPct: w.b.marginMinPct };
   }
 
   // Saved products and the worst one, for the expired-trial copy.
@@ -236,10 +236,10 @@ globalThis.MST_UPSELL = (() => {
     const count = Object.keys(all ?? {}).filter((k) => k.startsWith(`${PREFIX}:cost:`) && Number(all[k]) > 0).length;
     if (!count) return null;
     const w = await worstSavedProduct();
-    const worst = w
-      ? { title: w.title, amount: globalThis.MST_UI.fmtMoney(Math.abs(w.profitMinMXN)), loss: w.profitMinMXN < 0 }
-      : null;
-    return { count, worst };
+    // tone: Loss (red), Thin (under 10% margin) or Ok, for the copy key.
+    const tone = !w ? null : w.profitMinMXN < 0 ? "Loss" : w.marginMinPct < 10 ? "Thin" : "Ok";
+    const worst = w ? { title: w.title, amount: globalThis.MST_UI.fmtMoney(Math.abs(w.profitMinMXN)), tone } : null;
+    return { count, worst, one: count === 1 ? "One" : "" };
   }
 
   // Trial banner (top of card): countdown while active, win-back after expiry.
@@ -314,7 +314,7 @@ globalThis.MST_UPSELL = (() => {
       expiredOwnVars().then((own) => {
         if (!own) return;
         if (own.worst) {
-          text.textContent = T(own.worst.loss ? "trialExpiredWorstLoss" : "trialExpiredWorstThin", [String(own.count), own.worst.title, own.worst.amount]);
+          text.textContent = T(`trialExpiredWorst${own.worst.tone}${own.one}`, [String(own.count), own.worst.title, own.worst.amount]);
         } else {
           text.textContent = own.count === 1 ? T("trialExpiredProductsOne") : T("trialExpiredProducts", [String(own.count)]);
         }

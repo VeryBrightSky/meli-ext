@@ -850,5 +850,29 @@
   },
   "welcomeDemoPro": {
     "message": "Con PRO, en la misma tarjeta"
+  },
+  "upsellBody_expiredOk": {
+    "message": "Tu producto con menos margen, $1, deja $2 por venta. PRO te vuelve a dar el precio para ganar 30% y el costo máximo en cada publicación."
+  },
+  "upsellBody_expiredLossOne": {
+    "message": "Tu producto guardado, $1, pierde $2 por venta. PRO te vuelve a dar el precio para ganar 30% y el costo máximo en cada publicación."
+  },
+  "upsellBody_expiredThinOne": {
+    "message": "Tu producto guardado, $1, deja solo $2 por venta. PRO te vuelve a dar el precio para ganar 30% y el costo máximo en cada publicación."
+  },
+  "upsellBody_expiredOkOne": {
+    "message": "Tu producto guardado, $1, deja $2 por venta. PRO te vuelve a dar el precio para ganar 30% y el costo máximo en cada publicación."
+  },
+  "trialExpiredWorstOk": {
+    "message": "Tu prueba PRO terminó. De tus productos guardados ($1), el de menos margen, $2, deja $3 por venta."
+  },
+  "trialExpiredWorstLossOne": {
+    "message": "Tu prueba PRO terminó. Tu producto guardado, $2, pierde $3 por venta."
+  },
+  "trialExpiredWorstThinOne": {
+    "message": "Tu prueba PRO terminó. Tu producto guardado, $2, deja solo $3 por venta."
+  },
+  "trialExpiredWorstOkOne": {
+    "message": "Tu prueba PRO terminó. Tu producto guardado, $2, deja $3 por venta."
   }
 }
