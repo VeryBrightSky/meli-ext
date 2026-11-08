@@ -23,9 +23,8 @@ for (const c of CASES) {
   const matchExt = e.shippingMXN === w.shippingMXN && e.netMinMXN === w.netMinMXN;
   let note = c.note;
   if (!matchExt) {
-    if (e.shippingMXN === null) note += " | extension: weight above its 30 kg table (null); web uses the official row";
-    else if (c.in.priceMXN >= 299) note += ` | extension applies an extra ${c.in.reputation === "verde" ? "50" : c.in.reputation === "amarilla" ? "40" : "0"}% subsidy on top of a value that already includes the discount, and ignores the $499+/$999+ price bands: ${e.shippingMXN} vs official ${w.shippingMXN}`;
-    else note += ` | extension's single table is the verde column; for ${c.in.reputation} the official optional column is ${w.shippingMXN}`;
+    if (e.shippingMXN === null) note += " | extension: weight outside its table (null); web uses the official row";
+    else note += ` | extension shipping ${e.shippingMXN} vs official ${w.shippingMXN}`;
   }
   rows.push([c.id, inputs, webR, extR, offR, matchOff ? "yes" : "NO", matchExt ? "yes" : "NO", note]);
 }

@@ -6,7 +6,7 @@
     "message": "Estimado"
   },
   "badgeTooltip": {
-    "message": "Estimación basada en las tarifas publicadas por Mercado Libre (consultadas el $1). El porcentaje exacto depende de tu categoría y cuenta. No incluye las retenciones de IVA e ISR ni el costo real de Mercado Envíos, que varía según tu reputación."
+    "message": "Estimación basada en las tarifas publicadas por Mercado Libre (consultadas el $1). El porcentaje exacto depende de tu categoría y cuenta. No incluye las retenciones de IVA e ISR; el envío estimado sale de la tabla oficial de tu reputación y puede variar con el peso volumétrico."
   },
   "rowPrice": {
     "message": "Precio de venta"
@@ -309,7 +309,10 @@
     "message": "Ofrezco envío gratis"
   },
   "rowShippingSubsidy": {
-    "message": "Descuento por reputación (est.)"
+    "message": "Descuento por reputación"
+  },
+  "shippingDiscountIncluded": {
+    "message": "Ya incluido en la tabla ($1%)"
   },
   "upsellMonthly": {
     "message": "Activar PRO · $$89 al mes"
@@ -693,7 +696,7 @@
     "message": "Pegar y activar"
   },
   "dashShippingNoteEstimate": {
-    "message": "Envío: estimado por peso de Mercado Envíos (0.3 kg si no elegiste peso). Cifras estimadas."
+    "message": "Envío: estimado con la tabla oficial de Mercado Envíos según peso, precio y reputación (0.3 kg si no elegiste peso). Cifras estimadas."
   },
   "shippingEstimateTag": {
     "message": "est."
