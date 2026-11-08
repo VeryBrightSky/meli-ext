@@ -884,15 +884,29 @@ globalThis.MST_CARD = (() => {
         refs.maxCost.root.classList.toggle(`${PREFIX}-row--loss`, maxCost === null);
       }
       if (hasTarget) {
-        refs.target.label.textContent = T("rowTargetPriceFor", [String(margin)]);
         const lo = solve(quote.pctMin, margin);
         const hi = solve(quote.pctMax, margin);
-        patchRow(
-          refs.target,
-          null,
-          lo !== null && hi !== null ? fmtRange(lo, hi) : T("targetUnreachable"),
-          flash
-        );
+        // r4: one proposed price per card, never a price below the current
+        // one for a lower margin. When the current worst-case margin already
+        // meets the target, the bold row says so at the current price ("Ya
+        // ganas 30.5% a este precio: $827.00"); the max-cost row under it
+        // keeps the target's number, and the PRO line below the summary is
+        // the only place that proposes a (higher) price.
+        const currentMargin = b.marginMinPct ?? 0;
+        const targetMet = currentMargin >= margin;
+        refs.target.root.classList.toggle(`${PREFIX}-row--met`, targetMet);
+        if (targetMet) {
+          refs.target.label.textContent = T("rowTargetMet", [String(currentMargin)]);
+          patchRow(refs.target, null, fmtMoney(state.priceMXN), flash);
+        } else {
+          refs.target.label.textContent = T("rowTargetPriceFor", [String(margin)]);
+          patchRow(
+            refs.target,
+            null,
+            lo !== null && hi !== null ? fmtRange(lo, hi) : T("targetUnreachable"),
+            flash
+          );
+        }
         // One short line under the summary so the seller sees what PRO just
         // did for this listing (worst-case price for the margin in effect).
         // r3: never recommend a LOWER price for a margin the seller already
@@ -900,8 +914,7 @@ globalThis.MST_CARD = (() => {
         // the line points up instead: the price for 10 more points, or, if
         // no price reaches that, the most this unit may cost at the current
         // price for the target margin.
-        const currentMargin = b.marginMinPct ?? 0;
-        if (currentMargin >= margin) {
+        if (targetMet) {
           const upMargin = Math.min(99, Math.ceil(currentMargin + 10));
           const up = upMargin > currentMargin ? solve(quote.pctMax, upMargin) : null;
           if (up !== null && up > state.priceMXN) {

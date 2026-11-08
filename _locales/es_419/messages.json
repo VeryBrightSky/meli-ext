@@ -614,6 +614,9 @@
   "shareTextProfit": {
     "message": "Mira esto: en una publicación de $1 en Mercado Libre, después de comisión, costo fijo y envío, la ganancia real queda en $2. Lo calculé con Netio, una extensión gratis de Chrome que lo muestra en cada publicación: $3"
   },
+  "rowTargetMet": {
+    "message": "Ya ganas $1% a este precio"
+  },
   "rowTargetPriceFor": {
     "message": "Precio para ganar $1%"
   },

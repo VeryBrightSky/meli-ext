@@ -373,6 +373,12 @@ try {
     // line must not point at a LOWER price ($820.17 for 30 %): it names the
     // price for 10 more points instead (41 %: $1,004.29).
     assert.equal(proLine.text, "PRO: a $1,004.29 ganas el 41%");
+    // r4 (minor b): the bold target row must not contradict that line with a
+    // LOWER price ($820.17 for 30 %): it states the margin already met at
+    // the current price, and the max-cost row under it keeps the target.
+    assert.equal(await first.evaluate(rowValue("Ya ganas 30.5% a este precio")), "$827.00");
+    assert.equal(await first.evaluate(rowValue("Precio para ganar 30%")), null, "no lower price proposed anywhere on the card");
+    assert.equal(await first.$eval("#mst-card-root", (c) => c.textContent.includes("$820.17")), false, "$820.17 (30% at a lower price) is nowhere on the card");
     assert.equal(await first.$eval(".mst-share", (a) => a.hidden), false, "share shown once a cost is saved");
     // 665.70 − 413.50 = 252.20 → 30.49 % of 827
     assert.equal(await first.$eval(".mst-summary__profit", (e) => e.textContent), "Ganancia $252.20 · 30.5%");

@@ -614,6 +614,9 @@
   "shareTextProfit": {
     "message": "Check this: on a $1 Mercado Libre listing, after commission, fixed fee and shipping, the real profit is $2. Calculated with Netio, a free Chrome extension that shows it on every listing: $3"
   },
+  "rowTargetMet": {
+    "message": "You already earn $1% at this price"
+  },
   "rowTargetPriceFor": {
     "message": "Price to earn $1%"
   },
