@@ -17,3 +17,9 @@ Notas
 - Caducidad: mientras la app de consentimiento esté en estado "Prueba" (tipo Externo), Google caduca los refresh tokens a los 7 días. Para que dure, en la pantalla de consentimiento pulsa "Publicar la app": el scope de Chrome Web Store no exige verificación, solo muestra una advertencia de app no verificada que aceptas una vez al correr el paso 5. Si el token caduca, vuelve a correr el paso 5.
 - La API sube el zip y envía a revisión. La ficha (descripción, capturas, mosaico) y la pestaña Privacidad siguen siendo manuales: ver `README.txt` dentro de la carpeta de release.
 - Variables que lee `scripts/cws-publish.mjs`: `CWS_CLIENT_ID`, `CWS_CLIENT_SECRET`, `CWS_REFRESH_TOKEN`, `CWS_EXTENSION_ID` (por defecto `bjhikillfgbpblogloljjhejogfeajac`). El entorno gana sobre `.cws.env`, así que también sirve en CI como secretos.
+
+## Nota: proxy HTTPS
+
+Si el entorno sale a internet por un proxy (variable `HTTPS_PROXY`), ejecuta con `NODE_USE_ENV_PROXY=1` (ya incluido en `npm run release:publish`) y, si el proxy firma TLS con su propia CA, también `NODE_EXTRA_CA_CERTS=<ruta al bundle>`. Sin eso, `fetch` de Node ignora el proxy y falla con "fetch failed".
+
+Estado: configurado el 2026-11-08 con el proyecto `netio-cws` y el cliente OAuth "Netio release web" (redirect https://netiox.netlify.app/gracias.html). El `.cws.env` vive fuera de git.

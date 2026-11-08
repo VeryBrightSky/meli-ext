@@ -8,6 +8,10 @@
 //   CWS_CLIENT_ID, CWS_CLIENT_SECRET, CWS_REFRESH_TOKEN
 //   CWS_EXTENSION_ID (default bjhikillfgbpblogloljjhejogfeajac)
 //
+//
+// Behind an HTTPS proxy (HTTPS_PROXY set): run with NODE_USE_ENV_PROXY=1 and,
+// if the proxy re-signs TLS, NODE_EXTRA_CA_CERTS=<its CA bundle>; Node's fetch
+// ignores the proxy variables otherwise and fails with "fetch failed".
 // Exit codes: 0 uploaded and submitted; 1 configuration, upload or publish
 // problem (the API responses are printed as received).
 import { existsSync, readFileSync } from "node:fs";
