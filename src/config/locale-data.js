@@ -317,7 +317,7 @@ globalThis.MST_MESSAGES = Object.freeze({
     "rowCommission": "Sale commission ($1)",
     "rowFixedCost": "Fixed fee per unit (price < $$299)",
     "rowShipping": "Your shipping cost",
-    "rowShippingFree": "Your shipping cost (from $$299 you pay it)",
+    "rowShippingFree": "Your shipping cost (you pay it from $$299)",
     "rowNet": "You receive approx.",
     "rowProductCost": "Product cost",
     "rowProfit": "Profit",

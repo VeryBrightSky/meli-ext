@@ -42,7 +42,7 @@
     "message": "Your shipping cost"
   },
   "rowShippingFree": {
-    "message": "Your shipping cost (from $$299 you pay it)"
+    "message": "Your shipping cost (you pay it from $$299)"
   },
   "rowNet": {
     "message": "You receive approx."
